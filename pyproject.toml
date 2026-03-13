@@ -1,0 +1,6 @@
+[project]
+name = "wediga-dev"
+version = "0.1.0"
+description = "Personal landing page with role-based access control"
+requires-python = ">=3.12"
+dependencies = []
