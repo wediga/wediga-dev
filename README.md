@@ -49,6 +49,7 @@ wediga.dev/... (PROTECTED - Role B)
 - **Jinja2** for server-side template rendering
 - **Starlette Sessions** for authentication
 - **Tailwind CSS** (via CDN) for styling
+- **Docker** for containerization and deployment
 
 ---
 
@@ -63,6 +64,8 @@ wediga-dev/
 ├── content/             # Personal content (NOT in Git)
 ├── content.example/     # Content templates (in Git)
 ├── .env                 # Secrets (NOT in Git)
+├── Dockerfile
+├── compose.yaml
 └── pyproject.toml
 ```
 
@@ -81,6 +84,14 @@ cp .env.example .env
 # Edit .env and content/ with your data
 uv run uvicorn main:app --reload
 ```
+
+### Docker
+
+```bash
+docker compose up --build
+```
+
+Content and static files are mounted as volumes, so they can be updated without rebuilding the image.
 
 ---
 
