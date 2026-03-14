@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Example Project",
+    "tagline": "Short description of what it does",
+    "problem": "What problem does it solve?",
+    "solution": "How does it solve it?",
+    "learning": "What did you learn?",
+    "tech_stack": ["Python", "FastAPI"],
+    "links": {
+      "demo": "https://example.com",
+      "github": "https://github.com/..."
+    }
+  }
+]

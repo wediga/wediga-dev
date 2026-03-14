@@ -1,0 +1,10 @@
+{
+  "name": "Your Name",
+  "email": "your@email.com",
+  "github": "https://github.com/...",
+  "linkedin": "https://linkedin.com/in/...",
+  "address": {
+    "street": "Street and Number",
+    "city": "ZIP City"
+  }
+}
