@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Impressum – wediga.dev{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-6 py-16">
+
+    <div class="mb-16 animate-fade-up delay-1">
+        <h1 class="font-display text-4xl font-semibold tracking-wide text-parchment-100 mb-2">Impressum</h1>
+        <div class="glow-line w-32 mt-4"></div>
+    </div>
+
+    <div class="animate-fade-up delay-2 space-y-6 text-parchment-200/90">
+
+        <div>
+            <h2 class="font-display text-sm tracking-wider text-amber-500 uppercase mb-3">Angaben gemäß § 5 TMG</h2>
+            <p class="text-lg">{{ impressum.name }}</p>
+            {% if logged_in and impressum.address %}
+            <p class="text-parchment-300 mt-1">{{ impressum.address.street }}</p>
+            <p class="text-parchment-300">{{ impressum.address.city }}</p>
+            {% endif %}
+        </div>
+
+        <div>
+            <h2 class="font-display text-sm tracking-wider text-amber-500 uppercase mb-3">Kontakt</h2>
+            <p><a href="mailto:{{ impressum.email }}" class="link-glow text-parchment-300">{{ impressum.email }}</a></p>
+            <p class="mt-1"><a href="{{ impressum.github }}" target="_blank" class="link-glow text-parchment-300">GitHub</a></p>
+            <p class="mt-1"><a href="{{ impressum.linkedin }}" target="_blank" class="link-glow text-parchment-300">LinkedIn</a></p>
+        </div>
+
+    </div>
+
+    <div class="animate-fade-up delay-3 mt-12">
+        <a href="javascript:history.back()" class="link-glow text-parchment-400 text-xs tracking-wider uppercase">Zurück</a>
+    </div>
+
+</div>
+{% endblock %}

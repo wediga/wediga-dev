@@ -24,3 +24,8 @@ def load_skills():
 def load_contact():
     with open(CONTENT_DIR / "contact.json", 'r') as f:
         return json.load(f)
+
+
+def load_impressum():
+    with open(CONTENT_DIR / "impressum.json", 'r') as f:
+        return json.load(f)

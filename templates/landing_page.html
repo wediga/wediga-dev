@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}wediga.dev{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-screen px-6">
+
+    <!-- Profile Image -->
+    <div class="animate-fade-up delay-1 mb-8">
+        <div class="relative group">
+            <div class="absolute -inset-1 bg-gradient-to-br from-amber-600/30 to-transparent rounded-full blur-md group-hover:from-amber-500/40 transition-all duration-700"></div>
+            <img src="/static/Alexander_Wedig.jpg" alt="Alexander Wedig"
+                 class="relative w-36 h-36 rounded-full object-cover border-2 border-amber-700/40 grayscale-[30%] hover:grayscale-0 transition-all duration-700">
+        </div>
+    </div>
+
+    <!-- Name -->
+    <h1 class="animate-fade-up delay-2 font-display text-5xl md:text-6xl font-semibold tracking-wide text-parchment-100 mb-3">
+        Alexander Wedig
+    </h1>
+
+    <!-- Subtitle -->
+    <p class="animate-fade-up delay-3 font-body text-lg text-parchment-300 tracking-widest uppercase mb-10">
+        Softwareentwickler aus Berlin
+    </p>
+
+    <!-- Decorative Line -->
+    <div class="animate-fade-up delay-3 glow-line w-48 mb-10"></div>
+
+    <!-- Links -->
+    <div class="animate-fade-up delay-4 flex items-center gap-8 mb-12">
+        <a href="https://github.com/wediga" target="_blank" class="link-glow text-parchment-300 text-sm tracking-wider uppercase font-medium">
+            GitHub
+        </a>
+        <span class="text-amber-700/40 text-xs">&#9670;</span>
+        <a href="https://www.linkedin.com/in/alexander-wedig-b06aa2349/" target="_blank" class="link-glow text-parchment-300 text-sm tracking-wider uppercase font-medium">
+            LinkedIn
+        </a>
+    </div>
+
+    <!-- Login Button -->
+    <div class="animate-fade-up delay-5">
+        <a href="/login" class="group relative inline-flex items-center gap-2 border border-amber-700/40 text-parchment-200 px-8 py-3 text-sm tracking-widest uppercase font-medium hover:border-amber-500/60 hover:text-amber-400 transition-all duration-300">
+            <span>Anmelden</span>
+            <svg class="w-3 h-3 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+        </a>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block footer %}
+<div class="animate-fade-up delay-7 flex items-center justify-center gap-6 text-parchment-400 text-xs tracking-wider">
+    <a href="/impressum" class="link-glow uppercase">Impressum</a>
+    <span class="text-amber-700/30">&#9670;</span>
+    <!-- D&D Easter Egg: d20 -->
+    <div class="d20-spin" title="Roll for initiative">
+        <svg class="w-5 h-5 text-parchment-400/40 hover:text-amber-500 transition-colors duration-300" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2.5">
+            <!-- Outer pentagon -->
+            <polygon points="50,2 97,36 79,93 21,93 3,36"/>
+            <!-- Inner star connecting to center top -->
+            <line x1="50" y1="2" x2="21" y2="93"/>
+            <line x1="50" y1="2" x2="79" y2="93"/>
+            <line x1="97" y1="36" x2="21" y2="93"/>
+            <line x1="3" y1="36" x2="79" y2="93"/>
+            <line x1="3" y1="36" x2="97" y2="36"/>
+            <text x="50" y="58" text-anchor="middle" fill="currentColor" stroke="none" font-size="20" font-family="Cinzel" font-weight="600">20</text>
+        </svg>
+    </div>
+</div>
+{% endblock %}

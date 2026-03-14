@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Friends – wediga.dev{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-6 py-16">
+
+    <!-- Header -->
+    <div class="flex justify-between items-start mb-20 animate-fade-up delay-1">
+        <div>
+            <h1 class="font-display text-4xl md:text-5xl font-semibold tracking-wide text-parchment-100 mb-2">Friends</h1>
+            <div class="glow-line w-32 mt-4"></div>
+        </div>
+        <a href="/logout" class="link-glow text-parchment-400 text-xs tracking-wider uppercase mt-3">Logout</a>
+    </div>
+
+    <!-- Content -->
+    <div class="animate-fade-up delay-2 text-center py-20">
+        <div class="d20-spin inline-block mb-8">
+            <svg class="w-12 h-12 text-amber-600/30" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.5">
+                <polygon points="50,2 97,36 79,93 21,93 3,36"/>
+                <line x1="50" y1="2" x2="21" y2="93"/>
+                <line x1="50" y1="2" x2="79" y2="93"/>
+                <line x1="97" y1="36" x2="21" y2="93"/>
+                <line x1="3" y1="36" x2="79" y2="93"/>
+                <line x1="3" y1="36" x2="97" y2="36"/>
+                <text x="50" y="58" text-anchor="middle" fill="currentColor" stroke="none" font-size="20" font-family="Cinzel" font-weight="600">20</text>
+            </svg>
+        </div>
+        <p class="font-display text-xl text-parchment-300/70 tracking-wide">
+            Hier entsteht gerade etwas.
+        </p>
+        <p class="text-parchment-400/50 text-sm mt-3 tracking-wide">
+            Schau bald wieder vorbei.
+        </p>
+    </div>
+
+</div>
+{% endblock %}

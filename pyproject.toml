@@ -9,4 +9,6 @@ dependencies = [
     "python-multipart",
     "Jinja2",
     "markdown",
+    "itsdangerous",
+    "python-dotenv",
 ]

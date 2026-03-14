@@ -2,13 +2,18 @@ import os
 import starlette.middleware.sessions as sessions
 
 from fastapi import FastAPI, Request, Form
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.responses import RedirectResponse
 
-from content_loader import load_about, load_projects, load_skills, load_contact
+from content_loader import load_about, load_projects, load_skills, load_contact, load_impressum
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
 app.add_middleware(sessions.SessionMiddleware, secret_key=os.environ.get("SESSION_SECRET"))
 
 templates = Jinja2Templates(directory="templates")
@@ -62,6 +67,17 @@ def portfolio(request: Request):
         return templates.TemplateResponse("portfolio.html", {"request": request, "content": content})
 
     return RedirectResponse("/", status_code=303)
+
+@app.get("/impressum")
+def impressum(request: Request):
+    role = request.session.get("role")
+    data = load_impressum()
+
+    return templates.TemplateResponse("impressum.html", {
+        "request": request,
+        "impressum": data,
+        "logged_in": role is not None,
+    })
 
 @app.get("/friends")
 def friends(request: Request):

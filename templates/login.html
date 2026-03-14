@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Login – wediga.dev{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-screen px-6">
+
+    <h1 class="animate-fade-up delay-1 font-display text-3xl font-semibold tracking-wide text-parchment-100 mb-2">
+        Anmelden
+    </h1>
+    <div class="animate-fade-up delay-1 glow-line w-24 mb-10"></div>
+
+    {% if error %}
+    <div class="animate-fade-up mb-6 px-4 py-3 border border-red-800/50 bg-red-900/10 text-red-300 text-sm rounded">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/login" class="animate-fade-up delay-2 w-full max-w-sm space-y-6">
+        <div>
+            <label for="username" class="block text-xs text-parchment-300 tracking-wider uppercase mb-2 font-medium">Benutzername</label>
+            <input type="text" id="username" name="username" required autocomplete="username"
+                   class="w-full bg-surface-700 border border-parchment-400/10 text-parchment-100 px-4 py-3 text-sm tracking-wide focus:outline-none focus:border-amber-600/50 transition-colors duration-300 placeholder:text-parchment-400/30"
+                   placeholder="Benutzername eingeben">
+        </div>
+        <div>
+            <label for="password" class="block text-xs text-parchment-300 tracking-wider uppercase mb-2 font-medium">Passwort</label>
+            <input type="password" id="password" name="password" required autocomplete="current-password"
+                   class="w-full bg-surface-700 border border-parchment-400/10 text-parchment-100 px-4 py-3 text-sm tracking-wide focus:outline-none focus:border-amber-600/50 transition-colors duration-300 placeholder:text-parchment-400/30"
+                   placeholder="Passwort eingeben">
+        </div>
+        <button type="submit" class="w-full border border-amber-700/40 text-parchment-200 px-6 py-3 text-sm tracking-widest uppercase font-medium hover:border-amber-500/60 hover:text-amber-400 transition-all duration-300">
+            Anmelden
+        </button>
+    </form>
+
+    <a href="/" class="animate-fade-up delay-3 mt-8 link-glow text-parchment-400 text-xs tracking-wider uppercase">
+        Zurück zur Startseite
+    </a>
+
+</div>
+{% endblock %}

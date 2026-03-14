@@ -49,7 +49,6 @@ wediga.dev/... (PROTECTED - Role B)
 - **Jinja2** for server-side template rendering
 - **Starlette Sessions** for authentication
 - **Tailwind CSS** (via CDN) for styling
-- **Docker** for containerization and deployment
 
 ---
 
@@ -57,14 +56,13 @@ wediga.dev/... (PROTECTED - Role B)
 
 ```
 wediga-dev/
-├── main.py              # FastAPI app with auth logic
+├── main.py              # FastAPI app with auth and routing
 ├── content_loader.py    # Loads content from Markdown/JSON
 ├── templates/           # Jinja2 HTML templates
+├── static/              # Static files (images, NOT in Git)
 ├── content/             # Personal content (NOT in Git)
 ├── content.example/     # Content templates (in Git)
 ├── .env                 # Secrets (NOT in Git)
-├── Dockerfile
-├── compose.yaml
 └── pyproject.toml
 ```
 
@@ -82,12 +80,6 @@ cp -r content.example content
 cp .env.example .env
 # Edit .env and content/ with your data
 uv run uvicorn main:app --reload
-```
-
-### Docker
-
-```bash
-docker compose up --build
 ```
 
 ---
