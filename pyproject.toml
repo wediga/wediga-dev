@@ -12,3 +12,12 @@ dependencies = [
     "itsdangerous",
     "python-dotenv",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "httpx",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
