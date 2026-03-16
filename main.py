@@ -13,7 +13,7 @@ load_dotenv()
 
 app = FastAPI()
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=os.environ.get("STATIC_DIR", "static")), name="static")
 app.add_middleware(sessions.SessionMiddleware, secret_key=os.environ.get("SESSION_SECRET"))
 
 templates = Jinja2Templates(directory="templates")

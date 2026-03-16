@@ -15,8 +15,11 @@ os.environ.setdefault("FRIENDS_PASSWORD", "testpass2")
 
 
 @pytest.fixture()
-def client():
-    with patch("content_loader.CONTENT_DIR", EXAMPLE_CONTENT):
+def client(tmp_path):
+    static_dir = tmp_path / "static"
+    static_dir.mkdir()
+    with patch("content_loader.CONTENT_DIR", EXAMPLE_CONTENT), \
+         patch.dict(os.environ, {"STATIC_DIR": str(static_dir)}):
         import importlib
         import main
         importlib.reload(main)
