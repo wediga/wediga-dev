@@ -1,0 +1,40 @@
+"""Shared test fixtures.
+
+Each test session uses an isolated SQLite file via ``WEDIGA_DB_PATH`` so the
+real ``data/wediga.db`` is never touched. ``WEDIGA_CONTENT_DIR`` points at the
+repository content directory, which the seed reads without modifying.
+"""
+
+import os
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture()
+def temp_db(tmp_path, monkeypatch):
+    """Point the backend at a fresh temporary database file."""
+    db_file = tmp_path / "test.db"
+    monkeypatch.setenv("WEDIGA_DB_PATH", str(db_file))
+    monkeypatch.setenv("WEDIGA_CONTENT_DIR", str(REPO_ROOT / "content"))
+    return db_file
+
+
+@pytest.fixture()
+def migrated_db(temp_db):
+    """Run migrations against the temporary database."""
+    from app.db.migrate import run_migrations
+
+    run_migrations()
+    return temp_db
+
+
+@pytest.fixture()
+def seeded_db(migrated_db):
+    """Migrate and seed the temporary database."""
+    from app.db.seed import run_seed
+
+    run_seed()
+    return migrated_db
