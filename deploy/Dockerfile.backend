@@ -1,0 +1,43 @@
+# Backend image for the FastAPI service.
+# Multi-stage build based on the official astral-sh/uv example.
+# Build context is the sibling ../backend directory.
+
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_NO_DEV=1 \
+    UV_PYTHON_DOWNLOADS=0
+
+WORKDIR /app
+
+# Install dependencies first, using the lockfile, without the project itself
+# so this layer is cached as long as the lock and manifest do not change.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-dev --no-install-project
+
+# Copy the application source and install the project itself.
+COPY . /app
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+FROM python:3.12-slim-bookworm AS runtime
+
+# Run as a non-root user (uid/gid 999).
+RUN groupadd --gid 999 nonroot \
+    && useradd --uid 999 --gid 999 --no-create-home nonroot
+
+COPY --from=builder --chown=nonroot:nonroot /app /app
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1
+
+USER nonroot
+WORKDIR /app
+
+EXPOSE 8000
+
+# Serve the FastAPI app with uvicorn on port 8000.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

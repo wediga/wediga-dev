@@ -4,18 +4,25 @@ __pycache__/
 *.egg-info/
 .venv/
 
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
 # Environment
 .env
 
 # IDE
 .idea/
 
-# Private content
-content/
+# Private content (root-anchored so it never matches backend/app/content)
+/content/
 
-# Concept docs
-Umsetzungsplan.md
-Project Hub.md
-Lebenslauf_Alexander_Wedig.pdf
-Alexander_Wedig.jpg
-CI-CD-Plan.md
+# Private inputs used by later phases, kept out of the public repo
+/static/
+/Lebenslauf*.pdf
+
+# Runtime data (SQLite file and generated PDF, mounted as a volume)
+/data/

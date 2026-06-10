@@ -1,0 +1,43 @@
+# Compose file for the two-container setup behind the existing Caddy proxy.
+# Run from the deploy/ directory. Build contexts point at the sibling
+# project directories (../backend and ../frontend).
+#
+# Only the frontend joins the external "proxy" network that the live Caddy
+# reverse proxy uses. The backend stays on the default internal network and
+# is reachable by the frontend server-side via the service name "backend".
+# The browser only ever sees the frontend origin, so the backend needs no
+# public Caddy entry.
+
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../deploy/Dockerfile.backend
+    restart: unless-stopped
+    # The future SQLite file lives here, mounted from the gitignored data/
+    # directory. Nothing is created in Phase 1.
+    volumes:
+      - ../data:/app/data
+    # No host port is published. The live wediga-dev container already uses
+    # host port 8001, so binding it here would clash. The frontend reaches
+    # the backend over the internal network on container port 8000.
+    networks:
+      - default
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../deploy/Dockerfile.frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    # Reachable from the existing Caddy on the proxy network as
+    # "frontend:3000". No host port is published.
+    networks:
+      - default
+      - proxy
+
+networks:
+  default:
+  proxy:
+    external: true

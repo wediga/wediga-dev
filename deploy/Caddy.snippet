@@ -1,0 +1,16 @@
+# Caddy snippet for the existing reverse proxy at /opt/reverse-proxy.
+#
+# This is a documentation snippet, not a full Caddyfile. The live Caddy
+# configuration is not touched in Phase 1. Add a block like the one below to
+# the existing Caddyfile when the relaunch goes live.
+#
+# Only the frontend is exposed to the outside. The browser sees a single
+# origin (wediga.dev) served by the Next.js frontend. The frontend's own BFF
+# route handlers reach the backend server-side over the internal default
+# compose network via the service name "backend", while the external "proxy"
+# network only connects the live Caddy to the frontend. The backend has no
+# public entry and stays unreachable from outside.
+#
+# wediga.dev {
+#     reverse_proxy frontend:3000
+# }
