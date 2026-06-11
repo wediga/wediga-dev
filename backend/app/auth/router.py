@@ -6,7 +6,7 @@ across the whole backend instead of a second async layer for one query.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.auth.dependencies import require_admin
 from app.auth.passwords import verify_password
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 class LoginRequest(BaseModel):
-    password: str
+    password: str = Field(max_length=1024)
 
 
 @router.post("/login")

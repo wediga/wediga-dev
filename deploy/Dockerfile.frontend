@@ -5,14 +5,14 @@
 
 ARG NODE_VERSION=24.13.0
 
-FROM node:${NODE_VERSION}-slim AS deps
+FROM node:${NODE_VERSION}-slim@sha256:4660b1ca8b28d6d1906fd644abe34b2ed81d15434d26d845ef0aced307cf4b6f AS deps
 WORKDIR /app
 
 # Install dependencies based on the lockfile only, for a cached layer.
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:${NODE_VERSION}-slim AS builder
+FROM node:${NODE_VERSION}-slim@sha256:4660b1ca8b28d6d1906fd644abe34b2ed81d15434d26d845ef0aced307cf4b6f AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -23,7 +23,7 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
 
 RUN npm run build
 
-FROM node:${NODE_VERSION}-slim AS runner
+FROM node:${NODE_VERSION}-slim@sha256:4660b1ca8b28d6d1906fd644abe34b2ed81d15434d26d845ef0aced307cf4b6f AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production \

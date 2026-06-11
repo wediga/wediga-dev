@@ -1,5 +1,10 @@
 name: CI
 
+# Least-privilege token: the workflow only checks out, tests and builds,
+# it never writes back to the repository.
+permissions:
+  contents: read
+
 # Monorepo CI for the wediga.dev relaunch. A leading "changes" job detects
 # which project changed, then the backend and frontend jobs run only when
 # their files were touched.
