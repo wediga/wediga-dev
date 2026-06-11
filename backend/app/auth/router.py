@@ -8,6 +8,7 @@ across the whole backend instead of a second async layer for one query.
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from app.auth.csrf import issue_csrf_token
 from app.auth.dependencies import require_admin
 from app.auth.passwords import verify_password
 from app.auth.sessions import ADMIN_SESSION_KEY
@@ -35,6 +36,8 @@ def login(request: Request, body: LoginRequest) -> dict[str, bool]:
         )
 
     request.session[ADMIN_SESSION_KEY] = True
+    # Mint the CSRF token now, so the admin can read it right after login.
+    issue_csrf_token(request)
     return {"ok": True}
 
 
@@ -49,3 +52,9 @@ def logout(request: Request) -> dict[str, bool]:
 def me() -> dict[str, bool]:
     """Return success when an admin session is active."""
     return {"admin": True}
+
+
+@router.get("/csrf", dependencies=[Depends(require_admin)])
+def csrf(request: Request) -> dict[str, str]:
+    """Return the session CSRF token for the admin to send on writes."""
+    return {"csrf_token": issue_csrf_token(request)}

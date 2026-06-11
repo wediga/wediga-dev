@@ -50,6 +50,11 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    # The frontend reaches the backend server-side over the internal network.
+    # Without this the URL would fall back to localhost and resolve to the
+    # frontend container itself, breaking the admin guard and every read.
+    environment:
+      - BACKEND_URL=http://backend:8000
     # Drop all Linux capabilities and forbid privilege escalation. The Next.js
     # standalone server binds container port 3000 and needs no capability above
     # port 1024.
