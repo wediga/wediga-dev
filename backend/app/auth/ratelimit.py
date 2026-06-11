@@ -89,3 +89,10 @@ class RateLimiter:
 # With argon2 at roughly 50 ms per verify this leaves brute force hopeless
 # without locking out a person who simply mistypes the password a few times.
 login_limiter = RateLimiter(max_attempts=10, window_seconds=300)
+
+# A generous limiter for the public recruiter redeem: thirty attempts per five
+# minutes per IP. The token already carries 256 bits of entropy, so guessing is
+# infeasible; this only caps request floods and view-count inflation from a
+# single source, the same way the login limiter caps the one other public
+# surface.
+redeem_limiter = RateLimiter(max_attempts=30, window_seconds=300)

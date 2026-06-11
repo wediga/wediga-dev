@@ -56,6 +56,36 @@ export interface RecruiterLinkCreated extends RecruiterLink {
   token: string;
 }
 
+// The full repo row for the admin: mirrored GitHub fields plus curation. The
+// mirrored fields are read-only in the UI; only the curation fields are sent
+// back on a write.
+export interface GithubRepo {
+  id: number;
+  name: string;
+  description: string | null;
+  language: string | null;
+  stars: number | null;
+  url: string | null;
+  last_push: string | null;
+  last_sync: string | null;
+  visible: boolean;
+  pinned: boolean;
+  description_override: string | null;
+  sort_order: number;
+}
+
+// The curated repo as the recruiter view receives it. ``description`` is
+// already the effective text (override when set, otherwise the GitHub one).
+export interface CuratedRepo {
+  name: string;
+  description: string | null;
+  language: string | null;
+  stars: number | null;
+  url: string | null;
+  last_push: string | null;
+  pinned: boolean;
+}
+
 export interface Skill {
   id: number;
   name: string;

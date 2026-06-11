@@ -6,8 +6,9 @@ Migrations are never run in the request path; they are applied via
 ``python -m app.db.migrate``.
 """
 
+import asyncio
 import sqlite3
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
@@ -15,18 +16,28 @@ from fastapi.responses import JSONResponse
 from app.api import api_router
 from app.auth.bootstrap import ensure_admin
 from app.auth.sessions import add_session_middleware
+from app.github.scheduler import start_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Bootstrap the admin row on startup when the schema and env allow it."""
+    """Bootstrap the admin and start the GitHub refresh, neither blocking start."""
     try:
         ensure_admin()
     except Exception:
         # A missing schema or unset password must not block startup; the
         # login route fails cleanly in that case.
         pass
-    yield
+    # The scheduler is a fire-and-forget background task: creating it returns at
+    # once, so the first sync runs concurrently and never blocks the start.
+    sync_task = start_scheduler()
+    try:
+        yield
+    finally:
+        if sync_task is not None:
+            sync_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await sync_task
 
 
 app = FastAPI(title="wediga-backend", lifespan=lifespan)

@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.auth.csrf import require_csrf
 from app.auth.dependencies import require_admin
-from app.auth.ratelimit import client_ip
+from app.auth.ratelimit import client_ip, redeem_limiter
 from app.auth.sessions import RECRUITER_SESSION_KEY
 from app.recruiter import repository as repo
 from app.recruiter.dependencies import require_recruiter_view
@@ -72,8 +72,15 @@ def redeem(token: str, request: Request) -> dict[str, bool]:
 
     An unknown token is 404, a revoked or expired one is 410. On success the
     recruiter marker is set fresh in the session (no fixation carry-over) and a
-    single view row is written with only the coarse origin.
+    single view row is written with only the coarse origin. A per-IP rate limit
+    caps request floods and view-count inflation from a single source.
     """
+    if not redeem_limiter.hit(client_ip(request)):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts, try again later",
+        )
+
     result, link_id = repo.validate_token(token)
     if result == "invalid":
         raise HTTPException(

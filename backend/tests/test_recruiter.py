@@ -114,6 +114,14 @@ def test_redeem_invalid_token_is_404(client) -> None:
     assert client.post("/recruiter/redeem/not-a-real-token").status_code == 404
 
 
+def test_redeem_is_rate_limited(client) -> None:
+    # The redeem limiter allows thirty attempts per window per IP; the next one
+    # is 429, checked before the token is validated.
+    for _ in range(30):
+        client.post("/recruiter/redeem/whatever")
+    assert client.post("/recruiter/redeem/whatever").status_code == 429
+
+
 def test_redeem_revoked_link_is_410(app, admin_client) -> None:
     created = _create_link(admin_client, label="To revoke")
     revoke = admin_client.post(f"/recruiter/links/{created['id']}/revoke")
