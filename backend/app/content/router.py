@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth.csrf import require_csrf
 from app.auth.dependencies import require_admin
 from app.content import repository as repo
+from app.recruiter.dependencies import require_recruiter_view
 from app.content.schemas import (
     AboutContent,
     ContactContent,
@@ -27,6 +28,13 @@ router = APIRouter(prefix="/content", tags=["content"])
 
 # Writes need both an admin session and a valid CSRF token.
 WRITE_DEPS = [Depends(require_admin), Depends(require_csrf)]
+
+# Recruiter-facing reads (the full portfolio and the contact details) sit
+# behind the recruiter gate, which an admin session also satisfies and which
+# re-checks the link state, so a revoked or expired link loses access. About
+# and skills stay public because they feed the public landing page, and the
+# public impressum keeps its own name-and-email split.
+RECRUITER_READ_DEPS = [Depends(require_recruiter_view)]
 
 NOT_FOUND = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
@@ -56,7 +64,11 @@ def remove_about() -> dict[str, bool]:
 # --- contact -------------------------------------------------------------
 
 
-@router.get("/contact", response_model=ContactContent | None)
+@router.get(
+    "/contact",
+    response_model=ContactContent | None,
+    dependencies=RECRUITER_READ_DEPS,
+)
 def read_contact() -> ContactContent | None:
     data = repo.get_contact()
     return ContactContent(**data) if data is not None else None
@@ -112,9 +124,13 @@ def remove_impressum() -> dict[str, bool]:
 # --- projects ------------------------------------------------------------
 
 
-@router.get("/projects", response_model=list[ProjectRead])
+@router.get(
+    "/projects",
+    response_model=list[ProjectRead],
+    dependencies=RECRUITER_READ_DEPS,
+)
 def read_projects() -> list[dict]:
-    """Public read: only visible projects."""
+    """Recruiter read: only visible projects, gated behind the recruiter view."""
     return repo.list_projects(include_hidden=False)
 
 

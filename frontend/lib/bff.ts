@@ -19,6 +19,12 @@ export async function proxyToBackend(
   const csrf = request.headers.get("x-csrf-token");
   if (csrf) headers["x-csrf-token"] = csrf;
 
+  // Carry the real client IP through to the backend, so the login rate limit
+  // keys on the visitor and not on the single frontend container. Caddy sets
+  // this header; locally it is absent and the backend falls back to the peer.
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) headers["x-forwarded-for"] = forwardedFor;
+
   let body: string | undefined;
   if (method !== "GET" && method !== "HEAD") {
     const text = await request.text();

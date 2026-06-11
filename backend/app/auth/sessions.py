@@ -2,24 +2,28 @@
 
 Sessions use Starlette's ``SessionMiddleware``, which signs a cookie with
 itsdangerous and keeps no server-side state. The secret comes from
-``SESSION_SECRET``. The admin session marker is ``request.session["admin"]``.
-
-A recruiter session would use a separate key (``recruiter``) and is left as a
-placeholder here. It is intentionally not built in this phase.
+``SESSION_SECRET``. The admin session marker is ``request.session["admin"]``
+and the recruiter session marker is ``request.session["recruiter"]``, which
+holds the id of the redeemed link. Both markers share the one signed cookie
+but are independent keys, so a recruiter session never carries the admin
+marker and cannot reach an admin route.
 """
 
+import logging
 import os
 import secrets
 
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi import FastAPI
 
+logger = logging.getLogger("uvicorn.error")
+
 SESSION_COOKIE_NAME = "wediga_session"
 
 # Session key for the admin marker.
 ADMIN_SESSION_KEY = "admin"
 
-# Reserved for a future recruiter session (Phase 4). Not used yet.
+# Session key for the recruiter marker; holds the id of the redeemed link.
 RECRUITER_SESSION_KEY = "recruiter"
 
 
@@ -30,7 +34,13 @@ def _session_secret() -> str:
     # No predictable default ever ships: when SESSION_SECRET is unset we mint
     # a random per-process secret. Local startup keeps working, a missing
     # secret in production only invalidates sessions across restarts instead
-    # of running with a value that sits in the repository.
+    # of running with a value that sits in the repository. The fallback is
+    # logged loudly so a misconfigured production is visible in the logs and
+    # does not silently sign sessions with a throwaway secret.
+    logger.warning(
+        "SESSION_SECRET is not set; using a random per-process secret. "
+        "Sessions will not survive a restart. Set SESSION_SECRET in production."
+    )
     return secrets.token_urlsafe(32)
 
 

@@ -6,6 +6,7 @@ const SECTIONS = [
   { href: "/admin/skills", label: "Skills", hint: "Categories and skills" },
   { href: "/admin/contact", label: "Contact", hint: "Contact details" },
   { href: "/admin/impressum", label: "Impressum", hint: "Legal notice" },
+  { href: "/admin/links", label: "Links", hint: "Recruiter magic links" },
 ];
 
 export default function AdminPage() {

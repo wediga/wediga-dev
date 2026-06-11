@@ -39,6 +39,23 @@ export interface Project {
   visible: boolean;
 }
 
+export interface RecruiterLink {
+  id: number;
+  label: string | null;
+  created_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  view_count: number;
+  last_viewed_at: string | null;
+  active: boolean;
+}
+
+// The create response carries the plaintext token once; it is never returned
+// again by any later read.
+export interface RecruiterLinkCreated extends RecruiterLink {
+  token: string;
+}
+
 export interface Skill {
   id: number;
   name: string;

@@ -12,6 +12,7 @@ const NAV = [
   { href: "/admin/skills", label: "Skills" },
   { href: "/admin/contact", label: "Contact" },
   { href: "/admin/impressum", label: "Impressum" },
+  { href: "/admin/links", label: "Links" },
 ];
 
 // Server-side guard: ask the backend whether the forwarded session is an admin

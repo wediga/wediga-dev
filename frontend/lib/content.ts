@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { backendUrl } from "./backend";
 import type { About, Contact, Impressum, Project, SkillCategory } from "./types";
 
@@ -14,12 +15,29 @@ async function getJson<T>(path: string): Promise<T | null> {
   }
 }
 
+// Gated reads forward the visitor's session cookie, so the backend can apply
+// the recruiter-or-admin gate. The page itself is guarded by the recruiter
+// layout, this only carries the session through to the data fetch.
+async function getJsonWithSession<T>(path: string): Promise<T | null> {
+  try {
+    const cookieHeader = (await cookies()).toString();
+    const response = await fetch(backendUrl(path), {
+      headers: cookieHeader ? { cookie: cookieHeader } : {},
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 export function getAbout(): Promise<About | null> {
   return getJson<About>("/content/about");
 }
 
 export function getContact(): Promise<Contact | null> {
-  return getJson<Contact>("/content/contact");
+  return getJsonWithSession<Contact>("/content/contact");
 }
 
 export function getImpressum(): Promise<Impressum | null> {
@@ -27,7 +45,7 @@ export function getImpressum(): Promise<Impressum | null> {
 }
 
 export async function getProjects(): Promise<Project[]> {
-  return (await getJson<Project[]>("/content/projects")) ?? [];
+  return (await getJsonWithSession<Project[]>("/content/projects")) ?? [];
 }
 
 export async function getSkills(): Promise<SkillCategory[]> {

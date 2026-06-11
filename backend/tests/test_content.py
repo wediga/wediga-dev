@@ -194,10 +194,15 @@ def test_setting_delete_is_idempotent(admin_client) -> None:
 
 
 def test_public_reads_need_no_session(client) -> None:
+    # About and skills feed the public landing page, so they stay open.
     assert client.get("/content/about").status_code == 200
-    assert client.get("/content/contact").status_code == 200
-    assert client.get("/content/projects").status_code == 200
     assert client.get("/content/skills").status_code == 200
+
+
+def test_recruiter_reads_need_a_session(client) -> None:
+    # The full portfolio and the contact details sit behind the recruiter gate.
+    assert client.get("/content/projects").status_code == 401
+    assert client.get("/content/contact").status_code == 401
 
 
 # --- write protection ----------------------------------------------------

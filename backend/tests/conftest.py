@@ -13,6 +13,20 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+@pytest.fixture(autouse=True)
+def _reset_login_limiter():
+    """Isolate the process-level login limiter between tests.
+
+    The limiter keeps per-IP counts in module state, so without a reset the
+    repeated logins across the suite would accumulate and a later test could
+    hit the limit by accident.
+    """
+    from app.auth.ratelimit import login_limiter
+
+    login_limiter.clear()
+    yield
+
+
 @pytest.fixture()
 def temp_db(tmp_path, monkeypatch):
     """Point the backend at a fresh temporary database file."""
