@@ -52,16 +52,6 @@ CREATE TABLE IF NOT EXISTS github_repo (
     sort_order INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS cv_entry (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    area TEXT NOT NULL,
-    title TEXT,
-    organization TEXT,
-    period TEXT,
-    description TEXT,
-    sort_order INTEGER NOT NULL DEFAULT 0
-);
-
 CREATE TABLE IF NOT EXISTS recruiter_link (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     token TEXT NOT NULL UNIQUE,

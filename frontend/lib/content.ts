@@ -1,9 +1,10 @@
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { backendUrl } from "./backend";
 import type {
   About,
   Contact,
   CuratedRepo,
+  CvStatus,
   Impressum,
   Project,
   SkillCategory,
@@ -24,10 +25,13 @@ async function getJson<T>(path: string): Promise<T | null> {
 
 // Gated reads forward the visitor's session cookie, so the backend can apply
 // the recruiter-or-admin gate. The page itself is guarded by the recruiter
-// layout, this only carries the session through to the data fetch.
+// layout, this only carries the session through to the data fetch. The raw
+// cookie header is forwarded verbatim, the same way the BFF route handlers do
+// it, because re-serializing the cookies (cookies().toString()) re-encodes the
+// signed session value and the backend then rejects it.
 async function getJsonWithSession<T>(path: string): Promise<T | null> {
   try {
-    const cookieHeader = (await cookies()).toString();
+    const cookieHeader = (await headers()).get("cookie");
     const response = await fetch(backendUrl(path), {
       headers: cookieHeader ? { cookie: cookieHeader } : {},
       cache: "no-store",
@@ -57,6 +61,12 @@ export async function getProjects(): Promise<Project[]> {
 
 export async function getSkills(): Promise<SkillCategory[]> {
   return (await getJson<SkillCategory[]>("/content/skills")) ?? [];
+}
+
+// Whether a CV PDF is currently uploaded, gated like the portfolio. The page
+// uses this to decide whether to show the download and preview.
+export async function getCvStatus(): Promise<CvStatus> {
+  return (await getJsonWithSession<CvStatus>("/cv/status")) ?? { present: false };
 }
 
 // The curated GitHub repos, gated like the portfolio. The backend already

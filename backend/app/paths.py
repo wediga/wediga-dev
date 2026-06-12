@@ -35,3 +35,14 @@ def content_dir() -> Path:
     """
     override = os.environ.get("WEDIGA_CONTENT_DIR")
     return Path(override) if override else REPO_ROOT / "content"
+
+
+def cv_dir() -> Path:
+    """Return the directory holding the uploaded CV PDF.
+
+    It sits next to the database file, so it lands in the same writable data
+    volume. Deriving it from ``db_path().parent`` means the ``WEDIGA_DB_PATH``
+    override (set in the hardened container, where the repository root is
+    read-only) carries over without a second environment variable.
+    """
+    return db_path().parent / "cv"

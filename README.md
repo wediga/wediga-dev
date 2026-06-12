@@ -28,6 +28,7 @@ wediga.dev (PUBLIC)
 
 wediga.dev/... (PROTECTED - Role A)
 ├─ Detailed content
+├─ CV (PDF download)
 └─ Full profile
 
 wediga.dev/... (PROTECTED - Role B)
@@ -37,6 +38,7 @@ wediga.dev/... (PROTECTED - Role B)
 
 - Multiple user roles with separate views
 - Session-based auth via middleware
+- A CV uploaded as a PDF and offered as a download behind the protected area
 - Content loaded from external files (not in Git)
 - Public repo, private data
 

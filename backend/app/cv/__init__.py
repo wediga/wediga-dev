@@ -1,1 +1,1 @@
-"""CV layer: curriculum vitae data and PDF generation (added in a later phase)."""
+"""CV layer: stores the uploaded CV PDF and serves it as a gated download."""

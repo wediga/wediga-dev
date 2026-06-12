@@ -86,6 +86,11 @@ export interface CuratedRepo {
   pinned: boolean;
 }
 
+// The CV is a single uploaded PDF; its only state is whether one is present.
+export interface CvStatus {
+  present: boolean;
+}
+
 export interface Skill {
   id: number;
   name: string;

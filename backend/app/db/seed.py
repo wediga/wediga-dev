@@ -140,6 +140,7 @@ def run_seed() -> dict[str, int]:
         except Exception:
             conn.rollback()
             raise
+
     return summary
 
 

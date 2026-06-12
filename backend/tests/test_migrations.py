@@ -4,7 +4,6 @@ from app.db.migrate import list_tables, run_migrations
 
 EXPECTED_TABLES = {
     "admin",
-    "cv_entry",
     "github_repo",
     "link_view",
     "project",
