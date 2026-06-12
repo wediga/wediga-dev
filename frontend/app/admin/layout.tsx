@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import Link from "next/link";
 
 import { backendUrl } from "@/lib/backend";
@@ -13,20 +13,24 @@ const NAV = [
   { href: "/admin/contact", label: "Contact" },
   { href: "/admin/impressum", label: "Impressum" },
   { href: "/admin/repos", label: "Repos" },
+  { href: "/admin/cv", label: "CV" },
   { href: "/admin/links", label: "Links" },
 ];
 
 // Server-side guard: ask the backend whether the forwarded session is an admin
 // session. A missing or invalid session redirects to the login page, so the
-// admin area is never rendered without authentication.
+// admin area is never rendered without authentication. The raw cookie header
+// is forwarded verbatim, the same way the BFF route handlers do it, because
+// re-serializing the cookies (cookies().toString()) re-encodes the signed
+// session value and the backend then rejects it.
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const cookieHeader = (await cookies()).toString();
+  const cookieHeader = (await headers()).get("cookie");
   const response = await fetch(backendUrl("/auth/me"), {
-    headers: { cookie: cookieHeader },
+    headers: cookieHeader ? { cookie: cookieHeader } : {},
     cache: "no-store",
   });
   if (!response.ok) {

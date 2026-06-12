@@ -84,3 +84,43 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # End-to-end tests boot the real stack (backend plus the Next.js production
+  # build) and drive the critical flows through the browser, so the job needs
+  # both the Python toolchain (the backend runs via uv) and Node. It runs when
+  # either side changed, because an integration break can come from either.
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install backend dependencies
+        run: uv sync --frozen
+        working-directory: backend
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.13.0
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Run end-to-end tests
+        run: npm run e2e
+        working-directory: frontend
+        env:
+          # The admin password comes from the environment, never from code.
+          E2E_ADMIN_PASSWORD: e2e-admin-password
