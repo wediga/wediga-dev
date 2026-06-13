@@ -1,26 +1,120 @@
 @import "tailwindcss";
 
+/*
+  Provisional dark palette from the UI-spec. Colour is an open point this phase,
+  so raw values live here in :root as swappable CSS variables and the @theme
+  block only re-exports them to Tailwind v4. Swap the palette in one place.
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #06060a;
+  --ink: #eceef5;
+  --muted: #9a9cae;
+  --muted-2: #7c7e90;
+  --line: #1e1f2b;
+  --accent: #a987ff;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* Semantic z-scale, no arbitrary values. */
+  --z-cosmos: 0;
+  --z-vignette: 1;
+  --z-stage: 2;
+  --z-dots: 40;
+  --z-nav: 50;
+
+  /* Motion curves (Emil). Transitions stay under 300ms, transform + opacity only. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@theme {
+  --color-bg: var(--bg);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+
+  --font-sans: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/*
+  Global default stays the plain light shell the existing pages were built for
+  (public landing, login, admin, recruiter). The dark cosmos palette is opt-in
+  through .cosmos-surface so the relaunch surface can flip to it without
+  dragging the real pages onto a dark body they were never styled against.
+*/
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+  Visual relaunch surface. Applied on the dark, cosmos-backed pages only, where
+  it paints the near-black background and light ink the flight components expect.
+*/
+.cosmos-surface {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/*
+  Scrim utility, a soft radial backdrop that keeps the active station legible
+  over the moving cosmos. Used by flight stations behind their text.
+*/
+.scrim::before {
+  content: "";
+  position: absolute;
+  inset: -40% -18%;
+  z-index: -1;
+  background: radial-gradient(
+    58% 58% at 50% 50%,
+    rgba(6, 6, 11, 0.85),
+    rgba(6, 6, 11, 0.45) 52%,
+    transparent 76%
+  );
+  pointer-events: none;
+}
+
+/*
+  Flight planes live in the fixed stage, which is a sibling of the scroll
+  container, not an ancestor. A full-width plane on pointer-events:auto would
+  swallow a wheel over the station text: the event would target the plane and
+  find no scrollable element in its DOM ancestor chain, so the page would not
+  scroll over the middle of the viewport. The wrapper therefore stays
+  pointer-events:none and only genuine interactive elements opt back in, so the
+  wheel falls through to the scroller while links stay clickable. Far planes are
+  inert, which also blocks their lifted links, so only the near station is live.
+*/
+.flight-plane {
+  pointer-events: none;
+}
+.flight-plane a,
+.flight-plane button,
+.flight-plane [role="button"],
+.flight-plane input,
+.flight-plane select,
+.flight-plane textarea,
+.flight-plane summary,
+.flight-plane label {
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
