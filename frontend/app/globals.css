@@ -18,10 +18,6 @@
   --radius-lg: 16px;
 
   /* Semantic z-scale, no arbitrary values. */
-  --z-cosmos: 0;
-  --z-vignette: 1;
-  --z-stage: 2;
-  --z-dots: 40;
   --z-nav: 50;
 
   /* Motion curves (Emil). Transitions stay under 300ms, transform + opacity only. */
@@ -47,9 +43,8 @@
 
 /*
   Global default stays the plain light shell the existing pages were built for
-  (public landing, login, admin, recruiter). The dark cosmos palette is opt-in
-  through .cosmos-surface so the relaunch surface can flip to it without
-  dragging the real pages onto a dark body they were never styled against.
+  (login, impressum, admin, recruiter). The landing paints its own dark surface
+  in the Hero, so the real pages stay on the light body they were styled against.
 */
 body {
   font-family: var(--font-sans);
@@ -58,17 +53,8 @@ body {
 }
 
 /*
-  Visual relaunch surface. Applied on the dark, cosmos-backed pages only, where
-  it paints the near-black background and light ink the flight components expect.
-*/
-.cosmos-surface {
-  background: var(--bg);
-  color: var(--ink);
-}
-
-/*
-  Scrim utility, a soft radial backdrop that keeps the active station legible
-  over the moving cosmos. Used by flight stations behind their text.
+  Scrim utility, a soft radial backdrop that keeps text legible over a busy
+  background. Used by the site Footer behind its text.
 */
 .scrim::before {
   content: "";
@@ -82,30 +68,6 @@ body {
     transparent 76%
   );
   pointer-events: none;
-}
-
-/*
-  Flight planes live in the fixed stage, which is a sibling of the scroll
-  container, not an ancestor. A full-width plane on pointer-events:auto would
-  swallow a wheel over the station text: the event would target the plane and
-  find no scrollable element in its DOM ancestor chain, so the page would not
-  scroll over the middle of the viewport. The wrapper therefore stays
-  pointer-events:none and only genuine interactive elements opt back in, so the
-  wheel falls through to the scroller while links stay clickable. Far planes are
-  inert, which also blocks their lifted links, so only the near station is live.
-*/
-.flight-plane {
-  pointer-events: none;
-}
-.flight-plane a,
-.flight-plane button,
-.flight-plane [role="button"],
-.flight-plane input,
-.flight-plane select,
-.flight-plane textarea,
-.flight-plane summary,
-.flight-plane label {
-  pointer-events: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
