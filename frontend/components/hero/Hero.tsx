@@ -30,29 +30,32 @@ function usePrefersReducedMotion(): boolean {
 // Fixed in production: the approved configuration is 120k individual lit points.
 const ATOM_COUNT = 120000;
 
-// Placeholder station copy in fixed section order. Which planet carries which is
-// randomised per load inside the engine. The real BFF content lives in the
-// readable layer (see LandingContent); mapping it onto these stations is Phase H2.
-const SECTIONS = [
+// Public landing sections, in fixed order. Sparse on purpose: the public page is a
+// teaser, the depth lives behind the recruiter login. One planet anchors each
+// section, and the engine is told the count so it always has enough planets.
+// (Wording is a working draft; the access links are placeholders until H2 wires
+// the real contact URLs from the BFF.)
+type Section = {
+  eyebrow: string;
+  title: string;
+  body: string;
+  kicker?: string;
+  avatar?: boolean;
+  access?: boolean;
+};
+const SECTIONS: Section[] = [
   {
-    title: "Alexander Wedig",
     eyebrow: "Intro",
-    body: "ML Engineer. Aus rohen Daten wird geordnete Information, und genau das zeigt dieser Hero, sobald sich die Atome zum System ordnen.",
+    title: "Alexander Wedig",
+    kicker: "Softwareentwickler aus Berlin",
+    body: "Auf dem Weg ins Machine Learning Engineering.",
+    avatar: true,
   },
   {
-    title: "Über mich",
-    eyebrow: "About",
-    body: "Platzhalter. Ein paar Sätze über Hintergrund und Arbeitsweise, ruhig und lesbar, der echte Text kommt aus der BFF.",
-  },
-  {
-    title: "Werkzeuge",
-    eyebrow: "Toolkit",
-    body: "Platzhalter. Die Werkzeuge und Modelle, mit denen ich arbeite, als kurze geordnete Liste statt als Schlagwortwolke.",
-  },
-  {
-    title: "Zugang",
     eyebrow: "Zugang",
-    body: "Platzhalter. Die persönlichen Inhalte liegen hinter Zugang, erreichbar über Login oder den persönlichen Link.",
+    title: "Mehr sehen",
+    body: "Das vollständige Portfolio liegt hinter dem Login.",
+    access: true,
   },
 ];
 
@@ -123,7 +126,12 @@ export function Hero({ readable }: { readable: React.ReactNode }) {
         const { createWebglEngine } = await import("./engine/webglEngine");
         handle = await createWebglEngine(
           canvas,
-          { atomCount: ATOM_COUNT, seed, reducedMotion },
+          {
+            atomCount: ATOM_COUNT,
+            seed,
+            reducedMotion,
+            stationCount: SECTIONS.length,
+          },
           { onStation },
         );
       } catch {
@@ -209,7 +217,7 @@ export function Hero({ readable }: { readable: React.ReactNode }) {
                   sectionRefs.current[i] = el;
                 }}
                 style={{ opacity: 0, left: "50%", top: "50%" }}
-                className="absolute w-[min(82vw,420px)] -translate-x-1/2 -translate-y-1/2 text-center transition-opacity duration-200"
+                className="absolute w-[min(86vw,560px)] -translate-x-1/2 -translate-y-1/2 text-center transition-opacity duration-200"
               >
                 {/* Scrim: a circular darkening over the whole opened planet, darkest
                     at the centre and fading out before the rim, so the busy interior
@@ -223,17 +231,53 @@ export function Hero({ readable }: { readable: React.ReactNode }) {
                       "radial-gradient(circle closest-side at center, rgba(5,6,10,1) 0%, rgba(5,6,10,0.99) 48%, rgba(5,6,10,0.92) 72%, rgba(5,6,10,0.72) 90%, rgba(5,6,10,0) 100%)",
                   }}
                 />
+                {s.avatar ? (
+                  // Small self-hosted portrait; the next/image optimizer is needless
+                  // for an 88 KB asset and flaky in dev, so a plain img is cleaner.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src="/portrait.jpg"
+                    alt="Alexander Wedig"
+                    width={56}
+                    height={56}
+                    className="mx-auto mb-[2vh] h-[clamp(4rem,11vh,8rem)] w-[clamp(4rem,11vh,8rem)] rounded-full object-cover"
+                  />
+                ) : null}
                 <h2
                   key={active === i ? `${i}-on` : `${i}-off`}
-                  className={`text-4xl font-medium tracking-[-0.02em] text-white ${
+                  className={`text-[clamp(2rem,6vh,4.5rem)] font-medium leading-[1.05] tracking-[-0.02em] text-white ${
                     active === i ? "hero-assemble" : ""
                   }`}
                 >
                   {s.title}
                 </h2>
-                <p className="mx-auto mt-4 max-w-sm text-[15px] leading-relaxed text-zinc-100">
+                {s.kicker ? (
+                  <p className="mt-[1vh] text-[clamp(0.72rem,1.5vh,1.05rem)] uppercase tracking-[0.12em] text-zinc-400">
+                    {s.kicker}
+                  </p>
+                ) : null}
+                <p className="mx-auto mt-[1.8vh] max-w-md text-[clamp(1rem,2.4vh,1.6rem)] leading-relaxed text-zinc-100">
                   {s.body}
                 </p>
+                {s.access ? (
+                  <div className="pointer-events-auto mt-6 flex flex-col items-center gap-5">
+                    <div className="flex items-center gap-4 text-[clamp(0.72rem,1.4vh,1rem)] uppercase tracking-[0.14em] text-zinc-300">
+                      <a href="#" className="transition-colors hover:text-white">
+                        GitHub
+                      </a>
+                      <span className="text-zinc-600">·</span>
+                      <a href="#" className="transition-colors hover:text-white">
+                        LinkedIn
+                      </a>
+                    </div>
+                    <Link
+                      href="/login"
+                      className="rounded-md border border-white/25 px-6 py-2 text-[clamp(0.72rem,1.4vh,1rem)] uppercase tracking-[0.14em] text-white transition-colors hover:bg-white/5"
+                    >
+                      Anmelden
+                    </Link>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

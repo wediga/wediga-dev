@@ -18,10 +18,6 @@ import {
 import { generateStarSystem } from "./starSystem";
 import type { EngineCallbacks, EngineHandle, HeroConfig } from "./types";
 
-// Fixed section count: Intro, About, Toolkit, Zugang, in that order. Which planet
-// carries which is randomised per load.
-const STATIONS = 4;
-
 export async function createWebglEngine(
   canvas: HTMLCanvasElement,
   config: HeroConfig,
@@ -30,7 +26,12 @@ export async function createWebglEngine(
   // Round the requested atom count up to a square texture.
   const texSize = Math.max(8, Math.ceil(Math.sqrt(config.atomCount)));
   const count = texSize * texSize;
-  const data = generateStarSystem(count, config.seed);
+  // Section stops the rails ride through; one planet anchors each. Driven by the
+  // section count so adding a section just adds a stop. Clamped to >= 2 (a single
+  // stop has no journey and would divide by zero in the per-leg maths). The
+  // generator is told the count so it always yields at least that many planets.
+  const STATIONS = Math.max(2, Math.round(config.stationCount));
+  const data = generateStarSystem(count, config.seed, STATIONS);
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -270,10 +271,23 @@ export async function createWebglEngine(
       const j = Math.floor(rnd() * (i + 1));
       [idx[i], idx[j]] = [idx[j], idx[i]];
     }
-    const chosen = Array.from({ length: STATIONS }, (_, k) => idx[k % idx.length]);
-    // Visit the chosen planets from the outermost inward, so the ride always flies
-    // from outside into the system instead of jumping around. Which planets are
-    // chosen stays generative, only the order is fixed by orbit radius.
+    // Always start at the outermost planet so the ride flies from OUTSIDE into the
+    // system; the remaining stations are picked generatively from the rest. The
+    // descending orbit-radius sort then orders the whole set outermost-first. (With
+    // few stations a purely random pick could land the first stop mid-system, which
+    // broke the "from outside in" feel.)
+    let outer = 0;
+    for (let i = 1; i < planetCount; i++) {
+      if (
+        data.meta.planets[i].orbitRadius > data.meta.planets[outer].orbitRadius
+      ) {
+        outer = i;
+      }
+    }
+    const chosen = [
+      outer,
+      ...idx.filter((i) => i !== outer).slice(0, STATIONS - 1),
+    ];
     chosen.sort(
       (a, b) =>
         data.meta.planets[b].orbitRadius - data.meta.planets[a].orbitRadius,
@@ -305,9 +319,12 @@ export async function createWebglEngine(
   // directions; when the stations sit nearly opposite (the bisector collapses) it
   // bows perpendicular to the chord, so the curve always stays outside the system.
   // Seven control points: station k at index 2k, the midpoints at the odd indices.
-  const camPts = Array.from({ length: 7 }, () => new THREE.Vector3());
-  const lookPts = [0, 1, 2, 3].map(() => new THREE.Vector3());
-  const stationCam = [0, 1, 2, 3].map(() => new THREE.Vector3());
+  const camPts = Array.from(
+    { length: 2 * STATIONS - 1 },
+    () => new THREE.Vector3(),
+  );
+  const lookPts = Array.from({ length: STATIONS }, () => new THREE.Vector3());
+  const stationCam = Array.from({ length: STATIONS }, () => new THREE.Vector3());
   function updateWaypoints(t: number) {
     let rim = 0;
     for (let k = 0; k < STATIONS; k++) {
@@ -554,8 +571,11 @@ export async function createWebglEngine(
     // and converted to a world radius at this distance.
     const fovRad = (camera.fov * Math.PI) / 180;
     const focalPx = chh / 2 / Math.tan(fovRad / 2);
-    const boxW = Math.min(0.82 * cw, 420);
-    const targetScreenR = (boxW / 2) * 1.4 + 30;
+    // The open disc fills most of the viewport so the planet, and the text on it,
+    // reads large on any screen, scaling with the window instead of a fixed pixel
+    // size. Height-bound on landscape (fills to just shy of the top and bottom edge),
+    // width-bound on portrait so it never spills past the sides.
+    const targetScreenR = Math.min(chh * 0.45, cw * 0.46);
     const discWorldR = (targetScreenR * dist) / focalPx;
     vu.uOpenR.value = discWorldR;
     const worldR = discWorldR;

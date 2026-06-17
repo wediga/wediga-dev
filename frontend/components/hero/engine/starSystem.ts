@@ -100,12 +100,17 @@ interface Body {
   hueSpread: number; // degrees, half-width of the per-atom hue jitter
 }
 
-export function generateStarSystem(count: number, seed: number): StarSystemData {
+export function generateStarSystem(
+  count: number,
+  seed: number,
+  minPlanets = 0,
+): StarSystemData {
   const rng = mulberry32(seed);
   const rand = (lo: number, hi: number) => lo + (hi - lo) * rng();
 
-  // Curated planet count: enough to feel like a system, never a cluttered mess.
-  const planetCount = Math.round(rand(4, 9));
+  // Curated planet count: enough to feel like a system, never a cluttered mess,
+  // but never fewer than the sections that need a planet to anchor them.
+  const planetCount = Math.max(Math.round(rand(4, 9)), minPlanets);
 
   const bodies: Body[] = [];
 

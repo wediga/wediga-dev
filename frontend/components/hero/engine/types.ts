@@ -9,6 +9,10 @@ export interface HeroConfig {
   // A still, fully-formed frame with no camera ride for visitors who prefer
   // reduced motion.
   reducedMotion: boolean;
+  // Number of section stops the rails ride through (one planet anchors each). The
+  // generator guarantees at least this many planets, so adding a section just adds
+  // a stop. Realistic range is 2 upward.
+  stationCount: number;
 }
 
 export interface EngineCallbacks {
