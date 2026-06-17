@@ -1,52 +1,108 @@
-import { Markdown } from "@/components/Markdown";
-import type { About, SkillCategory } from "@/lib/types";
+import Link from "next/link";
+import type { SkillCategory } from "@/lib/types";
+import { INTRO } from "./content";
 
-// The real, readable landing content (about + skills) sourced from the BFF. It is
-// always present in the DOM for screen readers, search engines and the E2E suite.
-// The Hero decides where to mount it: a visible stacked column under reduced
-// motion, or an accessible layer behind the canvas during the full-motion ride.
-// Mapping this content onto the section planets is Phase H2.
+// The real, readable landing content: an intro teaser (name, role, hook), the
+// public toolkit (skills from the BFF), and the access door. It is always present
+// in the DOM for screen readers, search engines and the E2E suite. The Hero
+// decides where to mount it: the visible, interactive column under reduced
+// motion, or the accessible SEO layer behind the canvas during the full ride.
+// The full About story is intentionally NOT here; the public layer is a teaser
+// plus skills, the About story finds its visible home in the recruiter views.
+// GitHub/LinkedIn are also intentionally absent: the public impressum endpoint
+// only exposes name and email (the impressum split), so the social links stay
+// behind the login and are not surfaced on the public landing.
 export function LandingContent({
-  about,
   skills,
+  isRecruiter,
 }: {
-  about: About | null;
   skills: SkillCategory[];
+  isRecruiter: boolean;
 }) {
   return (
     <div className="mx-auto max-w-2xl px-6 py-16">
-      <h1 className="text-3xl font-bold text-white">wediga.dev</h1>
-
-      <section className="mt-6 text-zinc-100">
-        {about && about.text ? (
-          <Markdown>{about.text}</Markdown>
-        ) : (
-          <p className="text-zinc-400">No about text yet.</p>
-        )}
-      </section>
+      {/* The page's one h1: the name, not the domain. Carries the identity for
+          search engines and the document outline. */}
+      <h1 className="text-4xl font-medium tracking-[-0.02em] text-white">
+        {INTRO.name}
+      </h1>
+      <p className="mt-2 text-sm uppercase tracking-[0.12em] text-zinc-400">
+        {INTRO.role}
+      </p>
+      <p className="mt-4 text-lg leading-relaxed text-zinc-100">{INTRO.hook}</p>
 
       {skills.length > 0 ? (
-        <section className="mt-10">
-          <h2 className="text-xl font-semibold text-white">Skills</h2>
-          <div className="mt-4 space-y-4">
+        <section className="mt-12">
+          <h2 className="text-xl font-medium tracking-[-0.02em] text-white">
+            Toolkit
+          </h2>
+          <div className="mt-5 space-y-5">
             {skills.map((category) => (
-              <div key={category.id}>
-                <h3 className="font-medium text-zinc-200">{category.name}</h3>
-                <ul className="mt-1 flex flex-wrap gap-2">
-                  {category.skills.map((skill) => (
-                    <li
-                      key={skill.id}
-                      className="rounded bg-white/10 px-2 py-1 text-sm text-zinc-100"
-                    >
-                      {skill.name}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <SkillGroup key={category.id} category={category} />
             ))}
           </div>
         </section>
       ) : null}
+
+      <section className="mt-12">
+        <h2 className="text-xl font-medium tracking-[-0.02em] text-white">
+          Zugang
+        </h2>
+        <p className="mt-2 leading-relaxed text-zinc-100">
+          {isRecruiter
+            ? "Ihr Zugang ist freigeschaltet."
+            : "Das vollständige Portfolio liegt hinter dem Login."}
+        </p>
+        <div className="mt-5">
+          <AccessButton isRecruiter={isRecruiter} />
+        </div>
+      </section>
     </div>
+  );
+}
+
+// One skill category: a quiet label and the skills as low-contrast tags. Tags,
+// not a bulleted list, so the toolkit reads as a calm group and never as a
+// data dump. Shared shape with the visible Toolkit station.
+function SkillGroup({ category }: { category: SkillCategory }) {
+  if (category.skills.length === 0) return null;
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-[0.14em] text-zinc-400">
+        {category.name}
+      </p>
+      <ul className="mt-2 flex flex-wrap gap-2">
+        {category.skills.map((skill) => (
+          <li
+            key={skill.id}
+            className="rounded-full bg-white/[0.06] px-3 py-1 text-sm text-zinc-100"
+          >
+            {skill.name}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// The access door, two states. Without a recruiter session it leads to the
+// login; with a valid one it goes one door further, into the portfolio. The
+// server decides which state to render. `decorative` drops it from the tab
+// order for the visual duplicate in the hero station.
+export function AccessButton({
+  isRecruiter,
+  decorative,
+}: {
+  isRecruiter: boolean;
+  decorative?: boolean;
+}) {
+  return (
+    <Link
+      href={isRecruiter ? "/portfolio" : "/login"}
+      tabIndex={decorative ? -1 : undefined}
+      className="hero-door rounded-md border border-white/25 px-6 py-2 text-sm uppercase tracking-[0.14em] text-white transition-colors hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
+    >
+      {isRecruiter ? "Weiter ins Portfolio" : "Anmelden"}
+    </Link>
   );
 }

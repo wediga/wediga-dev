@@ -47,6 +47,24 @@ export function getAbout(): Promise<About | null> {
   return getJson<About>("/content/about");
 }
 
+// Whether the visitor carries a valid recruiter (or admin) session, asked of the
+// backend the same way the recruiter layout gates its pages. Read-only: the
+// landing uses it to flip the access door between login and portfolio, it does
+// not gate any content. The raw cookie header is forwarded verbatim, like the
+// gated reads, so the signed session value is not re-encoded.
+export async function getRecruiterSession(): Promise<boolean> {
+  try {
+    const cookieHeader = (await headers()).get("cookie");
+    const response = await fetch(backendUrl("/recruiter/session"), {
+      headers: cookieHeader ? { cookie: cookieHeader } : {},
+      cache: "no-store",
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 export function getContact(): Promise<Contact | null> {
   return getJsonWithSession<Contact>("/content/contact");
 }

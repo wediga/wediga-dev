@@ -3,10 +3,14 @@ import { backendUrl } from "@/lib/backend";
 
 // Magic-link entry point. A recruiter opens /r/{token}; this route handler
 // redeems the token at the backend server-side, passes the recruiter session
-// cookie back to the browser and redirects into the portfolio. A route handler
-// is used (not a page) because only a route handler may set cookies. An
-// invalid, expired or revoked token lands on a friendly error page without
-// revealing which of the three it was.
+// cookie back to the browser and redirects onto the landing page. A route
+// handler is used (not a page) because only a route handler may set cookies.
+// The landing then sees the fresh recruiter session and offers the door into the
+// portfolio, so a recruiter enters through the hero like everyone else instead
+// of being dropped straight into the portfolio. The redeem, the cookie and the
+// CSRF protection are unchanged; only the redirect target moved from /portfolio
+// to /. An invalid, expired or revoked token still lands on a friendly error
+// page without revealing which of the three it was.
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> },
@@ -26,7 +30,7 @@ export async function GET(
     return NextResponse.redirect(new URL("/link-invalid", request.url));
   }
 
-  const response = NextResponse.redirect(new URL("/portfolio", request.url));
+  const response = NextResponse.redirect(new URL("/", request.url));
   for (const value of backendResponse.headers.getSetCookie()) {
     response.headers.append("set-cookie", value);
   }

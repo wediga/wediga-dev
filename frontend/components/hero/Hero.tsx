@@ -3,11 +3,15 @@
 // The landing hero: an unordered mass of atoms forms into a stilisiertes star
 // system on load, then a scroll-driven on-rails camera rides from planet to
 // planet. Ported unchanged in feel from the approved /hero-lab sandbox; the
-// engine and its motion constants are the frozen contract.
+// engine and its motion constants are the frozen contract. Phase H2 changes only
+// the content carried on the planets, not the camera, scrim, spring or timing.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import type { EngineHandle } from "./engine/types";
+import type { SkillCategory } from "@/lib/types";
+import { INTRO } from "./content";
+import { AccessButton } from "./LandingContent";
 
 // Subscribe to prefers-reduced-motion the React way: SSR-safe (server snapshot is
 // false), no setState-in-effect, and it follows live changes to the setting.
@@ -30,40 +34,27 @@ function usePrefersReducedMotion(): boolean {
 // Fixed in production: the approved configuration is 120k individual lit points.
 const ATOM_COUNT = 120000;
 
-// Public landing sections, in fixed order. Sparse on purpose: the public page is a
-// teaser, the depth lives behind the recruiter login. One planet anchors each
-// section, and the engine is told the count so it always has enough planets.
-// (Wording is a working draft; the access links are placeholders until H2 wires
-// the real contact URLs from the BFF.)
-type Section = {
-  eyebrow: string;
-  title: string;
-  body: string;
-  kicker?: string;
-  avatar?: boolean;
-  access?: boolean;
-};
-const SECTIONS: Section[] = [
-  {
-    eyebrow: "Intro",
-    title: "Alexander Wedig",
-    kicker: "Softwareentwickler aus Berlin",
-    body: "Auf dem Weg ins Machine Learning Engineering.",
-    avatar: true,
-  },
-  {
-    eyebrow: "Zugang",
-    title: "Mehr sehen",
-    body: "Das vollständige Portfolio liegt hinter dem Login.",
-    access: true,
-  },
-];
+// Public landing stations, in fixed order: an intro teaser, a toolkit planet that
+// carries the real skills, and the access door. Sparse on purpose: the public
+// page is a teaser, the depth lives behind the recruiter login. One planet
+// anchors each station, and the engine is told the count so it always has enough
+// planets. The order is fixed; which planet holds which station is generative.
+type StationKind = "intro" | "toolkit" | "access";
+const STATIONS: StationKind[] = ["intro", "toolkit", "access"];
 
 function randomSeed() {
   return Math.floor(Math.random() * 1_000_000);
 }
 
-export function Hero({ readable }: { readable: React.ReactNode }) {
+export function Hero({
+  readable,
+  skills,
+  isRecruiter,
+}: {
+  readable: React.ReactNode;
+  skills: SkillCategory[];
+  isRecruiter: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<EngineHandle | null>(null);
   const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -130,7 +121,7 @@ export function Hero({ readable }: { readable: React.ReactNode }) {
             atomCount: ATOM_COUNT,
             seed,
             reducedMotion,
-            stationCount: SECTIONS.length,
+            stationCount: STATIONS.length,
           },
           { onStation },
         );
@@ -168,6 +159,11 @@ export function Hero({ readable }: { readable: React.ReactNode }) {
     };
   }, [reducedMotion]);
 
+  const titleClass = (i: number) =>
+    `text-[clamp(2rem,6vh,4.5rem)] font-medium leading-[1.05] tracking-[-0.02em] text-white ${
+      active === i ? "hero-assemble" : ""
+    }`;
+
   return (
     <main className="relative bg-[#05060a] text-zinc-200">
       <style>{`
@@ -176,8 +172,30 @@ export function Hero({ readable }: { readable: React.ReactNode }) {
           to { opacity: 1; filter: blur(0); transform: none; letter-spacing: normal; }
         }
         .hero-assemble { animation: heroAssemble 760ms cubic-bezier(0.16,1,0.3,1) both; }
+        /* Content reveal bound to the existing dock moment: the toolkit groups
+           rise in a short stagger as the station opens. It rides the camera and
+           scrim timing, it does not change them. */
+        @keyframes heroRise {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: none; }
+        }
+        .hero-rise > * { opacity: 0; animation: heroRise 560ms cubic-bezier(0.16,1,0.3,1) both; }
+        .hero-rise > *:nth-child(1) { animation-delay: 40ms; }
+        .hero-rise > *:nth-child(2) { animation-delay: 100ms; }
+        .hero-rise > *:nth-child(3) { animation-delay: 160ms; }
+        .hero-rise > *:nth-child(4) { animation-delay: 220ms; }
+        .hero-rise > *:nth-child(5) { animation-delay: 280ms; }
+        .hero-rise > *:nth-child(6) { animation-delay: 340ms; }
+        .hero-rise > *:nth-child(7) { animation-delay: 400ms; }
+        .hero-rise > *:nth-child(8) { animation-delay: 460ms; }
+        /* Physical press feedback on the access door. */
+        .hero-door { transition: transform 160ms cubic-bezier(0.16,1,0.3,1), background-color 200ms ease; }
+        .hero-door:active { transform: scale(0.97); }
         @media (prefers-reduced-motion: reduce) {
           .hero-assemble { animation: none; }
+          .hero-rise > * { animation: none; opacity: 1; }
+          .hero-door { transition: background-color 200ms ease; }
+          .hero-door:active { transform: none; }
         }
       `}</style>
 
@@ -189,7 +207,8 @@ export function Hero({ readable }: { readable: React.ReactNode }) {
 
       {reducedMotion ? (
         // Flat, fully readable column over the formed still frame. No camera, no
-        // rails: the real content is the page.
+        // rails: the real content is the page, and it is the same teaser, toolkit
+        // and access door as the full-motion ride.
         <div className="relative z-10 min-h-screen bg-[#05060a]/92 backdrop-blur-sm">
           {readable}
           <SiteFooter className="mx-auto max-w-2xl px-6 pb-16" />
@@ -197,8 +216,9 @@ export function Hero({ readable }: { readable: React.ReactNode }) {
       ) : (
         <>
           {/* The real BFF content stays in the DOM behind the canvas: present for
-              screen readers, search engines and the E2E suite while the ride plays.
-              Phase H2 surfaces it into the visible section planets. */}
+              screen readers, search engines and the E2E suite while the ride
+              plays. It is the accessible source of truth; the visible stations
+              below are its visual duplicate. */}
           <div
             className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
             aria-hidden="false"
@@ -206,13 +226,15 @@ export function Hero({ readable }: { readable: React.ReactNode }) {
             {readable}
           </div>
 
-          {/* Placeholder station text, real DOM text positioned on the active
-              planet via its projected screen coordinates, with a soft scrim behind
-              for legibility. Only the active station is shown. */}
-          <div className="pointer-events-none fixed inset-0 z-10">
-            {SECTIONS.map((s, i) => (
+          {/* Visible station text, real DOM text positioned on the active planet
+              via its projected screen coordinates, with a soft scrim behind for
+              legibility. Only the active station is shown. The whole overlay is a
+              visual duplicate of the readable layer, so it is aria-hidden and its
+              controls are out of the tab order; mouse users still click the door. */}
+          <div className="pointer-events-none fixed inset-0 z-10" aria-hidden="true">
+            {STATIONS.map((kind, i) => (
               <div
-                key={s.eyebrow}
+                key={kind}
                 ref={(el) => {
                   sectionRefs.current[i] = el;
                 }}
@@ -231,52 +253,80 @@ export function Hero({ readable }: { readable: React.ReactNode }) {
                       "radial-gradient(circle closest-side at center, rgba(5,6,10,1) 0%, rgba(5,6,10,0.99) 48%, rgba(5,6,10,0.92) 72%, rgba(5,6,10,0.72) 90%, rgba(5,6,10,0) 100%)",
                   }}
                 />
-                {s.avatar ? (
-                  // Small self-hosted portrait; the next/image optimizer is needless
-                  // for an 88 KB asset and flaky in dev, so a plain img is cleaner.
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src="/portrait.jpg"
-                    alt="Alexander Wedig"
-                    width={56}
-                    height={56}
-                    className="mx-auto mb-[2vh] h-[clamp(4rem,11vh,8rem)] w-[clamp(4rem,11vh,8rem)] rounded-full object-cover"
-                  />
+
+                {kind === "intro" ? (
+                  <>
+                    {/* Small self-hosted portrait; the next/image optimizer is
+                        needless for an 88 KB asset and flaky in dev, so a plain img
+                        is cleaner. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/portrait.jpg"
+                      alt="Alexander Wedig"
+                      width={56}
+                      height={56}
+                      className="mx-auto mb-[2vh] h-[clamp(4rem,11vh,8rem)] w-[clamp(4rem,11vh,8rem)] rounded-full object-cover"
+                    />
+                    <h2 key={active === i ? `${i}-on` : `${i}-off`} className={titleClass(i)}>
+                      {INTRO.name}
+                    </h2>
+                    <p className="mt-[1vh] text-[clamp(0.72rem,1.5vh,1.05rem)] uppercase tracking-[0.12em] text-zinc-400">
+                      {INTRO.role}
+                    </p>
+                    <p className="mx-auto mt-[1.8vh] max-w-md text-[clamp(1rem,2.4vh,1.6rem)] leading-relaxed text-zinc-100">
+                      {INTRO.hook}
+                    </p>
+                  </>
                 ) : null}
-                <h2
-                  key={active === i ? `${i}-on` : `${i}-off`}
-                  className={`text-[clamp(2rem,6vh,4.5rem)] font-medium leading-[1.05] tracking-[-0.02em] text-white ${
-                    active === i ? "hero-assemble" : ""
-                  }`}
-                >
-                  {s.title}
-                </h2>
-                {s.kicker ? (
-                  <p className="mt-[1vh] text-[clamp(0.72rem,1.5vh,1.05rem)] uppercase tracking-[0.12em] text-zinc-400">
-                    {s.kicker}
-                  </p>
+
+                {kind === "toolkit" ? (
+                  <>
+                    <h2 key={active === i ? `${i}-on` : `${i}-off`} className={titleClass(i)}>
+                      Toolkit
+                    </h2>
+                    {skills.length > 0 ? (
+                      <div
+                        key={active === i ? `${i}-groups-on` : `${i}-groups-off`}
+                        className="hero-rise mt-[2.2vh] flex flex-col items-center gap-[1.6vh]"
+                      >
+                        {skills.map((category) =>
+                          category.skills.length === 0 ? null : (
+                            <div key={category.id}>
+                              <p className="text-[clamp(0.6rem,1.2vh,0.8rem)] uppercase tracking-[0.14em] text-zinc-400">
+                                {category.name}
+                              </p>
+                              <ul className="mt-[0.8vh] flex flex-wrap justify-center gap-2">
+                                {category.skills.map((skill) => (
+                                  <li
+                                    key={skill.id}
+                                    className="rounded-full bg-white/[0.06] px-3 py-1 text-[clamp(0.78rem,1.7vh,1.05rem)] text-zinc-100"
+                                  >
+                                    {skill.name}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    ) : null}
+                  </>
                 ) : null}
-                <p className="mx-auto mt-[1.8vh] max-w-md text-[clamp(1rem,2.4vh,1.6rem)] leading-relaxed text-zinc-100">
-                  {s.body}
-                </p>
-                {s.access ? (
-                  <div className="pointer-events-auto mt-6 flex flex-col items-center gap-5">
-                    <div className="flex items-center gap-4 text-[clamp(0.72rem,1.4vh,1rem)] uppercase tracking-[0.14em] text-zinc-300">
-                      <a href="#" className="transition-colors hover:text-white">
-                        GitHub
-                      </a>
-                      <span className="text-zinc-600">·</span>
-                      <a href="#" className="transition-colors hover:text-white">
-                        LinkedIn
-                      </a>
+
+                {kind === "access" ? (
+                  <>
+                    <h2 key={active === i ? `${i}-on` : `${i}-off`} className={titleClass(i)}>
+                      Zugang
+                    </h2>
+                    <p className="mx-auto mt-[1.8vh] max-w-md text-[clamp(1rem,2.4vh,1.6rem)] leading-relaxed text-zinc-100">
+                      {isRecruiter
+                        ? "Ihr Zugang ist freigeschaltet."
+                        : "Das vollständige Portfolio liegt hinter dem Login."}
+                    </p>
+                    <div className="pointer-events-auto mt-[2vh] flex justify-center">
+                      <AccessButton isRecruiter={isRecruiter} decorative />
                     </div>
-                    <Link
-                      href="/login"
-                      className="rounded-md border border-white/25 px-6 py-2 text-[clamp(0.72rem,1.4vh,1rem)] uppercase tracking-[0.14em] text-white transition-colors hover:bg-white/5"
-                    >
-                      Anmelden
-                    </Link>
-                  </div>
+                  </>
                 ) : null}
               </div>
             ))}
@@ -285,7 +335,7 @@ export function Hero({ readable }: { readable: React.ReactNode }) {
           {/* Scroll track: one full-viewport snap section per stop (overview first,
               then one per station), so the wheel locks onto a station instead of
               leaving you in an in-between. The camera reads scrollY in the frame. */}
-          {Array.from({ length: SECTIONS.length + 1 }).map((_, i) => (
+          {Array.from({ length: STATIONS.length + 1 }).map((_, i) => (
             <div
               key={i}
               aria-hidden="true"
@@ -304,9 +354,7 @@ export function Hero({ readable }: { readable: React.ReactNode }) {
 
 function SiteFooter({ className }: { className?: string }) {
   return (
-    <footer
-      className={`flex gap-5 text-sm text-zinc-400 ${className ?? ""}`}
-    >
+    <footer className={`flex gap-5 text-sm text-zinc-400 ${className ?? ""}`}>
       <Link href="/impressum" className="transition-colors hover:text-white">
         Impressum
       </Link>

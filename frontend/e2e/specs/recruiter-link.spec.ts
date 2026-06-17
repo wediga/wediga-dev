@@ -2,10 +2,12 @@ import { test, expect } from "@playwright/test";
 import { login, openAdminPage } from "../helpers";
 
 // A recruiter link must unlock the recruiter view through /r/{token}, and
-// revoking it must lock the view again on the very next read. The visitor runs
-// in a separate browser context, so it carries only the recruiter session and
-// never the admin one.
-test("a recruiter link unlocks the recruiter view and revocation locks it again", async ({
+// revoking it must lock the view again on the very next read. Since Phase H2 the
+// magic link lands on the landing page, not straight in the portfolio: the
+// landing sees the fresh recruiter session and offers the door onward. The
+// visitor runs in a separate browser context, so it carries only the recruiter
+// session and never the admin one.
+test("a recruiter link lands on the landing, opens the portfolio through the access door, and revocation locks it again", async ({
   page,
   browser,
 }) => {
@@ -21,11 +23,18 @@ test("a recruiter link unlocks the recruiter view and revocation locks it again"
   const url = (await code.textContent())?.trim() ?? "";
   expect(url).toContain("/r/");
 
-  const visitor = await browser.newContext();
+  // The visitor uses reduced motion, so the landing renders its flat, interactive
+  // column with the access door rather than the WebGL ride.
+  const visitor = await browser.newContext({ reducedMotion: "reduce" });
   const visitorPage = await visitor.newPage();
   await visitorPage.goto(url);
 
-  // Redeeming the token starts the recruiter session and lands in the portfolio.
+  // Redeeming the token starts the recruiter session and now lands on the
+  // landing page (origin root), not directly in the portfolio.
+  await expect(visitorPage).toHaveURL(/^http:\/\/localhost:\d+\/$/);
+
+  // With a valid recruiter session the access door leads onward to the portfolio.
+  await visitorPage.getByRole("link", { name: "Weiter ins Portfolio" }).click();
   await expect(visitorPage).toHaveURL(/\/portfolio$/);
   await expect(
     visitorPage.getByRole("heading", { name: "Portfolio" }),
