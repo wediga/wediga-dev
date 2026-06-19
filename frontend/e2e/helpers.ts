@@ -9,8 +9,8 @@ export const ADMIN_PASSWORD =
 // browser on /admin once the session cookie is set.
 export async function login(page: Page): Promise<void> {
   await page.goto("/login");
-  await page.getByPlaceholder("Password").fill(ADMIN_PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByLabel("Passwort").fill(ADMIN_PASSWORD);
+  await page.getByRole("button", { name: "Anmelden" }).click();
   // The admin nav only renders once the layout gate accepts the session.
   await expect(page.getByRole("link", { name: "Overview" })).toBeVisible();
 }

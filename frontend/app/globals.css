@@ -70,6 +70,38 @@ body {
   pointer-events: none;
 }
 
+/*
+  Quiet pages (login, impressum, link-invalid). One restrained entrance: the
+  content settles in once on load. The resting state is fully visible, so the
+  keyframe only enhances an already-readable page and reduced motion collapses
+  it to instant via the block below.
+*/
+@keyframes quiet-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.quiet-enter {
+  animation: quiet-enter 420ms var(--ease-out) both;
+}
+
+/* Press feedback on the quiet buttons/links, transform only. */
+.quiet-press {
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 160ms var(--ease-out);
+}
+
+.quiet-press:active {
+  transform: scale(0.98);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -78,5 +110,9 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .quiet-press:active {
+    transform: none;
   }
 }
