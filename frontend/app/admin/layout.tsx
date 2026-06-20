@@ -1,21 +1,9 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import Link from "next/link";
 
 import { backendUrl } from "@/lib/backend";
 import { LogoutButton } from "@/components/LogoutButton";
-
-const NAV = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/about", label: "About" },
-  { href: "/admin/projects", label: "Projects" },
-  { href: "/admin/skills", label: "Skills" },
-  { href: "/admin/contact", label: "Contact" },
-  { href: "/admin/impressum", label: "Impressum" },
-  { href: "/admin/repos", label: "Repos" },
-  { href: "/admin/cv", label: "CV" },
-  { href: "/admin/links", label: "Links" },
-];
+import { AdminNav } from "@/components/admin/AdminNav";
 
 // Server-side guard: ask the backend whether the forwarded session is an admin
 // session. A missing or invalid session redirects to the login page, so the
@@ -38,18 +26,16 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-full">
-      <header className="flex items-center justify-between border-b border-gray-200 px-6 py-3">
-        <nav className="flex flex-wrap gap-4 text-sm">
-          {NAV.map((item) => (
-            <Link key={item.href} href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <LogoutButton />
+    <div className="flex min-h-[100dvh] flex-col bg-bg text-ink">
+      <header className="sticky top-0 z-[var(--z-nav)] border-b border-line bg-bg/85 backdrop-blur-md">
+        <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-3 px-5 py-3">
+          <AdminNav />
+          <LogoutButton />
+        </div>
       </header>
-      <main className="mx-auto max-w-3xl p-6">{children}</main>
+      <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-8 sm:py-10">
+        {children}
+      </main>
     </div>
   );
 }

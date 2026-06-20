@@ -4,13 +4,25 @@ import { useCallback, useEffect, useState } from "react";
 import { apiWrite } from "@/lib/adminClient";
 import { useCsrf } from "@/components/admin/useCsrf";
 import type { SkillCategory } from "@/lib/types";
+import {
+  ADMIN_INPUT,
+  AdminButton,
+  ConfirmButton,
+  EmptyState,
+  Feedback,
+  useActionFeedback,
+} from "@/components/admin/ui";
+
+// The inline name fields reuse the shared input look so they cannot drift from
+// the rest of the admin forms; each call adds flex-1 to fill its row.
+const NAME_INPUT = ADMIN_INPUT;
 
 export default function AdminSkillsPage() {
   const token = useCsrf();
   const [categories, setCategories] = useState<SkillCategory[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [newSkill, setNewSkill] = useState<Record<number, string>>({});
-  const [status, setStatus] = useState("");
+  const { run, get } = useActionFeedback();
 
   const load = useCallback(() => {
     return fetch("/api/content/skills", { cache: "no-store" })
@@ -46,34 +58,46 @@ export default function AdminSkillsPage() {
     );
   }
 
-  async function send(
+  // One write, keyed so each control reports its own outcome. On success the
+  // list reloads so the inputs reflect the committed state.
+  function write(
+    key: string,
     path: string,
     method: "POST" | "PUT" | "DELETE",
+    messages: { success: string; error: string },
     body?: unknown,
-  ): Promise<boolean> {
-    const response = await apiWrite(path, method, token, body);
-    if (response.ok) {
-      await load();
-      return true;
-    }
-    setStatus("Request failed");
-    return false;
+  ) {
+    return run(
+      key,
+      async () => {
+        const response = await apiWrite(path, method, token, body);
+        if (response.ok) await load();
+        return response.ok;
+      },
+      messages,
+    );
   }
 
   async function addCategory() {
     if (!newCategory.trim()) return;
-    const ok = await send("/api/content/skills/categories", "POST", {
-      name: newCategory,
-    });
+    const ok = await write(
+      "add-category",
+      "/api/content/skills/categories",
+      "POST",
+      { success: "Added", error: "Couldn't add. Try again." },
+      { name: newCategory },
+    );
     if (ok) setNewCategory("");
   }
 
   async function addSkill(categoryId: number) {
     const name = (newSkill[categoryId] ?? "").trim();
     if (!name) return;
-    const ok = await send(
+    const ok = await write(
+      `cat-${categoryId}-add`,
       `/api/content/skills/categories/${categoryId}/skills`,
       "POST",
+      { success: "Added", error: "Couldn't add. Try again." },
       { name },
     );
     if (ok) setNewSkill((current) => ({ ...current, [categoryId]: "" }));
@@ -81,76 +105,112 @@ export default function AdminSkillsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Skills</h1>
-      {status ? <p className="mt-2 text-sm text-gray-600">{status}</p> : null}
+      <h1 className="text-xl font-semibold text-ink">Skills</h1>
+      <p className="mt-1 text-sm text-muted">
+        Categories and the skills inside them, shown on the landing page.
+      </p>
 
-      <div className="mt-6 space-y-6">
+      <div className="mt-6 space-y-5">
         {categories.map((category) => (
-          <div key={category.id} className="rounded border border-gray-200 p-4">
-            <div className="flex items-center gap-2">
+          <div
+            key={category.id}
+            className="rounded-lg border border-line bg-surface/40 p-4 sm:p-5"
+          >
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 value={category.name}
                 onChange={(event) =>
                   setCategoryName(category.id, event.target.value)
                 }
-                className="flex-1 rounded border border-gray-300 px-3 py-1 font-semibold"
+                aria-label="Category name"
+                className="min-w-[12rem] flex-1 border-0 border-b border-line bg-transparent px-0 pb-1.5 text-lg font-semibold text-ink transition-colors hover:border-muted-2 focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60"
               />
-              <button
+              <AdminButton
+                pending={get(`cat-${category.id}-rename`).state === "pending"}
+                pendingLabel="Saving…"
                 onClick={() =>
-                  send(
+                  write(
+                    `cat-${category.id}-rename`,
                     `/api/content/skills/categories/${category.id}`,
                     "PUT",
+                    { success: "Saved", error: "Couldn't save." },
                     { name: category.name, sort_order: category.sort_order },
                   )
                 }
-                className="rounded border border-gray-300 px-3 py-1 text-sm"
               >
                 Rename
-              </button>
-              <button
-                onClick={() =>
-                  send(`/api/content/skills/categories/${category.id}`, "DELETE")
+              </AdminButton>
+              <ConfirmButton
+                label="Delete"
+                prompt="Delete this category?"
+                pendingLabel="Deleting…"
+                pending={get(`cat-${category.id}-delete`).state === "pending"}
+                onConfirm={() =>
+                  write(
+                    `cat-${category.id}-delete`,
+                    `/api/content/skills/categories/${category.id}`,
+                    "DELETE",
+                    { success: "Deleted", error: "Couldn't delete." },
+                  )
                 }
-                className="rounded border border-gray-300 px-3 py-1 text-sm"
-              >
-                Delete
-              </button>
+              />
+              <Feedback status={get(`cat-${category.id}-rename`)} />
+              <Feedback status={get(`cat-${category.id}-delete`)} />
             </div>
 
-            <ul className="mt-3 space-y-2">
+            <p className="mt-5 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-muted-2">
+              Skills
+            </p>
+            <ul className="mt-2 divide-y divide-line border-t border-line">
               {category.skills.map((skill) => (
-                <li key={skill.id} className="flex items-center gap-2">
+                <li
+                  key={skill.id}
+                  className="flex flex-wrap items-center gap-2 py-2.5"
+                >
                   <input
                     value={skill.name}
                     onChange={(event) =>
                       setSkillName(category.id, skill.id, event.target.value)
                     }
-                    className="flex-1 rounded border border-gray-300 px-3 py-1 text-sm"
+                    aria-label="Skill name"
+                    className={`${NAME_INPUT} flex-1`}
                   />
-                  <button
+                  <AdminButton
+                    pending={get(`skill-${skill.id}-rename`).state === "pending"}
+                    pendingLabel="Saving…"
                     onClick={() =>
-                      send(`/api/content/skills/${skill.id}`, "PUT", {
-                        name: skill.name,
-                        sort_order: skill.sort_order,
-                      })
+                      write(
+                        `skill-${skill.id}-rename`,
+                        `/api/content/skills/${skill.id}`,
+                        "PUT",
+                        { success: "Saved", error: "Couldn't save." },
+                        { name: skill.name, sort_order: skill.sort_order },
+                      )
                     }
-                    className="rounded border border-gray-300 px-3 py-1 text-sm"
                   >
                     Rename
-                  </button>
-                  <button
-                    onClick={() =>
-                      send(`/api/content/skills/${skill.id}`, "DELETE")
+                  </AdminButton>
+                  <ConfirmButton
+                    label="Delete"
+                    prompt="Delete this skill?"
+                    pendingLabel="Deleting…"
+                    pending={get(`skill-${skill.id}-delete`).state === "pending"}
+                    onConfirm={() =>
+                      write(
+                        `skill-${skill.id}-delete`,
+                        `/api/content/skills/${skill.id}`,
+                        "DELETE",
+                        { success: "Deleted", error: "Couldn't delete." },
+                      )
                     }
-                    className="rounded border border-gray-300 px-3 py-1 text-sm"
-                  >
-                    Delete
-                  </button>
+                  />
+                  <Feedback status={get(`skill-${skill.id}-rename`)} />
+                  <Feedback status={get(`skill-${skill.id}-delete`)} />
                 </li>
               ))}
             </ul>
 
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <input
                 value={newSkill[category.id] ?? ""}
                 onChange={(event) =>
@@ -160,35 +220,43 @@ export default function AdminSkillsPage() {
                   }))
                 }
                 placeholder="New skill"
-                className="flex-1 rounded border border-gray-300 px-3 py-1 text-sm"
+                aria-label="New skill name"
+                className={`${NAME_INPUT} flex-1`}
               />
-              <button
+              <AdminButton
+                variant="primary"
+                pending={get(`cat-${category.id}-add`).state === "pending"}
+                pendingLabel="Adding…"
                 onClick={() => addSkill(category.id)}
-                className="rounded bg-gray-900 px-3 py-1 text-sm text-white"
               >
                 Add skill
-              </button>
+              </AdminButton>
+              <Feedback status={get(`cat-${category.id}-add`)} />
             </div>
           </div>
         ))}
         {categories.length === 0 ? (
-          <p className="text-sm text-gray-500">No categories yet.</p>
+          <EmptyState>No categories yet. Add the first one below.</EmptyState>
         ) : null}
       </div>
 
-      <div className="mt-6 flex items-center gap-2">
+      <div className="mt-6 flex flex-wrap items-center gap-2">
         <input
           value={newCategory}
           onChange={(event) => setNewCategory(event.target.value)}
           placeholder="New category"
-          className="flex-1 rounded border border-gray-300 px-3 py-2"
+          aria-label="New category name"
+          className={`${NAME_INPUT} flex-1`}
         />
-        <button
+        <AdminButton
+          variant="primary"
+          pending={get("add-category").state === "pending"}
+          pendingLabel="Adding…"
           onClick={addCategory}
-          className="rounded bg-gray-900 px-4 py-2 text-sm text-white"
         >
           Add category
-        </button>
+        </AdminButton>
+        <Feedback status={get("add-category")} />
       </div>
     </div>
   );

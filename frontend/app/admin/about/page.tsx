@@ -3,58 +3,96 @@
 import { useEffect, useState } from "react";
 import { apiWrite } from "@/lib/adminClient";
 import { useCsrf } from "@/components/admin/useCsrf";
+import {
+  AdminButton,
+  AdminField,
+  ConfirmButton,
+  Feedback,
+  useActionFeedback,
+} from "@/components/admin/ui";
 
 export default function AdminAboutPage() {
   const token = useCsrf();
   const [text, setText] = useState("");
-  const [status, setStatus] = useState("");
+  const { run, get, set } = useActionFeedback();
 
   useEffect(() => {
     fetch("/api/content/about", { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : { text: "" }))
       .then((data) => setText(data.text ?? ""))
-      .catch(() => setStatus("Load failed"));
-  }, []);
+      .catch(() =>
+        set("load", {
+          state: "error",
+          message: "Couldn't load the current text. Reload the page.",
+        }),
+      );
+  }, [set]);
 
-  async function save() {
-    const response = await apiWrite("/api/content/about", "PUT", token, { text });
-    setStatus(response.ok ? "Saved" : "Save failed");
-  }
+  const save = () =>
+    run(
+      "save",
+      async () => {
+        const response = await apiWrite("/api/content/about", "PUT", token, {
+          text,
+        });
+        return response.ok;
+      },
+      { success: "Saved", error: "Couldn't save. Try again." },
+    );
 
-  async function remove() {
-    const response = await apiWrite("/api/content/about", "DELETE", token);
-    if (response.ok) {
-      setText("");
-      setStatus("Deleted");
-    } else {
-      setStatus("Delete failed");
-    }
-  }
+  const remove = () =>
+    run(
+      "delete",
+      async () => {
+        const response = await apiWrite("/api/content/about", "DELETE", token);
+        if (response.ok) setText("");
+        return response.ok;
+      },
+      { success: "Deleted", error: "Couldn't delete. Try again." },
+    );
+
+  const load = get("load");
+  const saving = get("save").state === "pending";
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">About</h1>
-      <p className="mt-1 text-sm text-gray-500">Markdown is rendered on the site.</p>
-      <textarea
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        rows={16}
-        className="mt-4 w-full rounded border border-gray-300 p-3 font-mono text-sm"
-      />
-      <div className="mt-3 flex items-center gap-3">
-        <button
+      <h1 className="text-xl font-semibold text-ink">About</h1>
+      <p className="mt-1 text-sm text-muted">
+        Markdown is rendered on the site.
+      </p>
+      {load.state === "error" ? (
+        <p className="mt-4 text-sm text-danger">{load.message}</p>
+      ) : null}
+
+      <div className="mt-6">
+        <AdminField
+          label="Intro text"
+          value={text}
+          onChange={setText}
+          multiline
+          rows={16}
+          mono
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <AdminButton
+          variant="primary"
+          pending={saving}
+          pendingLabel="Saving…"
           onClick={save}
-          className="rounded bg-gray-900 px-4 py-2 text-sm text-white"
         >
           Save
-        </button>
-        <button
-          onClick={remove}
-          className="rounded border border-gray-300 px-4 py-2 text-sm"
-        >
-          Delete
-        </button>
-        {status ? <span className="text-sm text-gray-600">{status}</span> : null}
+        </AdminButton>
+        <ConfirmButton
+          label="Delete"
+          prompt="Delete the intro text?"
+          pendingLabel="Deleting…"
+          pending={get("delete").state === "pending"}
+          onConfirm={remove}
+        />
+        <Feedback status={get("save")} />
+        <Feedback status={get("delete")} />
       </div>
     </div>
   );

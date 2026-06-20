@@ -34,6 +34,15 @@
   --status-wip: #ea6a38;
   --status-early: #c98aae;
 
+  /* Feedback colours for the admin forms. Two semantic tokens, deliberately
+     outside the warm Sakura arc so they read as system feedback, not as the
+     crimson accent or a warm status: a clear green for a confirmed write and a
+     clear red for a failed or destructive one. Both clear AA on the dark
+     surface as text, and they carry borders and tinted blocks via opacity
+     utilities, so the pages never need a raw hex of their own. */
+  --success: #5ec98a;
+  --danger: #ef5d61;
+
   /* Generative accent fallbacks. The runtime script overrides --gen-dot per
      toolkit item and --gen-underline once per system; without a hero snapshot
      (a direct view without the landing) both fall back to the crimson accent. */
@@ -62,6 +71,8 @@
   --color-status-done: var(--status-done);
   --color-status-wip: var(--status-wip);
   --color-status-early: var(--status-early);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
 
   --font-sans: var(--font-display), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
@@ -79,6 +90,9 @@ body {
   font-family: var(--font-sans);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  /* The whole site is dark, so native controls (date pickers, checkboxes,
+     scrollbars) should render in their dark variant rather than light-on-dark. */
+  color-scheme: dark;
 }
 
 /*

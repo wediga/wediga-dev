@@ -4,6 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { apiWrite } from "@/lib/adminClient";
 import { useCsrf } from "@/components/admin/useCsrf";
 import type { Project } from "@/lib/types";
+import {
+  AdminButton,
+  AdminField,
+  ConfirmButton,
+  Feedback,
+  useActionFeedback,
+} from "@/components/admin/ui";
 
 type FormState = {
   name: string;
@@ -68,21 +75,24 @@ function toBody(form: FormState) {
   };
 }
 
-const TEXT_FIELDS: (keyof FormState)[] = [
-  "name",
-  "tagline",
-  "demo_link",
-  "github_link",
-  "status",
+const SHORT_FIELDS: { key: keyof FormState; label: string }[] = [
+  { key: "tagline", label: "Tagline" },
+  { key: "status", label: "Status" },
+  { key: "demo_link", label: "Demo link" },
+  { key: "github_link", label: "GitHub link" },
 ];
-const AREA_FIELDS: (keyof FormState)[] = ["problem", "solution", "learning"];
+const AREA_FIELDS: { key: keyof FormState; label: string }[] = [
+  { key: "problem", label: "Problem" },
+  { key: "solution", label: "Solution" },
+  { key: "learning", label: "Learning" },
+];
 
 export default function AdminProjectsPage() {
   const token = useCsrf();
   const [projects, setProjects] = useState<Project[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
-  const [status, setStatus] = useState("");
+  const { run, get } = useActionFeedback();
 
   const load = useCallback(() => {
     return fetch("/api/content/projects", { cache: "no-store" })
@@ -97,159 +107,164 @@ export default function AdminProjectsPage() {
   function startNew() {
     setEditingId(null);
     setForm(EMPTY);
-    setStatus("");
   }
 
   function startEdit(project: Project) {
     setEditingId(project.id);
     setForm(toForm(project));
-    setStatus("");
   }
 
   function update<K extends keyof FormState>(field: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  async function save() {
-    const body = toBody(form);
-    const response =
-      editingId === null
-        ? await apiWrite("/api/content/projects", "POST", token, body)
-        : await apiWrite(
-            `/api/content/projects/${editingId}`,
-            "PUT",
-            token,
-            body,
-          );
-    if (response.ok) {
-      setStatus("Saved");
-      startNew();
-      await load();
-    } else {
-      setStatus("Save failed");
-    }
-  }
-
-  async function remove(id: number) {
-    const response = await apiWrite(
-      `/api/content/projects/${id}`,
-      "DELETE",
-      token,
+  const save = () =>
+    run(
+      "save",
+      async () => {
+        const body = toBody(form);
+        const response =
+          editingId === null
+            ? await apiWrite("/api/content/projects", "POST", token, body)
+            : await apiWrite(
+                `/api/content/projects/${editingId}`,
+                "PUT",
+                token,
+                body,
+              );
+        if (response.ok) {
+          startNew();
+          await load();
+        }
+        return response.ok;
+      },
+      { success: "Saved", error: "Couldn't save. Try again." },
     );
-    if (response.ok) {
-      if (editingId === id) startNew();
-      await load();
-    } else {
-      setStatus("Delete failed");
-    }
-  }
+
+  const remove = (id: number) =>
+    run(
+      `delete-${id}`,
+      async () => {
+        const response = await apiWrite(
+          `/api/content/projects/${id}`,
+          "DELETE",
+          token,
+        );
+        if (response.ok) {
+          if (editingId === id) startNew();
+          await load();
+        }
+        return response.ok;
+      },
+      { success: "Deleted", error: "Couldn't delete. Try again." },
+    );
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Projects</h1>
+      <h1 className="text-xl font-semibold text-ink">Projects</h1>
+      <p className="mt-1 text-sm text-muted">
+        Showcase projects, ordered by sort order.
+      </p>
 
-      <ul className="mt-4 divide-y divide-gray-200 rounded border border-gray-200">
+      <ul className="mt-6 divide-y divide-line overflow-hidden rounded-lg border border-line">
         {projects.map((project) => (
           <li
             key={project.id}
-            className="flex items-center justify-between px-4 py-2"
+            className="flex flex-wrap items-center justify-between gap-3 bg-surface/40 px-4 py-3"
           >
-            <span>
+            <span className="text-sm text-ink">
               {project.name}
-              {project.visible ? "" : " (hidden)"}
+              {project.visible ? null : (
+                <span className="ml-2 text-xs text-muted">(hidden)</span>
+              )}
             </span>
-            <span className="flex gap-2">
-              <button
-                onClick={() => startEdit(project)}
-                className="rounded border border-gray-300 px-3 py-1 text-sm"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => remove(project.id)}
-                className="rounded border border-gray-300 px-3 py-1 text-sm"
-              >
-                Delete
-              </button>
+            <span className="flex flex-wrap items-center gap-2">
+              <AdminButton onClick={() => startEdit(project)}>Edit</AdminButton>
+              <ConfirmButton
+                label="Delete"
+                prompt="Delete this project?"
+                pendingLabel="Deleting…"
+                pending={get(`delete-${project.id}`).state === "pending"}
+                onConfirm={() => remove(project.id)}
+              />
+              <Feedback status={get(`delete-${project.id}`)} />
             </span>
           </li>
         ))}
         {projects.length === 0 ? (
-          <li className="px-4 py-2 text-sm text-gray-500">No projects yet.</li>
+          <li className="bg-surface/40 px-4 py-6 text-center text-sm text-muted">
+            No projects yet. Create the first one below.
+          </li>
         ) : null}
       </ul>
 
-      <h2 className="mt-8 text-lg font-semibold">
+      <h2 className="mt-9 text-base font-semibold text-ink">
         {editingId === null ? "New project" : "Edit project"}
       </h2>
-      <div className="mt-3 space-y-3">
-        {TEXT_FIELDS.map((field) => (
-          <label key={field} className="block">
-            <span className="text-sm capitalize text-gray-600">
-              {field.replace("_", " ")}
-            </span>
-            <input
-              value={form[field] as string}
-              onChange={(event) => update(field, event.target.value as never)}
-              className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+      <div className="mt-4 space-y-4">
+        <AdminField
+          label="Name"
+          value={form.name}
+          onChange={(value) => update("name", value)}
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          {SHORT_FIELDS.map((field) => (
+            <AdminField
+              key={field.key}
+              label={field.label}
+              value={form[field.key] as string}
+              onChange={(value) => update(field.key, value as never)}
             />
-          </label>
-        ))}
-        <label className="block">
-          <span className="text-sm text-gray-600">tech stack (comma separated)</span>
-          <input
-            value={form.tech_stack}
-            onChange={(event) => update("tech_stack", event.target.value)}
-            className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
-          />
-        </label>
+          ))}
+        </div>
+        <AdminField
+          label="Tech stack"
+          hint="Comma separated"
+          value={form.tech_stack}
+          onChange={(value) => update("tech_stack", value)}
+        />
         {AREA_FIELDS.map((field) => (
-          <label key={field} className="block">
-            <span className="text-sm capitalize text-gray-600">{field}</span>
-            <textarea
-              value={form[field] as string}
-              onChange={(event) => update(field, event.target.value as never)}
-              rows={3}
-              className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
-            />
-          </label>
+          <AdminField
+            key={field.key}
+            label={field.label}
+            multiline
+            rows={3}
+            value={form[field.key] as string}
+            onChange={(value) => update(field.key, value as never)}
+          />
         ))}
-        <label className="block">
-          <span className="text-sm text-gray-600">sort order</span>
-          <input
+        <div className="grid gap-4 sm:grid-cols-2">
+          <AdminField
+            label="Sort order"
             type="number"
-            value={form.sort_order}
-            onChange={(event) =>
-              update("sort_order", Number(event.target.value))
-            }
-            className="mt-1 w-32 rounded border border-gray-300 px-3 py-2"
+            value={String(form.sort_order)}
+            onChange={(value) => update("sort_order", Number(value) || 0)}
           />
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={form.visible}
-            onChange={(event) => update("visible", event.target.checked)}
-          />
-          <span className="text-sm text-gray-600">visible</span>
-        </label>
+          <label className="flex items-center gap-2.5 self-end pb-2.5">
+            <input
+              type="checkbox"
+              checked={form.visible}
+              onChange={(event) => update("visible", event.target.checked)}
+              className="size-4 accent-[var(--accent)]"
+            />
+            <span className="text-sm text-muted">Visible on the site</span>
+          </label>
+        </div>
       </div>
-      <div className="mt-4 flex items-center gap-3">
-        <button
+
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <AdminButton
+          variant="primary"
+          pending={get("save").state === "pending"}
+          pendingLabel="Saving…"
           onClick={save}
-          className="rounded bg-gray-900 px-4 py-2 text-sm text-white"
         >
           {editingId === null ? "Create" : "Save"}
-        </button>
+        </AdminButton>
         {editingId !== null ? (
-          <button
-            onClick={startNew}
-            className="rounded border border-gray-300 px-4 py-2 text-sm"
-          >
-            Cancel
-          </button>
+          <AdminButton onClick={startNew}>Cancel</AdminButton>
         ) : null}
-        {status ? <span className="text-sm text-gray-600">{status}</span> : null}
+        <Feedback status={get("save")} />
       </div>
     </div>
   );

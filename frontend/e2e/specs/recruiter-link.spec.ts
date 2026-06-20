@@ -43,8 +43,11 @@ test("a recruiter link lands on the landing, opens the portfolio through the acc
   // read carried the recruiter session through to the backend.
   await expect(visitorPage.getByText("Example Project")).toBeVisible();
 
-  // The admin revokes the link.
+  // The admin revokes the link. Revoke is now a two-step inline confirmation
+  // (a deliberate Phase H5 guard against accidental destructive clicks): the
+  // first click arms it, the second confirms and sends the same revoke request.
   await page.getByRole("button", { name: "Revoke" }).first().click();
+  await page.getByRole("button", { name: "Confirm" }).first().click();
   await expect(page.getByText("Revoked")).toBeVisible();
 
   // The recruiter gate re-checks the link on every read, so the now-revoked
