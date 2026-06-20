@@ -14,26 +14,26 @@ export default async function ImpressumPage() {
 
   return (
     <div className="quiet-enter w-full max-w-xl">
-      <h1 className="text-[clamp(2rem,5vw,2.75rem)] font-medium leading-[1.05] tracking-[-0.02em] text-white">
+      <h1 className="text-[clamp(2rem,5vw,2.75rem)] font-medium leading-[1.05] tracking-[-0.02em] text-ink">
         Impressum
       </h1>
 
       {impressum ? (
-        <dl className="mt-10 divide-y divide-white/10 border-y border-white/10">
+        <dl className="mt-10 divide-y divide-line border-y border-line">
           <div className="grid grid-cols-1 gap-1 py-4 sm:grid-cols-[7rem_1fr] sm:gap-4">
-            <dt className="text-xs uppercase tracking-[0.14em] text-zinc-400">
+            <dt className="text-xs uppercase tracking-[0.14em] text-muted">
               Name
             </dt>
-            <dd className="text-zinc-100">{impressum.name}</dd>
+            <dd className="text-ink">{impressum.name}</dd>
           </div>
           <div className="grid grid-cols-1 gap-1 py-4 sm:grid-cols-[7rem_1fr] sm:gap-4">
-            <dt className="text-xs uppercase tracking-[0.14em] text-zinc-400">
+            <dt className="text-xs uppercase tracking-[0.14em] text-muted">
               E-Mail
             </dt>
             <dd>
               <a
                 href={`mailto:${impressum.email}`}
-                className="rounded-sm break-words text-zinc-100 underline decoration-white/30 underline-offset-4 transition-colors hover:decoration-white/70 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
+                className="rounded-sm break-words text-accent underline decoration-accent/40 underline-offset-4 transition-colors hover:decoration-accent focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60"
               >
                 {impressum.email}
               </a>
@@ -41,7 +41,7 @@ export default async function ImpressumPage() {
           </div>
         </dl>
       ) : (
-        <p className="mt-6 leading-relaxed text-zinc-400">
+        <p className="mt-6 leading-relaxed text-muted">
           Noch kein Impressum hinterlegt.
         </p>
       )}

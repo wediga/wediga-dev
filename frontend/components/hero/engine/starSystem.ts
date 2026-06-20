@@ -40,6 +40,10 @@ export interface StarSystemMeta {
   planetCount: number;
   sunAtoms: number;
   planets: PlanetMeta[];
+  // A representative sun tone (a mid rim sample of the warm core-to-rim ramp).
+  // Read-only metadata for the UI accent; the sun's per-atom colours are
+  // unchanged by this.
+  sunColor: [number, number, number];
 }
 
 function clamp(x: number, lo: number, hi: number): number {
@@ -307,6 +311,15 @@ export function generateStarSystem(
     }
   }
 
+  // A representative sun tone, a mid-to-rim sample of the same warm ramp the sun
+  // atoms run, so the UI accent can read the sun without touching the render.
+  const sunRn = 0.75;
+  const sunColor = hslToRgb(
+    (48 - 30 * sunRn) / 360,
+    clamp(0.28 + 0.57 * sunRn, 0, 0.95),
+    clamp(0.97 - 0.42 * sunRn, 0.45, 1),
+  );
+
   return {
     count,
     initial,
@@ -315,6 +328,6 @@ export function generateStarSystem(
     misc,
     color,
     bodyId,
-    meta: { seed, planetCount, sunAtoms: atomsPerBody[0], planets },
+    meta: { seed, planetCount, sunAtoms: atomsPerBody[0], planets, sunColor },
   };
 }

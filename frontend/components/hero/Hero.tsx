@@ -133,6 +133,18 @@ export function Hero({
         return;
       }
       engineRef.current = handle;
+      // Hand the generated system colours to the rest of the site (read-only).
+      // The recruiter and quiet views read this snapshot to colour their
+      // generative accent; without it they fall back to the crimson accent.
+      try {
+        sessionStorage.setItem(
+          "hero:system-colors",
+          JSON.stringify(handle.systemColors),
+        );
+      } catch {
+        // sessionStorage can be unavailable (privacy mode); the accent then
+        // simply falls back to crimson, so this is safe to ignore.
+      }
     })();
 
     return () => {
@@ -165,7 +177,7 @@ export function Hero({
     }`;
 
   return (
-    <main className="relative bg-[#05060a] text-zinc-200">
+    <main className="relative bg-bg text-ink">
       <style>{`
         @keyframes heroAssemble {
           from { opacity: 0; filter: blur(10px); transform: translateY(10px) scale(0.98); letter-spacing: 0.3em; }
@@ -209,7 +221,7 @@ export function Hero({
         // Flat, fully readable column over the formed still frame. No camera, no
         // rails: the real content is the page, and it is the same teaser, toolkit
         // and access door as the full-motion ride.
-        <div className="relative z-10 min-h-screen bg-[#05060a]/92 backdrop-blur-sm">
+        <div className="relative z-10 min-h-screen bg-bg/92 backdrop-blur-sm">
           {readable}
           <SiteFooter className="mx-auto max-w-2xl px-6 pb-16" />
         </div>
@@ -354,11 +366,11 @@ export function Hero({
 
 function SiteFooter({ className }: { className?: string }) {
   return (
-    <footer className={`flex gap-5 text-sm text-zinc-400 ${className ?? ""}`}>
-      <Link href="/impressum" className="transition-colors hover:text-white">
+    <footer className={`flex gap-5 text-sm text-muted ${className ?? ""}`}>
+      <Link href="/impressum" className="transition-colors hover:text-ink">
         Impressum
       </Link>
-      <Link href="/login" className="transition-colors hover:text-white">
+      <Link href="/login" className="transition-colors hover:text-ink">
         Login
       </Link>
     </footer>

@@ -12,17 +12,17 @@ export default function QuietLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-[#05060a] text-zinc-200">
+    <div className="flex min-h-[100dvh] flex-col bg-bg text-ink">
       <header className="mx-auto flex w-full max-w-3xl items-center justify-between px-6 py-6">
         <Link
           href="/"
-          className="rounded-sm text-sm font-medium tracking-[-0.02em] text-zinc-100 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
+          className="rounded-sm text-sm font-medium tracking-[-0.02em] text-ink transition-colors hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60"
         >
           {INTRO.name}
         </Link>
         <Link
           href="/"
-          className="rounded-sm text-sm text-zinc-400 transition-colors hover:text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
+          className="rounded-sm text-sm text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60"
         >
           Zur Startseite
         </Link>
@@ -32,16 +32,16 @@ export default function QuietLayout({
         {children}
       </main>
 
-      <footer className="mx-auto flex w-full max-w-3xl items-center justify-end gap-6 px-6 py-6 text-sm text-zinc-500">
+      <footer className="mx-auto flex w-full max-w-3xl items-center justify-end gap-6 px-6 py-6 text-sm text-muted-2">
         <Link
           href="/impressum"
-          className="rounded-sm transition-colors hover:text-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
+          className="rounded-sm transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60"
         >
           Impressum
         </Link>
         <Link
           href="/login"
-          className="rounded-sm transition-colors hover:text-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
+          className="rounded-sm transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60"
         >
           Anmelden
         </Link>

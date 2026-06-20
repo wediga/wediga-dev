@@ -644,6 +644,13 @@ export async function createWebglEngine(
   return {
     atomCount: count,
     planetCount: data.meta.planetCount,
+    // Read-only: the system's generated colours, the sun plus one base colour
+    // per planet, taken straight from the generator's meta the render already
+    // uses. Exposed for the site's generative UI accent, no render change.
+    systemColors: {
+      sun: data.meta.sunColor,
+      planets: data.meta.planets.map((p) => p.color),
+    },
     dispose() {
       running = false;
       cancelAnimationFrame(raf);

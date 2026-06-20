@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 
 import { backendUrl } from "@/lib/backend";
+import { RecruiterShell } from "@/components/recruiter/RecruiterShell";
 
 // Server-side guard for the recruiter views (portfolio, CV, contact). It asks
 // the backend whether the forwarded session is a recruiter or admin session.
@@ -24,5 +25,5 @@ export default async function RecruiterLayout({
     redirect("/");
   }
 
-  return <>{children}</>;
+  return <RecruiterShell>{children}</RecruiterShell>;
 }

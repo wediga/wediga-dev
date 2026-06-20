@@ -23,17 +23,17 @@ export function LandingContent({
     <div className="mx-auto max-w-2xl px-6 py-16">
       {/* The page's one h1: the name, not the domain. Carries the identity for
           search engines and the document outline. */}
-      <h1 className="text-4xl font-medium tracking-[-0.02em] text-white">
+      <h1 className="text-4xl font-medium tracking-[-0.02em] text-ink">
         {INTRO.name}
       </h1>
-      <p className="mt-2 text-sm uppercase tracking-[0.12em] text-zinc-400">
+      <p className="mt-2 text-sm uppercase tracking-[0.12em] text-muted">
         {INTRO.role}
       </p>
-      <p className="mt-4 text-lg leading-relaxed text-zinc-100">{INTRO.hook}</p>
+      <p className="mt-4 text-lg leading-relaxed text-ink">{INTRO.hook}</p>
 
       {skills.length > 0 ? (
         <section className="mt-12">
-          <h2 className="text-xl font-medium tracking-[-0.02em] text-white">
+          <h2 className="text-xl font-medium tracking-[-0.02em] text-ink">
             Toolkit
           </h2>
           <div className="mt-5 space-y-5">
@@ -45,10 +45,10 @@ export function LandingContent({
       ) : null}
 
       <section className="mt-12">
-        <h2 className="text-xl font-medium tracking-[-0.02em] text-white">
+        <h2 className="text-xl font-medium tracking-[-0.02em] text-ink">
           Zugang
         </h2>
-        <p className="mt-2 leading-relaxed text-zinc-100">
+        <p className="mt-2 leading-relaxed text-ink">
           {isRecruiter
             ? "Ihr Zugang ist freigeschaltet."
             : "Das vollständige Portfolio liegt hinter dem Login."}
@@ -68,14 +68,14 @@ function SkillGroup({ category }: { category: SkillCategory }) {
   if (category.skills.length === 0) return null;
   return (
     <div>
-      <p className="text-xs uppercase tracking-[0.14em] text-zinc-400">
+      <p className="text-xs uppercase tracking-[0.14em] text-muted">
         {category.name}
       </p>
       <ul className="mt-2 flex flex-wrap gap-2">
         {category.skills.map((skill) => (
           <li
             key={skill.id}
-            className="rounded-full bg-white/[0.06] px-3 py-1 text-sm text-zinc-100"
+            className="rounded-full bg-white/[0.06] px-3 py-1 text-sm text-ink"
           >
             {skill.name}
           </li>
@@ -88,7 +88,8 @@ function SkillGroup({ category }: { category: SkillCategory }) {
 // The access door, two states. Without a recruiter session it leads to the
 // login; with a valid one it goes one door further, into the portfolio. The
 // server decides which state to render. `decorative` drops it from the tab
-// order for the visual duplicate in the hero station.
+// order for the visual duplicate in the hero station. The button keeps the
+// hero's established neutral styling so the frozen hero look is unchanged.
 export function AccessButton({
   isRecruiter,
   decorative,

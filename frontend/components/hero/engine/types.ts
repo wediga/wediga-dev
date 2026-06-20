@@ -33,5 +33,13 @@ export interface EngineHandle {
   // Atoms actually allocated (rounded up to a square texture).
   atomCount: number;
   planetCount: number;
+  // The generated system's colours, read-only: the sun plus one base colour per
+  // planet, exactly as the render uses them. The landing reads these out and
+  // hands them to the rest of the site for the generative UI accent. Surfacing
+  // them does not change the motion, the framing or the rendered colours.
+  systemColors: {
+    sun: [number, number, number];
+    planets: [number, number, number][];
+  };
   dispose(): void;
 }
