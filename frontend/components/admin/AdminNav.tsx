@@ -34,7 +34,7 @@ export function AdminNav() {
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className={`rounded-md px-2.5 py-1.5 transition-colors duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 ${
+            className={`inline-flex items-center rounded-md px-2.5 py-1.5 transition-colors duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 pointer-coarse:min-h-[2.5rem] pointer-coarse:px-3 ${
               active
                 ? "bg-surface text-ink"
                 : "text-muted hover:text-ink"

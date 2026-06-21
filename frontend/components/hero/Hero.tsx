@@ -11,6 +11,7 @@ import Link from "next/link";
 import type { EngineHandle } from "./engine/types";
 import type { SkillCategory } from "@/lib/types";
 import { useMotionMode } from "@/lib/useMotionMode";
+import { systemIsCompact } from "@/lib/motion";
 import { MotionToggle } from "@/components/MotionToggle";
 import { INTRO, LANDING, accessLead } from "./content";
 import { AccessButton } from "./LandingContent";
@@ -18,8 +19,16 @@ import { AccessButton } from "./LandingContent";
 // three touches browser-only globals, so the engine is imported lazily inside the
 // effect. That keeps the page server-renderable and code-splits the heavy bundle.
 
-// Fixed in production: the approved configuration is 120k individual lit points.
+// The desktop configuration: the approved 120k individual lit points.
 const ATOM_COUNT = 120000;
+// On a compact / coarse-pointer device the GPGPU step runs every atom every
+// frame regardless of render mode, so the atom count is the honest performance
+// lever for the phone. A lower count keeps the simulation light while the quiet
+// sun stays dense enough to read (the sun still owns ~40% of the budget). Keyed
+// to the device, not the mode, so even the deliberate full-motion option on a
+// phone runs the lighter simulation. The exact value is tuned against an
+// emulated budget; the real-device 60fps confirmation is Alexander's to make.
+const MOBILE_ATOM_COUNT = 45000;
 
 // Public landing stations, in fixed order: an intro teaser, a toolkit planet that
 // carries the real skills, and the access door. Sparse on purpose: the public
@@ -102,13 +111,18 @@ export function Hero({
       }
     };
 
+    // Read the device class at build time: compact devices run the lighter
+    // simulation. Read here rather than via the motion hook because the count
+    // tracks the hardware, not the chosen mode.
+    const atomCount = systemIsCompact() ? MOBILE_ATOM_COUNT : ATOM_COUNT;
+
     (async () => {
       try {
         const { createWebglEngine } = await import("./engine/webglEngine");
         handle = await createWebglEngine(
           canvas,
           {
-            atomCount: ATOM_COUNT,
+            atomCount,
             seed,
             reducedMotion,
             stationCount: STATIONS.length,
@@ -370,7 +384,7 @@ function QuietLanding({
   isRecruiter: boolean;
 }) {
   return (
-    <div className="relative min-h-screen px-[max(28px,6vw)]">
+    <div className="relative min-h-[100dvh] px-[max(28px,6vw)]">
       {/* The living sun. The screen splits in two: on wide screens the sun is
           fixed and stationary, centred in the RIGHT half (its centre at 75% of
           the width), a dominant anchor that does not move as the content scrolls.
@@ -389,7 +403,10 @@ function QuietLanding({
           not pushed around in the half. An ordinary calm scroll; clears the
           pinned footer at the foot. */}
       <div className="relative z-10 pb-[16vh] pt-[4vh] xl:flex xl:w-1/2 xl:justify-end xl:pb-[20vh] xl:pr-[3vw] xl:pt-[15vh]">
-        <div className="xl:w-[34rem] xl:text-center">
+        {/* Below xl the sun sits centred above the content, so the content column
+            is centred under it (a readable measure, not pinned to the far left
+            on a tablet). At xl the two-track takes over and these reset. */}
+        <div className="mx-auto max-w-[34rem] xl:mx-0 xl:w-[34rem] xl:max-w-none xl:text-center">
         <section>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

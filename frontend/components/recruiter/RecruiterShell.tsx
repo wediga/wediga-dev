@@ -17,7 +17,7 @@ export function RecruiterShell({ children }: { children: React.ReactNode }) {
       <GenerativeAccents />
 
       <header className="sticky top-0 z-[var(--z-nav)] border-b border-line bg-bg/80 backdrop-blur-md">
-        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-6 px-6 py-4 lg:px-10">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-4 sm:gap-6 lg:px-10">
           <Link
             href="/"
             className="quiet-press rounded-sm text-sm font-medium tracking-[-0.02em] text-ink transition-colors hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60"

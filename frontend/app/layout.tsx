@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Familjen_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { MOTION_INIT_SCRIPT } from "@/lib/motion";
@@ -18,6 +18,16 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "wediga.dev",
   description: "Personal portfolio site",
+};
+
+// Without this, mobile browsers render at a ~980px desktop layout viewport and
+// scale it down, so the page looks tiny and off-screen and the compact media
+// query (max-width / pointer) can resolve wrong. width=device-width maps the
+// layout viewport to the real device width, which is what makes the responsive
+// breakpoints and the mobile quiet-motion default actually fire on a phone.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

@@ -9,6 +9,7 @@
 
 import { useSyncExternalStore } from "react";
 import {
+  COMPACT_MOTION_QUERY,
   MOTION_EVENT,
   MOTION_STORAGE_KEY,
   REDUCED_MOTION_QUERY,
@@ -20,13 +21,20 @@ import {
 
 function subscribe(onChange: () => void): () => void {
   const mq = window.matchMedia(REDUCED_MOTION_QUERY);
-  // An OS change only moves the mode when no deliberate choice is stored; sync the
+  // The compact query is the device default's input (rung 3). Crossing its
+  // boundary (a resize across 1024px, a rotation, a touch device) re-resolves
+  // the mode the same way an OS change does, so a visitor who never chose flips
+  // between quiet and full as the viewport class changes.
+  const compactMq = window.matchMedia(COMPACT_MOTION_QUERY);
+  // An OS or device-class change only moves the mode when no deliberate choice is
+  // stored; syncMotionFromSystem early-returns on a stored choice. Sync the
   // attribute first, then notify.
   const onSystem = () => {
     syncMotionFromSystem();
     onChange();
   };
   mq.addEventListener("change", onSystem);
+  compactMq.addEventListener("change", onSystem);
   window.addEventListener(MOTION_EVENT, onChange);
   // A choice made in another tab reaches us as a storage event; catch this tab's
   // attribute up to the new stored value, then notify. Ignore writes to other
@@ -39,6 +47,7 @@ function subscribe(onChange: () => void): () => void {
   window.addEventListener("storage", onStorage);
   return () => {
     mq.removeEventListener("change", onSystem);
+    compactMq.removeEventListener("change", onSystem);
     window.removeEventListener(MOTION_EVENT, onChange);
     window.removeEventListener("storage", onStorage);
   };

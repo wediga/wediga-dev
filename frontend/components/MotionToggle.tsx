@@ -38,7 +38,7 @@ export function MotionToggle({ className }: { className?: string }) {
               type="button"
               aria-pressed={active}
               onClick={() => setMotionChoice(option.mode)}
-              className={`px-4 py-[0.45rem] font-mono text-[0.72rem] uppercase tracking-[0.08em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 ${
+              className={`flex min-h-[2.25rem] items-center px-4 py-[0.45rem] font-mono text-[0.72rem] uppercase tracking-[0.08em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 pointer-coarse:min-h-[2.75rem] pointer-coarse:px-5 ${
                 active
                   ? "bg-accent/15 text-accent"
                   : "text-muted hover:text-ink"
