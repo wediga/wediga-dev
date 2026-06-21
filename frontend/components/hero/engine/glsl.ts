@@ -132,6 +132,7 @@ uniform float uPixelRatio;
 uniform float uOpenId;
 uniform float uOpen;
 uniform float uDim;       // how much the rest of the system steps back (0..1)
+uniform float uSunOnly;   // quiet mode: render only the sun, hide every planet
 attribute vec2 reference;
 attribute float aSize;
 attribute float aShade;
@@ -143,6 +144,18 @@ varying float vDim;
 varying float vOpen;
 
 void main() {
+  // Quiet mode shows the sun alone (bodyId -1). Planet atoms collapse to a
+  // zero-size point off screen, so they are never rasterised. Full motion leaves
+  // uSunOnly at 0, so this branch is skipped and the ride is unchanged.
+  if (uSunOnly > 0.5 && aBodyId > -0.5) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    gl_PointSize = 0.0;
+    vShade = 0.0;
+    vColor = vec3(0.0);
+    vDim = 0.0;
+    vOpen = 0.0;
+    return;
+  }
   vec3 pos = texture2D(uPositions, reference).xyz;
   vShade = aShade;
   vColor = aColor;

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Familjen_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+import { MOTION_INIT_SCRIPT } from "@/lib/motion";
 
 const display = Familjen_Grotesk({
   variable: "--font-display",
@@ -28,7 +29,17 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${display.variable} ${plexMono.variable} h-full antialiased`}
+      // The init script sets data-motion before paint, so the attribute is
+      // already on the element React hydrates against; suppress the resulting
+      // attribute mismatch on this one node.
+      suppressHydrationWarning
     >
+      <head>
+        {/* Resolve the motion mode before first paint to avoid a flash: a stored
+            choice wins over the OS prefers-reduced-motion, which wins over the
+            full-motion default. Mirrors resolveMotion in lib/motion.ts. */}
+        <script dangerouslySetInnerHTML={{ __html: MOTION_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

@@ -6,27 +6,14 @@
 // engine and its motion constants are the frozen contract. Phase H2 changes only
 // the content carried on the planets, not the camera, scrim, spring or timing.
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { EngineHandle } from "./engine/types";
 import type { SkillCategory } from "@/lib/types";
-import { INTRO } from "./content";
+import { useMotionMode } from "@/lib/useMotionMode";
+import { MotionToggle } from "@/components/MotionToggle";
+import { INTRO, LANDING, accessLead } from "./content";
 import { AccessButton } from "./LandingContent";
-
-// Subscribe to prefers-reduced-motion the React way: SSR-safe (server snapshot is
-// false), no setState-in-effect, and it follows live changes to the setting.
-const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
-function usePrefersReducedMotion(): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      const mq = window.matchMedia(REDUCED_MOTION_QUERY);
-      mq.addEventListener("change", onChange);
-      return () => mq.removeEventListener("change", onChange);
-    },
-    () => window.matchMedia(REDUCED_MOTION_QUERY).matches,
-    () => false,
-  );
-}
 
 // three touches browser-only globals, so the engine is imported lazily inside the
 // effect. That keeps the page server-renderable and code-splits the heavy bundle.
@@ -62,7 +49,10 @@ export function Hero({
 
   // A fresh system per load. Not rendered into markup, so no hydration mismatch.
   const [seed] = useState(randomSeed);
-  const reducedMotion = usePrefersReducedMotion();
+  // The resolved site-wide motion mode (the on-page switch wins over the OS
+  // setting). Reduced motion swaps the whole hero for the quiet, sun-anchored
+  // landing instead of the scroll-driven ride.
+  const reducedMotion = useMotionMode() === "reduced";
   // Active station drives which title gets the assemble animation. It changes only
   // a few times, so it is React state; the per-frame reveal is written to the DOM
   // directly in the callback to avoid re-rendering every frame.
@@ -211,22 +201,23 @@ export function Hero({
         }
       `}</style>
 
-      <canvas
-        ref={canvasRef}
-        className="fixed inset-0 h-full w-full"
-        aria-hidden="true"
-      />
-
       {reducedMotion ? (
-        // Flat, fully readable column over the formed still frame. No camera, no
-        // rails: the real content is the page, and it is the same teaser, toolkit
-        // and access door as the full-motion ride.
-        <div className="relative z-10 min-h-screen bg-bg/92 backdrop-blur-sm">
-          {readable}
-          <SiteFooter className="mx-auto max-w-2xl px-6 pb-16" />
-        </div>
+        // The quiet landing: its own design, not the ride pushed back. A living,
+        // cursor-reactive sun anchors one side while the same public content
+        // (intro teaser, toolkit, access door) reads down a calm column beside it.
+        <QuietLanding
+          canvasRef={canvasRef}
+          skills={skills}
+          isRecruiter={isRecruiter}
+        />
       ) : (
         <>
+          <canvas
+            ref={canvasRef}
+            className="fixed inset-0 h-full w-full"
+            aria-hidden="true"
+          />
+
           {/* The real BFF content stays in the DOM behind the canvas: present for
               screen readers, search engines and the E2E suite while the ride
               plays. It is the accessible source of truth; the visible stations
@@ -294,7 +285,7 @@ export function Hero({
                 {kind === "toolkit" ? (
                   <>
                     <h2 key={active === i ? `${i}-on` : `${i}-off`} className={titleClass(i)}>
-                      Toolkit
+                      {LANDING.toolkitHeading}
                     </h2>
                     {skills.length > 0 ? (
                       <div
@@ -328,12 +319,10 @@ export function Hero({
                 {kind === "access" ? (
                   <>
                     <h2 key={active === i ? `${i}-on` : `${i}-off`} className={titleClass(i)}>
-                      Zugang
+                      {LANDING.accessHeading}
                     </h2>
                     <p className="mx-auto mt-[1.8vh] max-w-md text-[clamp(1rem,2.4vh,1.6rem)] leading-relaxed text-zinc-100">
-                      {isRecruiter
-                        ? "Ihr Zugang ist freigeschaltet."
-                        : "Das vollständige Portfolio liegt hinter dem Login."}
+                      {accessLead(isRecruiter)}
                     </p>
                     <div className="pointer-events-auto mt-[2vh] flex justify-center">
                       <AccessButton isRecruiter={isRecruiter} decorative />
@@ -356,23 +345,149 @@ export function Hero({
             />
           ))}
 
-          {/* Impressum and Login stay reachable throughout the ride. */}
-          <SiteFooter className="fixed inset-x-0 bottom-0 z-20 flex justify-center gap-5 pb-5" />
+          {/* Impressum, Login and the motion switch stay reachable throughout the
+              ride. */}
+          <SiteFooter variant="fixed" />
         </>
       )}
     </main>
   );
 }
 
-function SiteFooter({ className }: { className?: string }) {
+// The quiet landing. A wide two-track layout: the public content reads down a
+// left-aligned column in a calm, ordinary scroll, while the living sun sits big
+// on the other track and stays in view (sticky) as you read. Real DOM text
+// throughout, the same teaser, toolkit and access door as the full-motion ride,
+// so both appearances say the same thing. The canvas hosts the engine's quiet
+// render mode (the sun alone, cursor-reactive, no camera ride).
+function QuietLanding({
+  canvasRef,
+  skills,
+  isRecruiter,
+}: {
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  skills: SkillCategory[];
+  isRecruiter: boolean;
+}) {
   return (
-    <footer className={`flex gap-5 text-sm text-muted ${className ?? ""}`}>
+    <div className="relative min-h-screen px-[max(28px,6vw)]">
+      {/* The living sun. The screen splits in two: on wide screens the sun is
+          fixed and stationary, centred in the RIGHT half (its centre at 75% of
+          the width), a dominant anchor that does not move as the content scrolls.
+          It is sized to stay within that right half, so it never crosses into the
+          text. On narrow screens it sits in flow above the content (the full
+          mobile pass is its own phase). The canvas is square so the sun stays
+          round, and the engine keeps margin inside it so the cursor never clips. */}
+      <div className="mx-auto mb-[2vh] flex aspect-square w-full max-w-[440px] items-center justify-center xl:fixed xl:left-3/4 xl:top-1/2 xl:z-0 xl:mx-0 xl:mb-0 xl:aspect-auto xl:h-[min(84vh,42vw)] xl:w-[min(84vh,42vw)] xl:max-w-none xl:-translate-x-1/2 xl:-translate-y-1/2">
+        <canvas ref={canvasRef} className="h-full w-full" aria-hidden="true" />
+      </div>
+
+      {/* Content. The text column sits in the LEFT half, anchored to its right
+          edge so it meets the centre line, with the sun centred in the right half
+          beside it. The text itself is centre-aligned within that fixed column
+          (centred heading, the lines overhanging evenly left and right), it is
+          not pushed around in the half. An ordinary calm scroll; clears the
+          pinned footer at the foot. */}
+      <div className="relative z-10 pb-[16vh] pt-[4vh] xl:flex xl:w-1/2 xl:justify-end xl:pb-[20vh] xl:pr-[3vw] xl:pt-[15vh]">
+        <div className="xl:w-[34rem] xl:text-center">
+        <section>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/portrait.jpg"
+            alt="Alexander Wedig"
+            width={64}
+            height={64}
+            className="mb-8 h-28 w-28 rounded-full object-cover sm:h-32 sm:w-32 xl:mx-auto"
+          />
+          <h1 className="text-[clamp(2.4rem,4.4vw,4rem)] font-medium leading-[1.02] tracking-[-0.02em] text-ink text-balance">
+            {INTRO.name}
+          </h1>
+          <p className="mt-4 font-mono text-sm uppercase tracking-[0.14em] text-muted">
+            {INTRO.role}
+          </p>
+          <p className="mt-5 max-w-[20ch] text-[clamp(1.3rem,2.1vw,1.85rem)] leading-snug text-ink sm:max-w-[34ch] xl:mx-auto">
+            {INTRO.hook}
+          </p>
+        </section>
+
+        {skills.length > 0 ? (
+          <section className="mt-[11vh]">
+            <h2 className="text-[clamp(1.8rem,3vw,2.6rem)] font-medium tracking-[-0.02em] text-ink">
+              {LANDING.toolkitHeading}
+            </h2>
+            <div className="mt-7 space-y-6">
+              {skills.map((category) =>
+                category.skills.length === 0 ? null : (
+                  <div key={category.id}>
+                    <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-2">
+                      {category.name}
+                    </p>
+                    <ul className="mt-2.5 flex flex-wrap gap-2 xl:justify-center">
+                      {category.skills.map((skill) => (
+                        <li
+                          key={skill.id}
+                          className="rounded-full bg-white/[0.06] px-4 py-1.5 font-mono text-sm text-ink"
+                        >
+                          {skill.name}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ),
+              )}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="mt-[11vh]">
+          <h2 className="text-[clamp(1.8rem,3vw,2.6rem)] font-medium tracking-[-0.02em] text-ink">
+            {LANDING.accessHeading}
+          </h2>
+          <p className="mt-4 max-w-[46ch] text-lg leading-relaxed text-muted xl:mx-auto">
+            {accessLead(isRecruiter)}
+          </p>
+          <div className="mt-7">
+            <AccessButton isRecruiter={isRecruiter} quiet />
+          </div>
+        </section>
+        </div>
+      </div>
+
+      {/* Pinned to the bottom edge of the viewport, covering the sun behind it. */}
+      <SiteFooter variant="pinned" />
+    </div>
+  );
+}
+
+// The site footer: Impressum, Login and the persistent motion switch. Two
+// variants: fixed over the full-motion ride, in-flow at the foot of the quiet
+// column. The switch is the same in both, so the choice is always reachable.
+function SiteFooter({ variant }: { variant: "fixed" | "pinned" }) {
+  const links = (
+    <div className="flex gap-5 text-sm text-muted">
       <Link href="/impressum" className="transition-colors hover:text-ink">
         Impressum
       </Link>
       <Link href="/login" className="transition-colors hover:text-ink">
         Login
       </Link>
+    </div>
+  );
+
+  // Full motion: a soft scrim over the ride, the canvas shows through. Quiet: a
+  // solid bar that fully covers the fixed sun behind it, with a top border to
+  // separate it from the content.
+  const surface =
+    variant === "pinned"
+      ? "border-t border-line bg-bg"
+      : "scrim";
+
+  return (
+    <footer
+      className={`fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 px-6 pb-5 pt-4 ${surface}`}
+    >
+      {links}
+      <MotionToggle />
     </footer>
   );
 }

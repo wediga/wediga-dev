@@ -39,6 +39,9 @@ export interface StarSystemMeta {
   seed: number;
   planetCount: number;
   sunAtoms: number;
+  // The sun's body radius in world units. Read-only metadata; the quiet render
+  // mode uses it to frame the sun, and it does not affect the full ride.
+  sunRadius: number;
   planets: PlanetMeta[];
   // A representative sun tone (a mid rim sample of the warm core-to-rim ramp).
   // Read-only metadata for the UI accent; the sun's per-atom colours are
@@ -328,6 +331,13 @@ export function generateStarSystem(
     misc,
     color,
     bodyId,
-    meta: { seed, planetCount, sunAtoms: atomsPerBody[0], planets, sunColor },
+    meta: {
+      seed,
+      planetCount,
+      sunAtoms: atomsPerBody[0],
+      sunRadius,
+      planets,
+      sunColor,
+    },
   };
 }

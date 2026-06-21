@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { SkillCategory } from "@/lib/types";
-import { INTRO } from "./content";
+import { INTRO, LANDING, accessLead } from "./content";
 
 // The real, readable landing content: an intro teaser (name, role, hook), the
 // public toolkit (skills from the BFF), and the access door. It is always present
@@ -34,7 +34,7 @@ export function LandingContent({
       {skills.length > 0 ? (
         <section className="mt-12">
           <h2 className="text-xl font-medium tracking-[-0.02em] text-ink">
-            Toolkit
+            {LANDING.toolkitHeading}
           </h2>
           <div className="mt-5 space-y-5">
             {skills.map((category) => (
@@ -46,13 +46,9 @@ export function LandingContent({
 
       <section className="mt-12">
         <h2 className="text-xl font-medium tracking-[-0.02em] text-ink">
-          Zugang
+          {LANDING.accessHeading}
         </h2>
-        <p className="mt-2 leading-relaxed text-ink">
-          {isRecruiter
-            ? "Ihr Zugang ist freigeschaltet."
-            : "Das vollständige Portfolio liegt hinter dem Login."}
-        </p>
+        <p className="mt-2 leading-relaxed text-ink">{accessLead(isRecruiter)}</p>
         <div className="mt-5">
           <AccessButton isRecruiter={isRecruiter} />
         </div>
@@ -88,20 +84,26 @@ function SkillGroup({ category }: { category: SkillCategory }) {
 // The access door, two states. Without a recruiter session it leads to the
 // login; with a valid one it goes one door further, into the portfolio. The
 // server decides which state to render. `decorative` drops it from the tab
-// order for the visual duplicate in the hero station. The button keeps the
-// hero's established neutral styling so the frozen hero look is unchanged.
+// order for the visual duplicate in the hero station. `quiet` swaps the frozen
+// hero's neutral styling for the crimson accent token used by the quiet landing,
+// while keeping the same href and label so the two appearances never diverge.
 export function AccessButton({
   isRecruiter,
   decorative,
+  quiet,
 }: {
   isRecruiter: boolean;
   decorative?: boolean;
+  quiet?: boolean;
 }) {
+  const className = quiet
+    ? "quiet-press inline-block rounded-md border border-accent px-7 py-3 text-sm uppercase tracking-[0.12em] text-ink transition-colors hover:bg-accent/15 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60"
+    : "hero-door rounded-md border border-white/25 px-6 py-2 text-sm uppercase tracking-[0.14em] text-white transition-colors hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60";
   return (
     <Link
       href={isRecruiter ? "/portfolio" : "/login"}
       tabIndex={decorative ? -1 : undefined}
-      className="hero-door rounded-md border border-white/25 px-6 py-2 text-sm uppercase tracking-[0.14em] text-white transition-colors hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
+      className={className}
     >
       {isRecruiter ? "Weiter ins Portfolio" : "Anmelden"}
     </Link>

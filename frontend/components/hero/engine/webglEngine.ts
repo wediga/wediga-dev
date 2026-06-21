@@ -63,6 +63,24 @@ export async function createWebglEngine(
   camera.position.copy(overviewPos);
   camera.lookAt(0, 0, 0);
 
+  // Quiet pose: a fixed, static framing of the sun alone, no ride. The sun fills
+  // a generous part of the smaller viewport dimension so it reads as a dominant
+  // anchor, but it deliberately leaves margin inside the canvas so the
+  // cursor-pushed points have room to move out and ease back without being
+  // clipped at the canvas edge. Recomputed on resize for the current aspect.
+  // Only used in reduced motion; in full motion it is computed but never read.
+  const QUIET_SUN_FILL = 0.8;
+  const quietPos = new THREE.Vector3();
+  const quietDir = new THREE.Vector3(0, 0.17, 0.99).normalize();
+  function computeQuiet() {
+    const r = data.meta.sunRadius;
+    const aspect = camera.aspect || 1;
+    const vTan = Math.tan(((camera.fov * Math.PI) / 180) / 2);
+    const dist = r / (QUIET_SUN_FILL * vTan * Math.min(1, aspect));
+    quietPos.copy(quietDir).multiplyScalar(dist);
+  }
+  computeQuiet();
+
   // --- static per-atom data textures -------------------------------------
   const localRGBA = new Float32Array(count * 4);
   for (let i = 0; i < count; i++) {
@@ -159,6 +177,8 @@ export async function createWebglEngine(
       uOpenId: { value: -1 },
       uOpen: { value: 0 },
       uDim: { value: 0 },
+      // Quiet mode renders the sun alone; full motion leaves this at 0.
+      uSunOnly: { value: 0 },
     },
     vertexShader: pointsVert,
     fragmentShader: pointsFrag,
@@ -246,6 +266,7 @@ export async function createWebglEngine(
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     computeOverview();
+    computeQuiet();
   }
   resize();
   const ro = new ResizeObserver(resize);
@@ -608,35 +629,88 @@ export async function createWebglEngine(
     renderFrame(delta);
   }
 
+  // Quiet mode frame: a living, cursor-reactive sun from a fixed pose. No rails,
+  // no scroll read, no station opening, only the sun. This is the reduced-motion
+  // path's whole render; the full-motion renderFrame above is left untouched.
+  function renderQuietFrame(delta: number) {
+    const dt = Math.min(delta, 1 / 30);
+    // Gentle life: advance the sim so the sun keeps its slow self-spin, and hold
+    // uForm well past every atom's delay so the sun stays fully formed.
+    simTime += dt * 0.5;
+    formTime += dt * 0.6;
+    vu.uTime.value = simTime;
+    vu.uForm.value = formTime;
+    vu.uDelta.value = dt;
+    posVar.material.uniforms.uDelta.value = dt;
+    updateCursor();
+
+    // Fixed pose framing the sun at the origin. No rails maths runs at all.
+    camera.position.copy(quietPos);
+    camera.up.set(0, 1, 0);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    camera.getWorldDirection(fwd);
+    camRight.crossVectors(fwd, worldUp).normalize();
+    camUp.crossVectors(camRight, fwd).normalize();
+    vu.uCamRight.value.copy(camRight);
+    vu.uCamUp.value.copy(camUp);
+    vu.uForward.value.copy(fwd);
+
+    // No planet ever opens in quiet mode.
+    vu.uOpen.value = 0;
+    vu.uOpenId.value = -1;
+    pointsMat.uniforms.uOpen.value = 0;
+    pointsMat.uniforms.uOpenId.value = -1;
+    pointsMat.uniforms.uDim.value = 0;
+
+    gpu.compute();
+    pointsMat.uniforms.uPositions.value =
+      gpu.getCurrentRenderTarget(posVar).texture;
+    renderer.render(scene, camera);
+  }
+
+  function quietLoop() {
+    if (!running) return;
+    raf = requestAnimationFrame(quietLoop);
+    const now = performance.now();
+    const delta = (now - lastT) / 1000;
+    lastT = now;
+    renderQuietFrame(delta);
+  }
+
+  // One loop per mode, so the background-pause resume restarts the right one.
+  const tick = config.reducedMotion ? quietLoop : loop;
+
   function onVisibility() {
     if (document.hidden) {
       running = false;
       cancelAnimationFrame(raf);
-    } else if (!running && !config.reducedMotion) {
+    } else if (!running) {
       running = true;
       lastT = performance.now();
-      loop();
+      tick();
     }
   }
   document.addEventListener("visibilitychange", onVisibility);
 
   if (config.reducedMotion) {
-    // Settle to the formed system, then hold a single still frame from the overview
-    // pose. No camera ride, no animation, no station opening.
+    // Quiet mode: render the sun alone (planets and orbit lines hidden) and
+    // pre-settle the atoms so the sun starts already formed, with no entrance
+    // impulse. Then run the living loop: slow spin plus cursor reaction, no ride.
+    pointsMat.uniforms.uSunOnly.value = 1;
+    setOrbitOpacity(0);
     formTime = 6;
     vu.uForm.value = formTime;
+    vu.uOpen.value = 0;
+    vu.uOpenId.value = -1;
     for (let s = 0; s < 280; s++) {
       vu.uTime.value = simTime;
       vu.uDelta.value = 1 / 60;
       posVar.material.uniforms.uDelta.value = 1 / 60;
       gpu.compute();
     }
-    const tex = gpu.getCurrentRenderTarget(posVar).texture;
-    pointsMat.uniforms.uPositions.value = tex;
-    // The system is fully formed in the still frame, so the orbit lines are shown.
-    setOrbitOpacity(1);
-    renderer.render(scene, camera);
-    running = false;
+    lastT = performance.now();
+    quietLoop();
   } else {
     loop();
   }

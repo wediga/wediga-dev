@@ -130,7 +130,11 @@ body {
   }
 }
 
-.quiet-enter {
+/* The entrance plays only in full motion. The resting state is fully visible, so
+   reduced motion (whether from the OS or the on-page switch) simply shows the
+   page at rest. Driven by the data-motion attribute, not the media query, so the
+   switch governs it site-wide. */
+[data-motion="full"] .quiet-enter {
   animation: quiet-enter 420ms var(--ease-out) both;
 }
 
@@ -152,22 +156,23 @@ body {
   always show the content immediately. Stagger delay comes from --reveal-i set
   inline per item.
 */
-@media (prefers-reduced-motion: no-preference) {
-  @keyframes recruiter-reveal {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
+@keyframes recruiter-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
   }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 
-  .reveal {
-    animation: recruiter-reveal 560ms var(--ease-out) both;
-    animation-delay: calc(var(--reveal-i, 0) * 70ms);
-  }
+/* Only in full motion; the resting state is fully visible, so reduced motion and
+   headless renders always show the content immediately. Driven by the
+   data-motion attribute so the on-page switch governs it site-wide. */
+[data-motion="full"] .reveal {
+  animation: recruiter-reveal 560ms var(--ease-out) both;
+  animation-delay: calc(var(--reveal-i, 0) * 70ms);
 }
 
 /*
@@ -210,17 +215,20 @@ body {
   flex: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+/* Reduced motion, driven by the resolved data-motion attribute rather than the
+   media query, so the on-page switch overrides the OS setting in both
+   directions. The init script folds prefers-reduced-motion into this attribute
+   before paint, so an OS preference still lands here unless a deliberate "Voll"
+   choice overrides it. */
+[data-motion="reduced"] *,
+[data-motion="reduced"] *::before,
+[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
 
-  .quiet-press:active {
-    transform: none;
-  }
+[data-motion="reduced"] .quiet-press:active {
+  transform: none;
 }
