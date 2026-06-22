@@ -1,5 +1,6 @@
 import { RecruiterNav } from "./RecruiterNav";
 import { GenerativeAccents } from "./GenerativeAccents";
+import { ScrollToTop } from "@/components/ScrollToTop";
 import { SiteHeader, SiteFooter, ChromeLink } from "@/components/site/SiteChrome";
 
 // The shared chrome around the three recruiter views. Dark and consistent with
@@ -14,6 +15,7 @@ import { SiteHeader, SiteFooter, ChromeLink } from "@/components/site/SiteChrome
 export function RecruiterShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-bg text-ink">
+      <ScrollToTop />
       <GenerativeAccents />
 
       <SiteHeader
