@@ -16,6 +16,7 @@ import {
   pointsFrag,
 } from "./glsl";
 import { generateStarSystem } from "./starSystem";
+import { mulberry32, shuffle } from "./random";
 import type { EngineCallbacks, EngineHandle, HeroConfig } from "./types";
 
 export async function createWebglEngine(
@@ -280,18 +281,11 @@ export async function createWebglEngine(
   // Random per load: which planet carries each section, in fixed section order.
   // Uses its own deterministic stream so it does not disturb the generator.
   function pickAssignments(s: number, planetCount: number): number[] {
-    let a = (s ^ 0x9e3779b9) >>> 0;
-    const rnd = () => {
-      a = (a + 0x6d2b79f5) | 0;
-      let t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
+    // mulberry32 normalises the seed with >>> 0, so this matches the prior inline
+    // PRNG seeded from (s ^ 0x9e3779b9) >>> 0 exactly.
+    const rnd = mulberry32(s ^ 0x9e3779b9);
     const idx = Array.from({ length: planetCount }, (_, i) => i);
-    for (let i = idx.length - 1; i > 0; i--) {
-      const j = Math.floor(rnd() * (i + 1));
-      [idx[i], idx[j]] = [idx[j], idx[i]];
-    }
+    shuffle(idx, rnd);
     // Always start at the outermost planet so the ride flies from OUTSIDE into the
     // system; the remaining stations are picked generatively from the rest. The
     // descending orbit-radius sort then orders the whole set outermost-first. (With
@@ -476,6 +470,22 @@ export async function createWebglEngine(
   let raf = 0;
   let running = true;
 
+  // Orient the camera at a look target and publish the camera basis the
+  // camera-facing backing disc reads. Identical in the full and quiet paths.
+  function setCameraBasis(lookTarget: THREE.Vector3) {
+    camera.up.set(0, 1, 0);
+    camera.lookAt(lookTarget);
+    camera.updateMatrixWorld();
+
+    // Camera basis for the camera-facing backing disc.
+    camera.getWorldDirection(fwd);
+    camRight.crossVectors(fwd, worldUp).normalize();
+    camUp.crossVectors(camRight, fwd).normalize();
+    vu.uCamRight.value.copy(camRight);
+    vu.uCamUp.value.copy(camUp);
+    vu.uForward.value.copy(fwd);
+  }
+
   function renderFrame(delta: number) {
     const dt = Math.min(delta, 1 / 30);
     // Calm the whole system while docked at a card so the orbiting and spinning
@@ -553,17 +563,7 @@ export async function createWebglEngine(
       camera.position.x = camLook.x + hdx * sc;
       camera.position.z = camLook.z + hdz * sc;
     }
-    camera.up.set(0, 1, 0);
-    camera.lookAt(camLook);
-    camera.updateMatrixWorld();
-
-    // Camera basis for the camera-facing backing disc.
-    camera.getWorldDirection(fwd);
-    camRight.crossVectors(fwd, worldUp).normalize();
-    camUp.crossVectors(camRight, fwd).normalize();
-    vu.uCamRight.value.copy(camRight);
-    vu.uCamUp.value.copy(camUp);
-    vu.uForward.value.copy(fwd);
+    setCameraBasis(camLook);
 
     const planetIndex = assignments[m.station];
     planetPosAt(planetIndex, simTime, projV);
@@ -646,15 +646,7 @@ export async function createWebglEngine(
 
     // Fixed pose framing the sun at the origin. No rails maths runs at all.
     camera.position.copy(quietPos);
-    camera.up.set(0, 1, 0);
-    camera.lookAt(0, 0, 0);
-    camera.updateMatrixWorld();
-    camera.getWorldDirection(fwd);
-    camRight.crossVectors(fwd, worldUp).normalize();
-    camUp.crossVectors(camRight, fwd).normalize();
-    vu.uCamRight.value.copy(camRight);
-    vu.uCamUp.value.copy(camUp);
-    vu.uForward.value.copy(fwd);
+    setCameraBasis(ORIGIN);
 
     // No planet ever opens in quiet mode.
     vu.uOpen.value = 0;

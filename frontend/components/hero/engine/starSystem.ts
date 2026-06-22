@@ -5,6 +5,9 @@
 // outward. The output is plain typed arrays the WebGL engine uploads as textures
 // or attributes without reshaping. Same seed gives the same system.
 
+import { hslToRgb } from "@/lib/color";
+import { mulberry32, shuffle } from "./random";
+
 export interface StarSystemData {
   count: number;
   // Chaos start position, xyz per atom.
@@ -53,22 +56,6 @@ function clamp(x: number, lo: number, hi: number): number {
   return x < lo ? lo : x > hi ? hi : x;
 }
 
-// HSL to RGB, all inputs and outputs in 0..1 (hue is fractional turns).
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
-  const hue2rgb = (p: number, q: number, t: number) => {
-    if (t < 0) t += 1;
-    if (t > 1) t -= 1;
-    if (t < 1 / 6) return p + (q - p) * 6 * t;
-    if (t < 1 / 2) return q;
-    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-    return p;
-  };
-  if (s === 0) return [l, l, l];
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-  const p = 2 * l - q;
-  return [hue2rgb(p, q, h + 1 / 3), hue2rgb(p, q, h), hue2rgb(p, q, h - 1 / 3)];
-}
-
 // The sun owns warm orange to yellow (roughly 15 to 60), so the planet palette
 // lives on the cool arc 75..350 (green, teal, blue, indigo, violet, magenta,
 // rose), which keeps the sun readable. Planet hues are spread evenly across this
@@ -76,19 +63,6 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 // distinct from one another instead of clustering into similar colours.
 const PLANET_HUE_LO = 75;
 const PLANET_HUE_HI = 350;
-
-// mulberry32: small, fast, deterministic. Same seed gives the same system, which
-// is what makes "generative per reload" reproducible when we want to compare.
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 interface Body {
   kind: 0 | 1; // 0 sun, 1 planet
@@ -156,10 +130,7 @@ export function generateStarSystem(
       PLANET_HUE_LO + hueSlot * (p + 0.5) + (rng() - 0.5) * hueSlot * 0.6,
     );
   }
-  for (let p = planetHues.length - 1; p > 0; p--) {
-    const j = Math.floor(rng() * (p + 1));
-    [planetHues[p], planetHues[j]] = [planetHues[j], planetHues[p]];
-  }
+  shuffle(planetHues, rng);
 
   for (let p = 0; p < planetCount; p++) {
     const pradius = rand(0.45, 1.15);

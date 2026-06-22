@@ -5,7 +5,6 @@ real ``data/wediga.db`` is never touched. ``WEDIGA_CONTENT_DIR`` points at the
 repository content directory, which the seed reads without modifying.
 """
 
-import os
 from pathlib import Path
 
 import pytest
