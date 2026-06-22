@@ -20,15 +20,6 @@ def require_admin(request: Request) -> None:
         )
 
 
-def require_recruiter(request: Request) -> None:
-    """Reject the request with 401 unless a recruiter session is present."""
-    if not request.session.get(RECRUITER_SESSION_KEY):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Recruiter authentication required",
-        )
-
-
 def require_recruiter_or_admin(request: Request) -> None:
     """Allow the recruiter views to either a recruiter or an admin session.
 

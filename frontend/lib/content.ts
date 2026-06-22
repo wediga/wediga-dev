@@ -1,9 +1,7 @@
 import { headers } from "next/headers";
 import { backendUrl } from "./backend";
 import type {
-  About,
   Contact,
-  CuratedRepo,
   CvStatus,
   Impressum,
   Project,
@@ -41,10 +39,6 @@ async function getJsonWithSession<T>(path: string): Promise<T | null> {
   } catch {
     return null;
   }
-}
-
-export function getAbout(): Promise<About | null> {
-  return getJson<About>("/content/about");
 }
 
 // Whether the visitor carries a valid recruiter (or admin) session, asked of the
@@ -85,11 +79,4 @@ export async function getSkills(): Promise<SkillCategory[]> {
 // uses this to decide whether to show the download and preview.
 export async function getCvStatus(): Promise<CvStatus> {
   return (await getJsonWithSession<CvStatus>("/cv/status")) ?? { present: false };
-}
-
-// The curated GitHub repos, gated like the portfolio. The backend already
-// filters to visible repos, orders pinned first and resolves the effective
-// description, so the view only renders what it receives.
-export async function getCuratedRepos(): Promise<CuratedRepo[]> {
-  return (await getJsonWithSession<CuratedRepo[]>("/github/repos")) ?? [];
 }
