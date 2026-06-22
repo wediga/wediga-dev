@@ -76,7 +76,7 @@ export default function LoginPage() {
           aria-busy={pending}
           className="quiet-press w-full rounded-md border border-muted-2/50 px-6 py-2.5 text-sm uppercase tracking-[0.14em] text-ink transition-colors hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60 disabled:opacity-50"
         >
-          {pending ? "Wird geprüft" : "Anmelden"}
+          {pending ? "Wird geprüft" : "Login"}
         </button>
       </form>
     </div>

@@ -13,8 +13,10 @@ import type { SkillCategory } from "@/lib/types";
 import { useMotionMode } from "@/lib/useMotionMode";
 import { systemIsCompact } from "@/lib/motion";
 import { MotionToggle } from "@/components/MotionToggle";
+import { SiteFooter as SharedSiteFooter } from "@/components/site/SiteChrome";
 import { INTRO, LANDING, accessLead } from "./content";
 import { AccessButton } from "./LandingContent";
+import { SkillGroup } from "./SkillGroup";
 
 // three touches browser-only globals, so the engine is imported lazily inside the
 // effect. That keeps the page server-renderable and code-splits the heavy bundle.
@@ -306,25 +308,15 @@ export function Hero({
                         key={active === i ? `${i}-groups-on` : `${i}-groups-off`}
                         className="hero-rise mt-[2.2vh] flex flex-col items-center gap-[1.6vh]"
                       >
-                        {skills.map((category) =>
-                          category.skills.length === 0 ? null : (
-                            <div key={category.id}>
-                              <p className="text-[clamp(0.6rem,1.2vh,0.8rem)] uppercase tracking-[0.14em] text-zinc-400">
-                                {category.name}
-                              </p>
-                              <ul className="mt-[0.8vh] flex flex-wrap justify-center gap-2">
-                                {category.skills.map((skill) => (
-                                  <li
-                                    key={skill.id}
-                                    className="rounded-full bg-white/[0.06] px-3 py-1 text-[clamp(0.78rem,1.7vh,1.05rem)] text-zinc-100"
-                                  >
-                                    {skill.name}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ),
-                        )}
+                        {skills.map((category) => (
+                          <SkillGroup
+                            key={category.id}
+                            category={category}
+                            labelClass="text-[clamp(0.6rem,1.2vh,0.8rem)] uppercase tracking-[0.14em] text-zinc-400"
+                            listClass="mt-[0.8vh] flex flex-wrap justify-center gap-2"
+                            pillClass="rounded-full bg-white/[0.06] px-3 py-1 text-[clamp(0.78rem,1.7vh,1.05rem)] text-zinc-100"
+                          />
+                        ))}
                       </div>
                     ) : null}
                   </>
@@ -433,25 +425,15 @@ function QuietLanding({
               {LANDING.toolkitHeading}
             </h2>
             <div className="mt-7 space-y-6">
-              {skills.map((category) =>
-                category.skills.length === 0 ? null : (
-                  <div key={category.id}>
-                    <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-2">
-                      {category.name}
-                    </p>
-                    <ul className="mt-2.5 flex flex-wrap gap-2 xl:justify-center">
-                      {category.skills.map((skill) => (
-                        <li
-                          key={skill.id}
-                          className="rounded-full bg-white/[0.06] px-4 py-1.5 font-mono text-sm text-ink"
-                        >
-                          {skill.name}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ),
-              )}
+              {skills.map((category) => (
+                <SkillGroup
+                  key={category.id}
+                  category={category}
+                  labelClass="font-mono text-xs uppercase tracking-[0.14em] text-muted-2"
+                  listClass="mt-2.5 flex flex-wrap gap-2 xl:justify-center"
+                  pillClass="rounded-full bg-white/[0.06] px-4 py-1.5 font-mono text-sm text-ink"
+                />
+              ))}
             </div>
           </section>
         ) : null}
@@ -480,31 +462,29 @@ function QuietLanding({
 // variants: fixed over the full-motion ride, in-flow at the foot of the quiet
 // column. The switch is the same in both, so the choice is always reachable.
 function SiteFooter({ variant }: { variant: "fixed" | "pinned" }) {
-  const links = (
-    <div className="flex gap-5 text-sm text-muted">
-      <Link href="/impressum" className="transition-colors hover:text-ink">
-        Impressum
-      </Link>
-      <Link href="/login" className="transition-colors hover:text-ink">
-        Login
-      </Link>
-    </div>
-  );
-
   // Full motion: a soft scrim over the ride, the canvas shows through. Quiet: a
   // solid bar that fully covers the fixed sun behind it, with a top border to
-  // separate it from the content.
+  // separate it from the content. Either way it sits at the nav layer of the
+  // semantic z-scale, never an arbitrary value.
   const surface =
     variant === "pinned"
       ? "border-t border-line bg-bg"
       : "scrim";
 
   return (
-    <footer
-      className={`fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 px-6 pb-5 pt-4 ${surface}`}
+    <SharedSiteFooter
+      outerClassName={`fixed inset-x-0 bottom-0 z-[var(--z-nav)] ${surface}`}
+      rowClassName="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 px-6 pb-5 pt-4"
     >
-      {links}
+      <div className="flex gap-5 text-sm text-muted">
+        <Link href="/impressum" className="transition-colors hover:text-ink">
+          Impressum
+        </Link>
+        <Link href="/login" className="transition-colors hover:text-ink">
+          Login
+        </Link>
+      </div>
       <MotionToggle />
-    </footer>
+    </SharedSiteFooter>
   );
 }

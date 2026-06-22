@@ -1,8 +1,6 @@
 import { getContact } from "@/lib/content";
 import { safeHref } from "@/lib/url";
-
-const linkClass =
-  "rounded-sm break-words text-accent underline decoration-accent/40 underline-offset-4 transition-colors hover:decoration-accent focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60";
+import { ACCENT_LINK } from "@/components/site/SiteChrome";
 
 export default async function ContactPage() {
   const contact = await getContact();
@@ -28,20 +26,20 @@ export default async function ContactPage() {
             <span className="text-ink">{contact.name}</span>
           </Field>
           <Field label="E-Mail" reveal={2}>
-            <a href={`mailto:${contact.email}`} className={linkClass}>
+            <a href={`mailto:${contact.email}`} className={ACCENT_LINK}>
               {contact.email}
             </a>
           </Field>
           {github ? (
             <Field label="GitHub" reveal={3}>
-              <a href={github} className={linkClass} rel="noreferrer noopener">
+              <a href={github} className={ACCENT_LINK} rel="noreferrer noopener">
                 {contact.github}
               </a>
             </Field>
           ) : null}
           {linkedin ? (
             <Field label="LinkedIn" reveal={4}>
-              <a href={linkedin} className={linkClass} rel="noreferrer noopener">
+              <a href={linkedin} className={ACCENT_LINK} rel="noreferrer noopener">
                 {contact.linkedin}
               </a>
             </Field>

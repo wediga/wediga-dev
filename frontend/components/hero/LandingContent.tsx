@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { SkillCategory } from "@/lib/types";
 import { INTRO, LANDING, accessLead } from "./content";
+import { SkillGroup } from "./SkillGroup";
 
 // The real, readable landing content: an intro teaser (name, role, hook), the
 // public toolkit (skills from the BFF), and the access door. It is always present
@@ -38,7 +39,13 @@ export function LandingContent({
           </h2>
           <div className="mt-5 space-y-5">
             {skills.map((category) => (
-              <SkillGroup key={category.id} category={category} />
+              <SkillGroup
+                key={category.id}
+                category={category}
+                labelClass="text-xs uppercase tracking-[0.14em] text-muted"
+                listClass="mt-2 flex flex-wrap gap-2"
+                pillClass="rounded-full bg-white/[0.06] px-3 py-1 text-sm text-ink"
+              />
             ))}
           </div>
         </section>
@@ -53,30 +60,6 @@ export function LandingContent({
           <AccessButton isRecruiter={isRecruiter} />
         </div>
       </section>
-    </div>
-  );
-}
-
-// One skill category: a quiet label and the skills as low-contrast tags. Tags,
-// not a bulleted list, so the toolkit reads as a calm group and never as a
-// data dump. Shared shape with the visible Toolkit station.
-function SkillGroup({ category }: { category: SkillCategory }) {
-  if (category.skills.length === 0) return null;
-  return (
-    <div>
-      <p className="text-xs uppercase tracking-[0.14em] text-muted">
-        {category.name}
-      </p>
-      <ul className="mt-2 flex flex-wrap gap-2">
-        {category.skills.map((skill) => (
-          <li
-            key={skill.id}
-            className="rounded-full bg-white/[0.06] px-3 py-1 text-sm text-ink"
-          >
-            {skill.name}
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
@@ -105,7 +88,7 @@ export function AccessButton({
       tabIndex={decorative ? -1 : undefined}
       className={className}
     >
-      {isRecruiter ? "Weiter ins Portfolio" : "Anmelden"}
+      {isRecruiter ? "Weiter ins Portfolio" : "Login"}
     </Link>
   );
 }

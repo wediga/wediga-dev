@@ -10,7 +10,7 @@ export const ADMIN_PASSWORD =
 export async function login(page: Page): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("Passwort").fill(ADMIN_PASSWORD);
-  await page.getByRole("button", { name: "Anmelden" }).click();
+  await page.getByRole("button", { name: "Login" }).click();
   // The admin nav only renders once the layout gate accepts the session.
   await expect(page.getByRole("link", { name: "Overview" })).toBeVisible();
 }

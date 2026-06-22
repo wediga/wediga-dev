@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getImpressum } from "@/lib/content";
+import { ACCENT_LINK } from "@/components/site/SiteChrome";
 
 export const metadata: Metadata = {
   title: "Impressum",
@@ -33,7 +34,7 @@ export default async function ImpressumPage() {
             <dd>
               <a
                 href={`mailto:${impressum.email}`}
-                className="rounded-sm break-words text-accent underline decoration-accent/40 underline-offset-4 transition-colors hover:decoration-accent focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60"
+                className={ACCENT_LINK}
               >
                 {impressum.email}
               </a>
