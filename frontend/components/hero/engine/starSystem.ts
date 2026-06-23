@@ -81,11 +81,140 @@ interface Body {
   hueSpread: number; // degrees, half-width of the per-atom hue jitter
 }
 
-export function generateStarSystem(
+// Per-atom colour for the sun: a warm near-white core ramping to an orange rim,
+// varied per atom. rn is the normalised radius (0 core, 1 rim). Draws the rng in
+// the order hue, sat, light, exactly as the inline form did.
+function sunAtomColor(
+  rn: number,
+  rng: () => number,
+): [number, number, number] {
+  const hue = (48 - 30 * rn + (rng() - 0.5) * 8) / 360;
+  const sat = clamp(0.28 + 0.57 * rn + (rng() - 0.5) * 0.12, 0, 0.95);
+  const light = clamp(0.97 - 0.42 * rn + (rng() - 0.5) * 0.1, 0.45, 1);
+  return hslToRgb(hue, sat, light);
+}
+
+// Per-atom colour for a planet: several tones around the body's base hue, banded
+// a little by latitude so the self-spin reads. Draws the rng in the order hueDeg,
+// sat, light, exactly as the inline form did.
+function planetAtomColor(
+  body: Body,
+  latitude: number,
+  rng: () => number,
+): [number, number, number] {
+  const hueDeg =
+    body.baseHue + (rng() - 0.5) * 2 * body.hueSpread + latitude * 5;
+  const hue = ((((hueDeg % 360) + 360) % 360) / 360);
+  const sat = clamp(body.baseSat + (rng() - 0.5) * 0.16, 0.2, 0.72);
+  const light = clamp(
+    body.baseLight + latitude * 0.1 + (rng() - 0.5) * 0.12,
+    0.32,
+    0.82,
+  );
+  return hslToRgb(hue, sat, light);
+}
+
+// The six per-atom output arrays the fill loop writes into.
+interface AtomArrays {
+  initial: Float32Array;
+  local: Float32Array;
+  orbit: Float32Array;
+  misc: Float32Array;
+  color: Float32Array;
+  bodyId: Float32Array;
+}
+
+// Fill every slot for atom i, which belongs to body (bodyIndex is its position in
+// the bodies array; the sun is 0). Lifted out of the double loop verbatim, so the
+// per-atom maths and the rng draw order (u, v, r, chaos r, cu, cv, delay, shade,
+// then the colour helper) are unchanged; the loop body is now a single call.
+function fillAtom(
+  arr: AtomArrays,
+  i: number,
+  body: Body,
+  bodyIndex: number,
+  maxOrbit: number,
+  rng: () => number,
+  rand: (lo: number, hi: number) => number,
+): void {
+  // Local offset: a point on the body's surface with light radial jitter so the
+  // shell has grain rather than a hard edge. The sun gets some interior fill so
+  // it reads as a solid core, not a hollow sphere.
+  const u = rng();
+  const v = rng();
+  const theta = 2 * Math.PI * u;
+  const phi = Math.acos(2 * v - 1);
+  const sinPhi = Math.sin(phi);
+  const dirX = sinPhi * Math.cos(theta);
+  const dirY = sinPhi * Math.sin(theta);
+  const dirZ = Math.cos(phi);
+  const shellLo = body.kind === 0 ? 0.35 : 0.9;
+  const r = body.radius * rand(shellLo, 1.0);
+  arr.local[i * 3 + 0] = dirX * r;
+  arr.local[i * 3 + 1] = dirY * r;
+  arr.local[i * 3 + 2] = dirZ * r;
+
+  // -1 for the sun, otherwise the planet index (body order minus the sun).
+  arr.bodyId[i] = body.kind === 0 ? -1 : bodyIndex - 1;
+
+  // Chaos start: a wide, uneven cloud so the "before" state looks like raw
+  // unordered data, not a tidy sphere.
+  const cr = rand(8, 26);
+  const cu = rng();
+  const cv = rng();
+  const ct = 2 * Math.PI * cu;
+  const cp = Math.acos(2 * cv - 1);
+  const csp = Math.sin(cp);
+  arr.initial[i * 3 + 0] = csp * Math.cos(ct) * cr;
+  arr.initial[i * 3 + 1] = csp * Math.sin(ct) * cr * 0.7;
+  arr.initial[i * 3 + 2] = Math.cos(cp) * cr;
+
+  arr.orbit[i * 4 + 0] = body.orbitRadius;
+  arr.orbit[i * 4 + 1] = body.orbitPhase;
+  arr.orbit[i * 4 + 2] = body.orbitSpeed;
+  arr.orbit[i * 4 + 3] = body.inclination;
+
+  const radial = body.orbitRadius / maxOrbit; // 0 at core, 1 at the rim
+  arr.misc[i * 4 + 0] = radial * 0.85 + rng() * 0.15; // delay
+  arr.misc[i * 4 + 1] = body.spinSpeed;
+  arr.misc[i * 4 + 2] = body.kind;
+  // Shade: the sun runs bright, planets sit dimmer, with per-atom variance so the
+  // mass has depth instead of one flat tone.
+  arr.misc[i * 4 + 3] = body.kind === 0 ? rand(0.75, 1.0) : rand(0.3, 0.7);
+
+  // Colour. The sun ramps from a near-white core to an orange rim; each planet
+  // carries several tones around its base hue, banded by latitude (the unit
+  // sphere y) so the self-spin reads. The per-atom maths live in the helpers.
+  const [cr_, cg_, cb_] =
+    body.kind === 0
+      ? sunAtomColor(Math.min(1, r / body.radius), rng)
+      : planetAtomColor(body, dirY, rng);
+  arr.color[i * 3 + 0] = cr_;
+  arr.color[i * 3 + 1] = cg_;
+  arr.color[i * 3 + 2] = cb_;
+}
+
+// The planned layout: the live rng (so the fill loop continues the same stream),
+// the bodies and their planet meta, the per-body atom budget, and the headline
+// counts the result meta reports.
+interface StarSystemPlan {
+  rng: () => number;
+  bodies: Body[];
+  planets: PlanetMeta[];
+  atomsPerBody: number[];
+  planetCount: number;
+  sunRadius: number;
+}
+
+// Plan the bodies and distribute the atom budget: the sun at the origin plus a
+// curated set of planets on spaced orbits, then the per-body atom counts. Every
+// rng draw for the system layout happens here, in order, before any atom is
+// filled. Pure relocation of the planning block; no maths or draw order changed.
+function planStarSystem(
   count: number,
   seed: number,
-  minPlanets = 0,
-): StarSystemData {
+  minPlanets: number,
+): StarSystemPlan {
   const rng = mulberry32(seed);
   const rand = (lo: number, hi: number) => lo + (hi - lo) * rng();
 
@@ -195,6 +324,18 @@ export function generateStarSystem(
   atomsPerBody[0] += count - assigned;
   if (atomsPerBody[0] < 0) atomsPerBody[0] = 0;
 
+  return { rng, bodies, planets, atomsPerBody, planetCount, sunRadius };
+}
+
+export function generateStarSystem(
+  count: number,
+  seed: number,
+  minPlanets = 0,
+): StarSystemData {
+  const { rng, bodies, planets, atomsPerBody, planetCount, sunRadius } =
+    planStarSystem(count, seed, minPlanets);
+  const rand = (lo: number, hi: number) => lo + (hi - lo) * rng();
+
   const initial = new Float32Array(count * 3);
   const local = new Float32Array(count * 3);
   const orbit = new Float32Array(count * 4);
@@ -206,82 +347,13 @@ export function generateStarSystem(
   // home orbit sits from the core, so the sun forms first and the rim last.
   const maxOrbit = bodies.reduce((m, b) => Math.max(m, b.orbitRadius), 1);
 
+  const arr: AtomArrays = { initial, local, orbit, misc, color, bodyId };
   let i = 0;
   for (let b = 0; b < bodies.length; b++) {
     const body = bodies[b];
     const n = atomsPerBody[b];
     for (let k = 0; k < n && i < count; k++, i++) {
-      // Local offset: a point on the body's surface with light radial jitter so
-      // the shell has grain rather than a hard edge. The sun gets some interior
-      // fill so it reads as a solid core, not a hollow sphere.
-      const u = rng();
-      const v = rng();
-      const theta = 2 * Math.PI * u;
-      const phi = Math.acos(2 * v - 1);
-      const sinPhi = Math.sin(phi);
-      const dirX = sinPhi * Math.cos(theta);
-      const dirY = sinPhi * Math.sin(theta);
-      const dirZ = Math.cos(phi);
-      const shellLo = body.kind === 0 ? 0.35 : 0.9;
-      const r = body.radius * rand(shellLo, 1.0);
-      local[i * 3 + 0] = dirX * r;
-      local[i * 3 + 1] = dirY * r;
-      local[i * 3 + 2] = dirZ * r;
-
-      // -1 for the sun, otherwise the planet index (body order minus the sun).
-      bodyId[i] = body.kind === 0 ? -1 : b - 1;
-
-      // Chaos start: a wide, uneven cloud so the "before" state looks like raw
-      // unordered data, not a tidy sphere.
-      const cr = rand(8, 26);
-      const cu = rng();
-      const cv = rng();
-      const ct = 2 * Math.PI * cu;
-      const cp = Math.acos(2 * cv - 1);
-      const csp = Math.sin(cp);
-      initial[i * 3 + 0] = csp * Math.cos(ct) * cr;
-      initial[i * 3 + 1] = csp * Math.sin(ct) * cr * 0.7;
-      initial[i * 3 + 2] = Math.cos(cp) * cr;
-
-      orbit[i * 4 + 0] = body.orbitRadius;
-      orbit[i * 4 + 1] = body.orbitPhase;
-      orbit[i * 4 + 2] = body.orbitSpeed;
-      orbit[i * 4 + 3] = body.inclination;
-
-      const radial = body.orbitRadius / maxOrbit; // 0 at core, 1 at the rim
-      misc[i * 4 + 0] = radial * 0.85 + rng() * 0.15; // delay
-      misc[i * 4 + 1] = body.spinSpeed;
-      misc[i * 4 + 2] = body.kind;
-      // Shade: the sun runs bright, planets sit dimmer, with per-atom variance so
-      // the mass has depth instead of one flat tone.
-      misc[i * 4 + 3] = body.kind === 0 ? rand(0.75, 1.0) : rand(0.3, 0.7);
-
-      // Colour. The sun ramps from a near-white core to an orange rim, varied per
-      // atom. Each planet carries several tones around its base hue, banded a
-      // little by latitude so the self-spin reads. All bounds stay curated.
-      let cr_, cg_, cb_;
-      if (body.kind === 0) {
-        const rn = Math.min(1, r / body.radius);
-        const hue = (48 - 30 * rn + (rng() - 0.5) * 8) / 360;
-        const sat = clamp(0.28 + 0.57 * rn + (rng() - 0.5) * 0.12, 0, 0.95);
-        const light = clamp(0.97 - 0.42 * rn + (rng() - 0.5) * 0.1, 0.45, 1);
-        [cr_, cg_, cb_] = hslToRgb(hue, sat, light);
-      } else {
-        const latitude = dirY; // unit sphere y, drives the banding
-        const hueDeg =
-          body.baseHue + (rng() - 0.5) * 2 * body.hueSpread + latitude * 5;
-        const hue = ((((hueDeg % 360) + 360) % 360) / 360);
-        const sat = clamp(body.baseSat + (rng() - 0.5) * 0.16, 0.2, 0.72);
-        const light = clamp(
-          body.baseLight + latitude * 0.1 + (rng() - 0.5) * 0.12,
-          0.32,
-          0.82,
-        );
-        [cr_, cg_, cb_] = hslToRgb(hue, sat, light);
-      }
-      color[i * 3 + 0] = cr_;
-      color[i * 3 + 1] = cg_;
-      color[i * 3 + 2] = cb_;
+      fillAtom(arr, i, body, b, maxOrbit, rng, rand);
     }
   }
 
