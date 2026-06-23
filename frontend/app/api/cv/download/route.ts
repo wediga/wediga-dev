@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendUrl } from "@/lib/backend";
+import { sessionCookieHeader } from "@/lib/forwarding";
 
 // The CV download is binary, so it cannot go through the text-based proxy. This
 // forwards the visitor's session cookie to the recruiter-gated backend endpoint
 // and streams the bytes back unchanged.
 export async function GET(request: NextRequest) {
-  const headers: Record<string, string> = {};
-  const cookie = request.headers.get("cookie");
-  if (cookie) headers["cookie"] = cookie;
+  const headers = sessionCookieHeader(request.headers.get("cookie"));
 
   // Carry the query string through, so the ?inline switch reaches the backend
   // and the CV page can embed a preview while the download link forces a save.
@@ -25,18 +24,22 @@ export async function GET(request: NextRequest) {
   }
 
   const body = await backendResponse.arrayBuffer();
-  return new NextResponse(body, {
-    status: 200,
-    headers: {
-      "content-type": "application/pdf",
-      "content-disposition":
-        backendResponse.headers.get("content-disposition") ??
-        'attachment; filename="Lebenslauf.pdf"',
-      "cache-control": "private, no-store",
-      // Never let a polyglot upload be sniffed as HTML, and give the PDF no
-      // capabilities of its own, so the inline preview can carry no XSS.
-      "x-content-type-options": "nosniff",
-      "content-security-policy": "default-src 'none'",
-    },
-  });
+  const response = new NextResponse(body, { status: 200 });
+
+  // The PDF security headers (content-type, content-disposition, cache-control,
+  // x-content-type-options and content-security-policy) are authoritative on the
+  // backend, which the backend tests assert. Relay them here so the values live
+  // in one place instead of being hardcoded a second time.
+  for (const name of [
+    "content-type",
+    "content-disposition",
+    "cache-control",
+    "x-content-type-options",
+    "content-security-policy",
+  ]) {
+    const value = backendResponse.headers.get(name);
+    if (value) response.headers.set(name, value);
+  }
+
+  return response;
 }

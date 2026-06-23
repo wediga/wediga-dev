@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.csrf import require_csrf
 from app.auth.dependencies import require_admin
+from app.errors import not_found
 from app.github import repository as repo
 from app.github import sync
 from app.github.client import GithubApiError
@@ -27,7 +28,11 @@ router = APIRouter(prefix="/github", tags=["github"])
 # Writes need both an admin session and a valid CSRF token.
 WRITE_DEPS = [Depends(require_admin), Depends(require_csrf)]
 
-NOT_FOUND = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+# Recruiter-facing read (the curated repo list) sits behind the recruiter gate,
+# which an admin session also satisfies and which re-checks the link state.
+RECRUITER_READ_DEPS = [Depends(require_recruiter_view)]
+
+NOT_FOUND = not_found()
 
 
 @router.get(
@@ -43,7 +48,7 @@ def list_admin_repos() -> list[dict]:
 @router.get(
     "/repos",
     response_model=list[GithubRepoPublic],
-    dependencies=[Depends(require_recruiter_view)],
+    dependencies=RECRUITER_READ_DEPS,
 )
 def list_curated_repos() -> list[dict]:
     """Recruiter read: the curated, visible repos, pinned first."""

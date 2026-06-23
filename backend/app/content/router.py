@@ -6,11 +6,12 @@ and ``require_csrf`` for the synchronizer token, so a write without a session
 is 401 and a write without a valid token is 403.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
 from app.auth.csrf import require_csrf
 from app.auth.dependencies import require_admin
 from app.content import repository as repo
+from app.errors import not_found
 from app.recruiter.dependencies import require_recruiter_view
 from app.content.schemas import (
     AboutContent,
@@ -36,7 +37,7 @@ WRITE_DEPS = [Depends(require_admin), Depends(require_csrf)]
 # public impressum keeps its own name-and-email split.
 RECRUITER_READ_DEPS = [Depends(require_recruiter_view)]
 
-NOT_FOUND = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+NOT_FOUND = not_found()
 
 
 # --- about ---------------------------------------------------------------

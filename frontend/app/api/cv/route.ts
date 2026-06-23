@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendUrl } from "@/lib/backend";
+import { sessionCookieHeader } from "@/lib/forwarding";
 
 // The 10 MB file cap lives on the backend; this bound covers the multipart
 // envelope around it, so the BFF rejects an oversized body up front instead of
@@ -16,8 +17,7 @@ export async function POST(request: NextRequest) {
   }
 
   const headers: Record<string, string> = {};
-  const cookie = request.headers.get("cookie");
-  if (cookie) headers["cookie"] = cookie;
+  Object.assign(headers, sessionCookieHeader(request.headers.get("cookie")));
   const csrf = request.headers.get("x-csrf-token");
   if (csrf) headers["x-csrf-token"] = csrf;
   const contentType = request.headers.get("content-type");

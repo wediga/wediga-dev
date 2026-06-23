@@ -14,6 +14,7 @@ from app.auth.csrf import require_csrf
 from app.auth.dependencies import require_admin
 from app.auth.ratelimit import client_ip, redeem_limiter
 from app.auth.sessions import RECRUITER_SESSION_KEY
+from app.errors import not_found
 from app.recruiter import repository as repo
 from app.recruiter.dependencies import require_recruiter_view
 from app.recruiter.schemas import (
@@ -60,9 +61,7 @@ def revoke_link(link_id: int) -> dict:
     """Revoke a link, which blocks any further redeem."""
     link = repo.revoke_link(link_id)
     if link is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Link not found"
-        )
+        raise not_found("Link not found")
     return link
 
 
@@ -83,9 +82,7 @@ def redeem(token: str, request: Request) -> dict[str, bool]:
 
     result, link_id = repo.validate_token(token)
     if result == "invalid":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Link not found"
-        )
+        raise not_found("Link not found")
     if result in ("revoked", "expired"):
         raise HTTPException(
             status_code=status.HTTP_410_GONE, detail="Link no longer valid"

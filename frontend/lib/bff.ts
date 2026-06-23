@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendUrl } from "./backend";
+import { sessionCookieHeader } from "./forwarding";
+
+// Route params for the dynamic [id] handlers. Next.js passes params as a
+// promise, so each handler awaits it before reading the id.
+export type Params = { params: Promise<{ id: string }> };
 
 // Forward a browser request to the backend and relay the response back.
 // The incoming session cookie and the CSRF header travel to the backend, and
@@ -13,8 +18,7 @@ export async function proxyToBackend(
   const method = request.method;
   const headers: Record<string, string> = {};
 
-  const cookie = request.headers.get("cookie");
-  if (cookie) headers["cookie"] = cookie;
+  Object.assign(headers, sessionCookieHeader(request.headers.get("cookie")));
 
   const csrf = request.headers.get("x-csrf-token");
   if (csrf) headers["x-csrf-token"] = csrf;

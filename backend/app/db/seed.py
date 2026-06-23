@@ -7,13 +7,14 @@ written with ``INSERT ... ON CONFLICT ... DO UPDATE`` (upsert), so a second
 run produces no duplicates and pulls in content edits made in the files. The
 admin-managed ``visible`` flag on a project is left untouched on update, so a
 re-seed never re-shows a project the admin hid. The returned summary counts
-the rows actually written or updated via ``cursor.rowcount``.
+the entries processed from the files, not the rows that actually changed.
 """
 
 import json
 from pathlib import Path
 
-from app.db.connection import get_connection, now
+from app.content import repository
+from app.db.connection import get_connection
 from app.paths import content_dir
 
 
@@ -23,36 +24,26 @@ def _require(path: Path) -> Path:
     return path
 
 
-def _upsert_setting(conn, key: str, value: str) -> int:
-    cursor = conn.execute(
-        "INSERT INTO site_setting (key, value, updated_at) VALUES (?, ?, ?) "
-        "ON CONFLICT (key) DO UPDATE SET "
-        "value = excluded.value, updated_at = excluded.updated_at "
-        "WHERE site_setting.value <> excluded.value",
-        (key, value, now()),
-    )
-    return cursor.rowcount
-
-
 def _seed_about(conn, base: Path) -> int:
     path = _require(base / "about.md")
     text = path.read_text(encoding="utf-8")
-    return _upsert_setting(conn, "about_text", text)
+    repository._set_setting(conn, "about_text", text)
+    return 1
 
 
 def _seed_setting_json(conn, base: Path, filename: str, key: str) -> int:
     path = _require(base / filename)
     data = json.loads(path.read_text(encoding="utf-8"))
-    return _upsert_setting(conn, key, json.dumps(data, ensure_ascii=False))
+    repository._set_setting(conn, key, json.dumps(data, ensure_ascii=False))
+    return 1
 
 
 def _seed_projects(conn, base: Path) -> int:
     path = _require(base / "projects.json")
     projects = json.loads(path.read_text(encoding="utf-8"))
-    written = 0
     for index, item in enumerate(projects):
         links = item.get("links", {}) or {}
-        cursor = conn.execute(
+        conn.execute(
             "INSERT INTO project "
             "(name, tagline, problem, solution, learning, tech_stack, "
             "demo_link, github_link, status, sort_order, visible) "
@@ -62,16 +53,7 @@ def _seed_projects(conn, base: Path) -> int:
             "solution = excluded.solution, learning = excluded.learning, "
             "tech_stack = excluded.tech_stack, demo_link = excluded.demo_link, "
             "github_link = excluded.github_link, status = excluded.status, "
-            "sort_order = excluded.sort_order "
-            "WHERE project.tagline IS NOT excluded.tagline "
-            "OR project.problem IS NOT excluded.problem "
-            "OR project.solution IS NOT excluded.solution "
-            "OR project.learning IS NOT excluded.learning "
-            "OR project.tech_stack IS NOT excluded.tech_stack "
-            "OR project.demo_link IS NOT excluded.demo_link "
-            "OR project.github_link IS NOT excluded.github_link "
-            "OR project.status IS NOT excluded.status "
-            "OR project.sort_order IS NOT excluded.sort_order",
+            "sort_order = excluded.sort_order",
             (
                 item.get("name"),
                 item.get("tagline"),
@@ -85,8 +67,7 @@ def _seed_projects(conn, base: Path) -> int:
                 index,
             ),
         )
-        written += cursor.rowcount
-    return written
+    return len(projects)
 
 
 def _seed_skills(conn, base: Path) -> tuple[int, int]:
@@ -95,32 +76,30 @@ def _seed_skills(conn, base: Path) -> tuple[int, int]:
     category_count = 0
     skill_count = 0
     for cat_index, (category, names) in enumerate(data.items()):
-        cursor = conn.execute(
+        conn.execute(
             "INSERT INTO skill_category (name, sort_order) VALUES (?, ?) "
-            "ON CONFLICT (name) DO UPDATE SET sort_order = excluded.sort_order "
-            "WHERE skill_category.sort_order IS NOT excluded.sort_order",
+            "ON CONFLICT (name) DO UPDATE SET sort_order = excluded.sort_order",
             (category, cat_index),
         )
-        category_count += cursor.rowcount
+        category_count += 1
         row = conn.execute(
             "SELECT id FROM skill_category WHERE name = ?", (category,)
         ).fetchone()
         category_id = row[0]
         for skill_index, name in enumerate(names):
-            cursor = conn.execute(
+            conn.execute(
                 "INSERT INTO skill (category_id, name, sort_order) "
                 "VALUES (?, ?, ?) "
                 "ON CONFLICT (category_id, name) DO UPDATE SET "
-                "sort_order = excluded.sort_order "
-                "WHERE skill.sort_order IS NOT excluded.sort_order",
+                "sort_order = excluded.sort_order",
                 (category_id, name, skill_index),
             )
-            skill_count += cursor.rowcount
+            skill_count += 1
     return category_count, skill_count
 
 
 def run_seed() -> dict[str, int]:
-    """Read content files into the database and return written-row counts."""
+    """Read content files into the database and return processed-entry counts."""
     base = content_dir()
     summary: dict[str, int] = {}
     with get_connection() as conn:
@@ -147,7 +126,7 @@ def run_seed() -> dict[str, int]:
 def main() -> None:
     summary = run_seed()
     for key, value in summary.items():
-        print(f"{key}: {value} written")
+        print(f"{key}: {value} processed")
 
 
 if __name__ == "__main__":

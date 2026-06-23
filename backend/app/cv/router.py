@@ -21,6 +21,7 @@ from fastapi.responses import FileResponse
 from app.auth.csrf import require_csrf
 from app.auth.dependencies import require_admin
 from app.cv import storage
+from app.errors import not_found
 from app.recruiter.dependencies import require_recruiter_view
 
 router = APIRouter(prefix="/cv", tags=["cv"])
@@ -55,9 +56,7 @@ def download_cv(inline: bool = False) -> FileResponse:
     """
     path = storage.cv_path()
     if not path.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="No CV uploaded yet"
-        )
+        raise not_found("No CV uploaded yet")
     return FileResponse(
         path,
         media_type="application/pdf",

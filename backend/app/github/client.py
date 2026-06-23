@@ -59,6 +59,20 @@ def _map_repo(raw: dict) -> dict:
     }
 
 
+def _parse_batch(payload) -> list[dict]:
+    """Validate one page payload and map its repos to the mirrored fields.
+
+    Raises ``GithubApiError`` when the payload is not a list or any item is not
+    a dict or has no name, so a malformed page never reaches the cache.
+    """
+    if not isinstance(payload, list):
+        raise GithubApiError("unexpected GitHub response shape")
+    for item in payload:
+        if not isinstance(item, dict) or not item.get("name"):
+            raise GithubApiError("unexpected GitHub response shape")
+    return [_map_repo(item) for item in payload]
+
+
 def fetch_repos(*, client: httpx.Client | None = None) -> list[dict]:
     """Return the account's public repos mapped to the mirrored fields.
 
@@ -92,12 +106,7 @@ def fetch_repos(*, client: httpx.Client | None = None) -> list[dict]:
                     f"GitHub returned status {response.status_code}"
                 )
             batch = response.json()
-            if not isinstance(batch, list):
-                raise GithubApiError("unexpected GitHub response shape")
-            for item in batch:
-                if not isinstance(item, dict) or not item.get("name"):
-                    raise GithubApiError("unexpected GitHub response shape")
-                repos.append(_map_repo(item))
+            repos.extend(_parse_batch(batch))
             if len(batch) < PER_PAGE:
                 break
         return repos

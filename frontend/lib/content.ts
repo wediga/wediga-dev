@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { backendUrl } from "./backend";
+import { sessionCookieHeader } from "./forwarding";
 import type {
   Contact,
   CvStatus,
@@ -31,7 +32,7 @@ async function getJsonWithSession<T>(path: string): Promise<T | null> {
   try {
     const cookieHeader = (await headers()).get("cookie");
     const response = await fetch(backendUrl(path), {
-      headers: cookieHeader ? { cookie: cookieHeader } : {},
+      headers: sessionCookieHeader(cookieHeader),
       cache: "no-store",
     });
     if (!response.ok) return null;
@@ -50,7 +51,7 @@ export async function getRecruiterSession(): Promise<boolean> {
   try {
     const cookieHeader = (await headers()).get("cookie");
     const response = await fetch(backendUrl("/recruiter/session"), {
-      headers: cookieHeader ? { cookie: cookieHeader } : {},
+      headers: sessionCookieHeader(cookieHeader),
       cache: "no-store",
     });
     return response.ok;
