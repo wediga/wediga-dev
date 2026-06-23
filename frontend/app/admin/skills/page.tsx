@@ -13,22 +13,24 @@ import {
   useActionFeedback,
 } from "@/components/admin/ui";
 
-// The inline name fields reuse the shared input look so they cannot drift from
-// the rest of the admin forms; each call adds flex-1 to fill its row.
-const NAME_INPUT = ADMIN_INPUT;
-
 export default function AdminSkillsPage() {
   const token = useCsrf();
   const [categories, setCategories] = useState<SkillCategory[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [newSkill, setNewSkill] = useState<Record<number, string>>({});
-  const { run, get } = useActionFeedback();
+  const { run, get, set } = useActionFeedback();
 
   const load = useCallback(() => {
     return fetch("/api/content/skills", { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : []))
-      .then((data: SkillCategory[]) => setCategories(data));
-  }, []);
+      .then((data: SkillCategory[]) => setCategories(data))
+      .catch(() =>
+        set("load", {
+          state: "error",
+          message: "Couldn't load the skills. Reload the page.",
+        }),
+      );
+  }, [set]);
 
   useEffect(() => {
     load();
@@ -109,6 +111,11 @@ export default function AdminSkillsPage() {
       <p className="mt-1 text-sm text-muted">
         Categories and the skills inside them, shown on the landing page.
       </p>
+      {get("load").state === "error" ? (
+        <div className="mt-4">
+          <Feedback status={get("load")} />
+        </div>
+      ) : null}
 
       <div className="mt-6 space-y-5">
         {categories.map((category) => (
@@ -173,7 +180,7 @@ export default function AdminSkillsPage() {
                       setSkillName(category.id, skill.id, event.target.value)
                     }
                     aria-label="Skill name"
-                    className={`${NAME_INPUT} flex-1`}
+                    className={`${ADMIN_INPUT} flex-1`}
                   />
                   <AdminButton
                     pending={get(`skill-${skill.id}-rename`).state === "pending"}
@@ -221,7 +228,7 @@ export default function AdminSkillsPage() {
                 }
                 placeholder="New skill"
                 aria-label="New skill name"
-                className={`${NAME_INPUT} flex-1`}
+                className={`${ADMIN_INPUT} flex-1`}
               />
               <AdminButton
                 variant="primary"
@@ -246,7 +253,7 @@ export default function AdminSkillsPage() {
           onChange={(event) => setNewCategory(event.target.value)}
           placeholder="New category"
           aria-label="New category name"
-          className={`${NAME_INPUT} flex-1`}
+          className={`${ADMIN_INPUT} flex-1`}
         />
         <AdminButton
           variant="primary"

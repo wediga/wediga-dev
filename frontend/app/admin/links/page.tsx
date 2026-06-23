@@ -8,20 +8,17 @@ import {
   AdminButton,
   AdminField,
   ConfirmButton,
+  EmptyState,
   Feedback,
   useActionFeedback,
 } from "@/components/admin/ui";
 
-function statusOf(link: RecruiterLink): string {
-  if (link.revoked_at) return "Revoked";
-  if (!link.active) return "Expired";
-  return "Active";
-}
-
-function statusTone(status: string): string {
-  if (status === "Active") return "text-success";
-  if (status === "Revoked") return "text-danger";
-  return "text-muted";
+// One source of truth for a link's state: the label and the tone are derived
+// together, so the rendered word and its colour cannot drift apart.
+function linkStatus(link: RecruiterLink): { label: string; tone: string } {
+  if (link.revoked_at) return { label: "Revoked", tone: "text-danger" };
+  if (!link.active) return { label: "Expired", tone: "text-muted" };
+  return { label: "Active", tone: "text-success" };
 }
 
 // Show a timestamp as a short, readable value without pulling in a date library.
@@ -36,13 +33,19 @@ export default function AdminLinksPage() {
   const [label, setLabel] = useState("");
   const [expiresOn, setExpiresOn] = useState("");
   const [createdUrl, setCreatedUrl] = useState("");
-  const { run, get } = useActionFeedback();
+  const { run, get, set } = useActionFeedback();
 
   const load = useCallback(() => {
     return fetch("/api/recruiter/links", { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : []))
-      .then((data: RecruiterLink[]) => setLinks(data));
-  }, []);
+      .then((data: RecruiterLink[]) => setLinks(data))
+      .catch(() =>
+        set("load", {
+          state: "error",
+          message: "Couldn't load the links. Reload the page.",
+        }),
+      );
+  }, [set]);
 
   useEffect(() => {
     load();
@@ -94,6 +97,11 @@ export default function AdminLinksPage() {
       <p className="mt-1 text-sm text-muted">
         Create a named magic link, share it, and see how often it was opened.
       </p>
+      {get("load").state === "error" ? (
+        <div className="mt-4">
+          <Feedback status={get("load")} />
+        </div>
+      ) : null}
 
       <div className="mt-6 max-w-md space-y-4">
         <AdminField
@@ -135,19 +143,24 @@ export default function AdminLinksPage() {
       ) : null}
 
       <h2 className="mt-9 text-base font-semibold text-ink">Links</h2>
-      <ul className="mt-3 divide-y divide-line overflow-hidden rounded-lg border border-line">
-        {links.map((link) => {
-          const status = statusOf(link);
-          return (
-            <li key={link.id} className="bg-surface/40 px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-ink">
-                  {link.label || "(no label)"}
-                </span>
-                <span className={`text-sm font-medium ${statusTone(status)}`}>
-                  {status}
-                </span>
-              </div>
+      {links.length === 0 ? (
+        <div className="mt-3">
+          <EmptyState>No links yet.</EmptyState>
+        </div>
+      ) : (
+        <ul className="mt-3 divide-y divide-line overflow-hidden rounded-lg border border-line">
+          {links.map((link) => {
+            const status = linkStatus(link);
+            return (
+              <li key={link.id} className="bg-surface/40 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-ink">
+                    {link.label || "(no label)"}
+                  </span>
+                  <span className={`text-sm font-medium ${status.tone}`}>
+                    {status.label}
+                  </span>
+                </div>
               <div className="mt-1.5 flex flex-wrap gap-x-6 gap-y-1 text-sm tabular-nums text-muted">
                 <span>Opens: {link.view_count}</span>
                 <span>Last opened: {fmt(link.last_viewed_at)}</span>
@@ -169,15 +182,11 @@ export default function AdminLinksPage() {
                   <Feedback status={get(`revoke-${link.id}`)} />
                 </div>
               )}
-            </li>
-          );
-        })}
-        {links.length === 0 ? (
-          <li className="bg-surface/40 px-4 py-6 text-center text-sm text-muted">
-            No links yet.
-          </li>
-        ) : null}
-      </ul>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

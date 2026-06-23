@@ -7,6 +7,7 @@ import type { GithubRepo } from "@/lib/types";
 import {
   AdminButton,
   AdminField,
+  EmptyState,
   Feedback,
   useActionFeedback,
 } from "@/components/admin/ui";
@@ -44,8 +45,14 @@ export default function AdminReposPage() {
         setEdits(
           Object.fromEntries(data.map((repo) => [repo.id, toCuration(repo)])),
         );
-      });
-  }, []);
+      })
+      .catch(() =>
+        set("load", {
+          state: "error",
+          message: "Couldn't load the repos. Reload the page.",
+        }),
+      );
+  }, [set]);
 
   useEffect(() => {
     load();
@@ -126,9 +133,21 @@ export default function AdminReposPage() {
         The sync mirrors the public repos. Curate them here: hide, pin, override
         the description and order them. Curation is kept across every sync.
       </p>
+      {get("load").state === "error" ? (
+        <div className="mt-4">
+          <Feedback status={get("load")} />
+        </div>
+      ) : null}
 
-      <ul className="mt-6 space-y-4">
-        {repos.map((repo) => {
+      {repos.length === 0 ? (
+        <div className="mt-6">
+          <EmptyState>
+            No repos yet. Use the sync button to fetch the public repos.
+          </EmptyState>
+        </div>
+      ) : (
+        <ul className="mt-6 space-y-4">
+          {repos.map((repo) => {
           const edit = edits[repo.id];
           if (!edit) return null;
           return (
@@ -207,13 +226,9 @@ export default function AdminReposPage() {
               </div>
             </li>
           );
-        })}
-        {repos.length === 0 ? (
-          <li className="rounded-lg border border-dashed border-line px-4 py-6 text-center text-sm text-muted">
-            No repos yet. Use the sync button to fetch the public repos.
-          </li>
-        ) : null}
-      </ul>
+          })}
+        </ul>
+      )}
     </div>
   );
 }

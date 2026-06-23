@@ -8,6 +8,7 @@ import {
   AdminButton,
   AdminField,
   ConfirmButton,
+  EmptyState,
   Feedback,
   useActionFeedback,
 } from "@/components/admin/ui";
@@ -92,13 +93,19 @@ export default function AdminProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
-  const { run, get } = useActionFeedback();
+  const { run, get, set } = useActionFeedback();
 
   const load = useCallback(() => {
     return fetch("/api/content/projects", { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : []))
-      .then((data: Project[]) => setProjects(data));
-  }, []);
+      .then((data: Project[]) => setProjects(data))
+      .catch(() =>
+        set("load", {
+          state: "error",
+          message: "Couldn't load the projects. Reload the page.",
+        }),
+      );
+  }, [set]);
 
   useEffect(() => {
     load();
@@ -165,38 +172,44 @@ export default function AdminProjectsPage() {
       <p className="mt-1 text-sm text-muted">
         Showcase projects, ordered by sort order.
       </p>
+      {get("load").state === "error" ? (
+        <div className="mt-4">
+          <Feedback status={get("load")} />
+        </div>
+      ) : null}
 
-      <ul className="mt-6 divide-y divide-line overflow-hidden rounded-lg border border-line">
-        {projects.map((project) => (
-          <li
-            key={project.id}
-            className="flex flex-wrap items-center justify-between gap-3 bg-surface/40 px-4 py-3"
-          >
-            <span className="text-sm text-ink">
-              {project.name}
-              {project.visible ? null : (
-                <span className="ml-2 text-xs text-muted">(hidden)</span>
-              )}
-            </span>
-            <span className="flex flex-wrap items-center gap-2">
-              <AdminButton onClick={() => startEdit(project)}>Edit</AdminButton>
-              <ConfirmButton
-                label="Delete"
-                prompt="Delete this project?"
-                pendingLabel="Deleting…"
-                pending={get(`delete-${project.id}`).state === "pending"}
-                onConfirm={() => remove(project.id)}
-              />
-              <Feedback status={get(`delete-${project.id}`)} />
-            </span>
-          </li>
-        ))}
-        {projects.length === 0 ? (
-          <li className="bg-surface/40 px-4 py-6 text-center text-sm text-muted">
-            No projects yet. Create the first one below.
-          </li>
-        ) : null}
-      </ul>
+      {projects.length === 0 ? (
+        <div className="mt-6">
+          <EmptyState>No projects yet. Create the first one below.</EmptyState>
+        </div>
+      ) : (
+        <ul className="mt-6 divide-y divide-line overflow-hidden rounded-lg border border-line">
+          {projects.map((project) => (
+            <li
+              key={project.id}
+              className="flex flex-wrap items-center justify-between gap-3 bg-surface/40 px-4 py-3"
+            >
+              <span className="text-sm text-ink">
+                {project.name}
+                {project.visible ? null : (
+                  <span className="ml-2 text-xs text-muted">(hidden)</span>
+                )}
+              </span>
+              <span className="flex flex-wrap items-center gap-2">
+                <AdminButton onClick={() => startEdit(project)}>Edit</AdminButton>
+                <ConfirmButton
+                  label="Delete"
+                  prompt="Delete this project?"
+                  pendingLabel="Deleting…"
+                  pending={get(`delete-${project.id}`).state === "pending"}
+                  onConfirm={() => remove(project.id)}
+                />
+                <Feedback status={get(`delete-${project.id}`)} />
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <h2 className="mt-9 text-base font-semibold text-ink">
         {editingId === null ? "New project" : "Edit project"}

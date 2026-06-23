@@ -1,17 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { apiWrite } from "@/lib/adminClient";
-import { useCsrf } from "@/components/admin/useCsrf";
+import { AdminField } from "@/components/admin/ui";
 import {
-  AdminButton,
-  AdminField,
-  ConfirmButton,
-  Feedback,
-  useActionFeedback,
-} from "@/components/admin/ui";
+  type LoadedRecord,
+  recordString,
+  SingleRecordForm,
+} from "@/components/admin/SingleRecordForm";
 
-const EMPTY = {
+type ImpressumForm = {
+  name: string;
+  email: string;
+  github: string;
+  linkedin: string;
+  street: string;
+  city: string;
+};
+
+const EMPTY: ImpressumForm = {
   name: "",
   email: "",
   github: "",
@@ -20,7 +25,7 @@ const EMPTY = {
   city: "",
 };
 
-const FIELDS: { key: keyof typeof EMPTY; label: string; type?: string }[] = [
+const FIELDS: { key: keyof ImpressumForm; label: string; type?: string }[] = [
   { key: "name", label: "Name" },
   { key: "email", label: "Email", type: "email" },
   { key: "github", label: "GitHub" },
@@ -30,120 +35,52 @@ const FIELDS: { key: keyof typeof EMPTY; label: string; type?: string }[] = [
 ];
 
 export default function AdminImpressumPage() {
-  const token = useCsrf();
-  const [form, setForm] = useState(EMPTY);
-  const { run, get, set } = useActionFeedback();
-
-  useEffect(() => {
-    fetch("/api/content/impressum", { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => {
-        if (data) {
-          setForm({
-            name: data.name ?? "",
-            email: data.email ?? "",
-            github: data.github ?? "",
-            linkedin: data.linkedin ?? "",
-            street: data.address?.street ?? "",
-            city: data.address?.city ?? "",
-          });
-        }
-      })
-      .catch(() =>
-        set("load", {
-          state: "error",
-          message: "Couldn't load the impressum. Reload the page.",
-        }),
-      );
-  }, [set]);
-
-  function update(field: keyof typeof EMPTY, value: string) {
-    setForm((current) => ({ ...current, [field]: value }));
-  }
-
-  const save = () =>
-    run(
-      "save",
-      async () => {
-        const body = {
-          name: form.name,
-          email: form.email,
-          github: form.github || null,
-          linkedin: form.linkedin || null,
-          address:
-            form.street || form.city
-              ? { street: form.street, city: form.city }
-              : null,
-        };
-        const response = await apiWrite(
-          "/api/content/impressum",
-          "PUT",
-          token,
-          body,
-        );
-        return response.ok;
-      },
-      { success: "Saved", error: "Couldn't save. Try again." },
-    );
-
-  const remove = () =>
-    run(
-      "delete",
-      async () => {
-        const response = await apiWrite(
-          "/api/content/impressum",
-          "DELETE",
-          token,
-        );
-        if (response.ok) setForm(EMPTY);
-        return response.ok;
-      },
-      { success: "Deleted", error: "Couldn't delete. Try again." },
-    );
-
-  const load = get("load");
-
   return (
-    <div>
-      <h1 className="text-xl font-semibold text-ink">Impressum</h1>
-      <p className="mt-1 text-sm text-muted">
-        The full legal notice behind the login.
-      </p>
-      {load.state === "error" ? (
-        <p className="mt-4 text-sm text-danger">{load.message}</p>
-      ) : null}
-
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        {FIELDS.map((field) => (
-          <AdminField
-            key={field.key}
-            label={field.label}
-            type={field.type}
-            value={form[field.key]}
-            onChange={(value) => update(field.key, value)}
-          />
-        ))}
-      </div>
-
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <AdminButton
-          variant="primary"
-          pending={get("save").state === "pending"}
-          pendingLabel="Saving…"
-          onClick={save}
-        >
-          Save
-        </AdminButton>
-        <ConfirmButton
-          label="Delete"
-          prompt="Delete the impressum?"
-          pendingLabel="Deleting…"
-          pending={get("delete").state === "pending"}
-          onConfirm={remove}
-        />
-        <Feedback status={get("save")} />
-        <Feedback status={get("delete")} />
-      </div>
-    </div>
+    <SingleRecordForm<ImpressumForm>
+      title="Impressum"
+      description="The full legal notice behind the login."
+      endpoint="/api/content/impressum"
+      empty={EMPTY}
+      fromResponse={(data) => {
+        const address =
+          typeof data.address === "object" && data.address !== null
+            ? (data.address as LoadedRecord)
+            : {};
+        return {
+          name: recordString(data.name),
+          email: recordString(data.email),
+          github: recordString(data.github),
+          linkedin: recordString(data.linkedin),
+          street: recordString(address.street),
+          city: recordString(address.city),
+        };
+      }}
+      toBody={(value) => ({
+        name: value.name,
+        email: value.email,
+        github: value.github || null,
+        linkedin: value.linkedin || null,
+        address:
+          value.street || value.city
+            ? { street: value.street, city: value.city }
+            : null,
+      })}
+      loadError="Couldn't load the impressum. Reload the page."
+      deletePrompt="Delete the impressum?"
+    >
+      {(form, update) => (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          {FIELDS.map((field) => (
+            <AdminField
+              key={field.key}
+              label={field.label}
+              type={field.type}
+              value={form[field.key]}
+              onChange={(value) => update(field.key, value)}
+            />
+          ))}
+        </div>
+      )}
+    </SingleRecordForm>
   );
 }

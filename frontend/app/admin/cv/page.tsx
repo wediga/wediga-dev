@@ -68,7 +68,9 @@ export default function AdminCvPage() {
         protected CV page as a download.
       </p>
       {load.state === "error" ? (
-        <p className="mt-4 text-sm text-danger">{load.message}</p>
+        <div className="mt-4">
+          <Feedback status={load} />
+        </div>
       ) : null}
 
       <section className="mt-6 rounded-lg border border-line bg-surface/40 p-5 sm:p-6">
