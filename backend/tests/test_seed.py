@@ -25,8 +25,8 @@ def _counts() -> dict[str, int]:
 def test_seed_loads_content(migrated_db) -> None:
     run_seed()
     counts = _counts()
-    assert counts["projects"] == 3
-    assert counts["categories"] == 5
+    assert counts["projects"] == 1
+    assert counts["categories"] == 2
     assert counts["about"] == 1
     assert counts["skills"] > 0
 

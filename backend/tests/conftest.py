@@ -2,7 +2,8 @@
 
 Each test session uses an isolated SQLite file via ``WEDIGA_DB_PATH`` so the
 real ``data/wediga.db`` is never touched. ``WEDIGA_CONTENT_DIR`` points at the
-repository content directory, which the seed reads without modifying.
+committed ``content.example`` fixture, so the seed tests never read the
+gitignored ``content/``.
 """
 
 from pathlib import Path
@@ -32,7 +33,7 @@ def temp_db(tmp_path, monkeypatch):
     """Point the backend at a fresh temporary database file."""
     db_file = tmp_path / "test.db"
     monkeypatch.setenv("WEDIGA_DB_PATH", str(db_file))
-    monkeypatch.setenv("WEDIGA_CONTENT_DIR", str(REPO_ROOT / "content"))
+    monkeypatch.setenv("WEDIGA_CONTENT_DIR", str(REPO_ROOT / "content.example"))
     return db_file
 
 
