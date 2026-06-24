@@ -36,7 +36,6 @@ export default function AdminSkillsPage() {
     load();
   }, [load]);
 
-  // Edit category and skill names in place, then send the current value.
   function setCategoryName(id: number, name: string) {
     setCategories((current) =>
       current.map((category) =>
@@ -60,8 +59,8 @@ export default function AdminSkillsPage() {
     );
   }
 
-  // One write, keyed so each control reports its own outcome. On success the
-  // list reloads so the inputs reflect the committed state.
+  // Keyed so each control reports its own outcome. On success the list reloads
+  // so the inputs reflect the committed state.
   function write(
     key: string,
     path: string,

@@ -6,11 +6,10 @@ import { LogoutButton } from "@/components/LogoutButton";
 import { AdminNav } from "@/components/admin/AdminNav";
 
 // Server-side guard: ask the backend whether the forwarded session is an admin
-// session. A missing or invalid session redirects to the login page, so the
-// admin area is never rendered without authentication. The raw cookie header
-// is forwarded verbatim, the same way the BFF route handlers do it, because
-// re-serializing the cookies (cookies().toString()) re-encodes the signed
-// session value and the backend then rejects it.
+// session, redirect to login otherwise. The raw cookie header is forwarded
+// verbatim (the BFF route handlers do the same) because re-serializing via
+// cookies().toString() re-encodes the signed session value and the backend
+// then rejects it.
 export default async function AdminLayout({
   children,
 }: {

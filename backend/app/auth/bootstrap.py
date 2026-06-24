@@ -1,10 +1,9 @@
 """Admin bootstrap from the environment.
 
-On startup, if the ``admin`` table has no row and ``ADMIN_PASSWORD`` is set,
-a single admin row (id=1) is created with an argon2 hash of the password.
-If the row already exists, nothing happens, so a restart never overwrites the
-password. The raw password is read only here, never logged and never stored
-in plaintext.
+On startup, with no ``admin`` row and ``ADMIN_PASSWORD`` set, one admin row
+(id=1) is created from an argon2 hash. An existing row is left alone, so a
+restart never overwrites the password. The raw password is never logged or
+stored in plaintext.
 """
 
 import os

@@ -1,17 +1,7 @@
-"""In-memory rate limiting for the admin login.
+"""Single-process fixed-window per-IP limiter for the admin login.
 
-The login is the one brute-force surface, so it gets a small per-IP limiter.
-wediga.dev runs a single backend process, so an in-memory fixed-window
-counter is enough and avoids pulling in a dependency for one endpoint. The
-counter keys on the client IP and resets once its window elapses, and a stale
-window is pruned on access so the dictionary cannot grow without bound under
-normal traffic.
-
-The client IP is read from ``X-Forwarded-For`` because the browser reaches the
-backend only through Caddy and the Next.js BFF, both of which sit in front. The
-backend is not publicly reachable, so the forwarded header is trusted as set by
-that proxy chain. When the header is absent (local development without a proxy)
-the limiter falls back to the direct peer address.
+The client IP comes from ``X-Forwarded-For``, trusted because the backend is
+reachable only through the Caddy and Next.js BFF proxy chain that sets it.
 """
 
 import time
@@ -21,13 +11,11 @@ from threading import Lock
 def client_ip(request) -> str:
     """Return the trusted client IP for rate-limiting and tracking.
 
-    Caddy appends the real peer as the last ``X-Forwarded-For`` entry, while
-    any values a client injects sit to its left, so the rightmost entry is the
-    address the trusted proxy observed. Reading the leftmost entry instead
-    would let a client forge a fresh value per request and so escape the rate
-    limit, which is why the rightmost entry is used here. The Next.js BFF
-    forwards the header without adding a hop, so exactly one proxy (Caddy)
-    appends. Without the header the direct peer is used for local development.
+    Use the rightmost ``X-Forwarded-For`` entry: Caddy appends the real peer
+    there, while any client-injected values sit to its left. Reading the
+    leftmost entry would let a client forge a fresh value per request and
+    escape the limit. The BFF adds no hop, so exactly one proxy appends.
+    Without the header the direct peer is used for local development.
     """
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
@@ -57,10 +45,8 @@ class RateLimiter:
         """Record an attempt for ``key`` and return ``True`` if it is allowed."""
         nowt = time.monotonic()
         with self._lock:
-            # Bound memory: once the table grows past the cap, drop every key
-            # whose window has fully elapsed. What remains are only the keys
-            # active inside the current window, so the table cannot grow
-            # without bound under a spread of distinct addresses.
+            # Past the cap, drop every key whose window has fully elapsed, so
+            # the table cannot grow without bound under a spread of addresses.
             if len(self._hits) > self._max_keys:
                 self._hits = {
                     k: v
@@ -80,19 +66,16 @@ class RateLimiter:
             self._hits.pop(key, None)
 
     def clear(self) -> None:
-        """Drop all counters. Used to isolate the limiter between tests."""
+        """Drop all counters, to isolate the limiter between tests."""
         with self._lock:
             self._hits.clear()
 
 
-# A single shared limiter for the login: ten attempts per five minutes per IP.
-# With argon2 at roughly 50 ms per verify this leaves brute force hopeless
-# without locking out a person who simply mistypes the password a few times.
+# Login: ten attempts per five minutes per IP. With argon2 at ~50 ms per verify
+# this stops brute force without locking out a few mistyped passwords.
 login_limiter = RateLimiter(max_attempts=10, window_seconds=300)
 
-# A generous limiter for the public recruiter redeem: thirty attempts per five
-# minutes per IP. The token already carries 256 bits of entropy, so guessing is
-# infeasible; this only caps request floods and view-count inflation from a
-# single source, the same way the login limiter caps the one other public
-# surface.
+# Recruiter redeem: thirty attempts per five minutes per IP. The token carries
+# 256 bits of entropy, so this only caps request floods and view-count
+# inflation from one source, not guessing.
 redeem_limiter = RateLimiter(max_attempts=30, window_seconds=300)

@@ -50,14 +50,14 @@ export interface RecruiterLink {
   active: boolean;
 }
 
-// The create response carries the plaintext token once; it is never returned
-// again by any later read.
+// The create response carries the plaintext token once, never returned again by
+// any later read.
 export interface RecruiterLinkCreated extends RecruiterLink {
   token: string;
 }
 
 // The full repo row for the admin: mirrored GitHub fields plus curation. The
-// mirrored fields are read-only in the UI; only the curation fields are sent
+// mirrored fields are read-only in the UI, only the curation fields are sent
 // back on a write.
 export interface GithubRepo {
   id: number;
@@ -74,8 +74,8 @@ export interface GithubRepo {
   sort_order: number;
 }
 
-// The curated repo as the recruiter view receives it. ``description`` is
-// already the effective text (override when set, otherwise the GitHub one).
+// The curated repo as the recruiter view receives it. description is already the
+// effective text (the override when set, otherwise the GitHub one).
 export interface CuratedRepo {
   name: string;
   description: string | null;
@@ -86,7 +86,7 @@ export interface CuratedRepo {
   pinned: boolean;
 }
 
-// The CV is a single uploaded PDF; its only state is whether one is present.
+// The CV is a single uploaded PDF, its only state is whether one is present.
 export interface CvStatus {
   present: boolean;
 }

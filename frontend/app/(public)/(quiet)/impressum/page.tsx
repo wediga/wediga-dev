@@ -6,10 +6,8 @@ export const metadata: Metadata = {
   title: "Impressum",
 };
 
-// The public impressum shows only name and email. The full legal details
-// (address and links) sit behind the recruiter view, which gates them by
-// session. The read here is unchanged; only the presentation moved into the
-// quiet dark shell.
+// The public impressum shows only name and email; the full legal details
+// (address and links) sit behind the session-gated recruiter view.
 export default async function ImpressumPage() {
   const impressum = await getImpressum();
 

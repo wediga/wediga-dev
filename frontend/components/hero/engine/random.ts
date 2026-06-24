@@ -1,9 +1,6 @@
-// Small deterministic helpers shared by the generator and the rails camera. The
-// star system and the per-load section assignment both need the same fast PRNG
-// and the same in-place shuffle, so they are defined once here.
+// Deterministic helpers shared by the generator and the rails camera.
 
-// mulberry32: small, fast, deterministic. Same seed gives the same system, which
-// is what makes "generative per reload" reproducible when we want to compare.
+// mulberry32: deterministic per seed.
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return function () {
@@ -15,7 +12,7 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-// Fisher-Yates, in place, drawing one number from rnd per step.
+// Fisher-Yates in place, one draw from rnd per step.
 export function shuffle<T>(array: T[], rnd: () => number): void {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1));

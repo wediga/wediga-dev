@@ -21,10 +21,9 @@ export const metadata: Metadata = {
 };
 
 // Without this, mobile browsers render at a ~980px desktop layout viewport and
-// scale it down, so the page looks tiny and off-screen and the compact media
-// query (max-width / pointer) can resolve wrong. width=device-width maps the
-// layout viewport to the real device width, which is what makes the responsive
-// breakpoints and the mobile quiet-motion default actually fire on a phone.
+// scale down, so the compact media query (max-width / pointer) resolves wrong.
+// width=device-width maps the layout viewport to the real device width, which is
+// what fires the responsive breakpoints and the mobile quiet-motion default.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -41,12 +40,12 @@ export default function RootLayout({
       className={`${display.variable} ${plexMono.variable} h-full antialiased`}
       // The init script sets data-motion before paint, so the attribute is
       // already on the element React hydrates against; suppress the resulting
-      // attribute mismatch on this one node.
+      // mismatch on this one node.
       suppressHydrationWarning
     >
       <head>
         {/* Resolve the motion mode before first paint to avoid a flash: a stored
-            choice wins over the OS prefers-reduced-motion, which wins over the
+            choice wins over OS prefers-reduced-motion, which wins over the
             full-motion default. Mirrors resolveMotion in lib/motion.ts. */}
         <script dangerouslySetInnerHTML={{ __html: MOTION_INIT_SCRIPT }} />
       </head>

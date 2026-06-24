@@ -1,18 +1,15 @@
-// Static intro copy for the landing. There is no BFF source for this: the name,
-// role and hook are the page's own identity, and the hook is meant to be easy to
-// change by hand. Shared by the visible Intro station and the readable/SEO layer
-// so both always read the same, and by the page metadata.
+// Static intro copy for the landing, no BFF source: the name, role and hook are
+// the page's own identity, edited by hand. Shared by the Intro station, the
+// readable/SEO layer and the page metadata so they always read the same.
 export const INTRO = {
   name: "Alexander Wedig",
   role: "Softwareentwickler aus Berlin",
   hook: "Auf dem Weg ins Machine Learning Engineering.",
 } as const;
 
-// The public landing's section copy, in one place so the three renderings (the
-// full-motion station overlay, the readable/SEO layer, and the quiet landing)
-// can never drift apart. The markup of those three legitimately differs (text
-// tracked onto planets, a hidden readable column, a quiet two-track layout), but
-// the words live here only.
+// The landing's section copy in one place so the three renderings (station
+// overlay, readable/SEO layer, quiet landing) never drift apart. Their markup
+// differs, but the words live here only.
 export const LANDING = {
   toolkitHeading: "Toolkit",
   accessHeading: "Zugang",

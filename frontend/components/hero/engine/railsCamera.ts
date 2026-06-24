@@ -1,8 +1,6 @@
 // Rails camera path maths: which planet anchors each section, the per-section
-// waypoints, the scroll-to-curve mapping and the azimuthal orbit-lerp. Pure
-// geometry over the generated system and the station count; it owns its own
-// deterministic assignment stream and its waypoint scratch arrays. Pulled
-// verbatim out of createWebglEngine; no constant, formula or draw order changed.
+// waypoints, the scroll-to-curve mapping and the azimuthal orbit-lerp. Owns its
+// own deterministic assignment stream and waypoint scratch arrays.
 
 import * as THREE from "three";
 import { mulberry32, shuffle } from "./random";
@@ -39,23 +37,18 @@ export function buildRailsCamera(
   STATIONS: number,
   seed: number,
 ): RailsCamera {
-  // The scroll position drives the camera along a fixed path through the section
-  // planets. Progress is read in the animation frame, never via a scroll listener,
+  // Scroll progress is read in the animation frame, never via a scroll listener,
   // so native scrolling stays untouched.
 
-  // Random per load: which planet carries each section, in fixed section order.
-  // Uses its own deterministic stream so it does not disturb the generator.
+  // Which planet carries each section, random per load on its own deterministic
+  // stream so it does not disturb the generator.
   function pickAssignments(s: number, planetCount: number): number[] {
-    // mulberry32 normalises the seed with >>> 0, so this matches the prior inline
-    // PRNG seeded from (s ^ 0x9e3779b9) >>> 0 exactly.
     const rnd = mulberry32(s ^ 0x9e3779b9);
     const idx = Array.from({ length: planetCount }, (_, i) => i);
     shuffle(idx, rnd);
-    // Always start at the outermost planet so the ride flies from OUTSIDE into the
-    // system; the remaining stations are picked generatively from the rest. The
-    // descending orbit-radius sort then orders the whole set outermost-first. (With
-    // few stations a purely random pick could land the first stop mid-system, which
-    // broke the "from outside in" feel.)
+    // Always start at the outermost planet so the ride flies from outside in; with
+    // few stations a purely random pick could land the first stop mid-system. The
+    // descending orbit-radius sort then orders the whole set outermost-first.
     let outer = 0;
     for (let i = 1; i < planetCount; i++) {
       if (
@@ -76,9 +69,9 @@ export function buildRailsCamera(
   }
   const assignments = pickAssignments(seed, data.meta.planets.length);
 
-  // The scroll track is STATIONS+1 equal full-viewport snap sections (an overview
-  // first, then one per station), so each leg is one snap step regardless of how far
-  // apart the planets sit; the per-leg camera easing evens out the felt speed.
+  // The scroll track is STATIONS+1 equal full-viewport snap sections (overview
+  // first, then one per station), so each leg is one snap step regardless of planet
+  // spacing; the per-leg easing evens out the felt speed.
 
   const radial = new THREE.Vector3();
   function planetPosAt(planetIndex: number, t: number, out: THREE.Vector3) {
@@ -91,13 +84,12 @@ export function buildRailsCamera(
     return out.set(bx, -bz * si, bz * ci);
   }
 
-  // Camera waypoints sit OUTSIDE each planet, so every station is approached from
+  // Camera waypoints sit outside each planet, so every station is approached from
   // outside. Between stations the path is a quadratic bezier through an outward
-  // midpoint, so the curve bows gently around the bodies with an even felt speed.
-  // The midpoint's outward direction is the bisector of the two stations' radial
-  // directions; when the stations sit nearly opposite (the bisector collapses) it
-  // bows perpendicular to the chord, so the curve always stays outside the system.
-  // Seven control points: station k at index 2k, the midpoints at the odd indices.
+  // midpoint along the bisector of the two stations' radial directions; when the
+  // stations sit nearly opposite (the bisector collapses) it bows perpendicular to
+  // the chord, so the curve always stays outside the system. Station k at index 2k,
+  // midpoints at the odd indices.
   const camPts = Array.from(
     { length: 2 * STATIONS - 1 },
     () => new THREE.Vector3(),
@@ -149,24 +141,20 @@ export function buildRailsCamera(
   }
 
   // Maps scroll 0..1 to a curve param with a dwell band at each station and a
-  // smoothstep travel band between, so the camera eases to a gentle stop at every
-  // station instead of drifting between two.
+  // smoothstep travel band between, so the camera eases to a stop at every station.
   function mapScroll(p: number): ScrollMap {
-    // p maps to x in [0, STATIONS] across the equal snap sections. x = 0 is the
-    // overview, x = i (i >= 1) is station i-1, where the scroll snaps and the card
-    // locks. Between snaps the camera eases from one station to the next.
+    // x in [0, STATIONS] across the equal snap sections. x = 0 is the overview,
+    // x = i (i >= 1) is station i-1 where the scroll snaps and the card locks.
     const x = p * STATIONS;
-    // docked: 1 only right at a station, fading sharply to 0 a short way out and flat
-    // 0 across the middle of a leg, so the text and its scrim are present ONLY while
-    // actually parked, not lingering faintly across the whole travel. Driven by the
-    // distance in x to the nearest station (x = 1..STATIONS), so it works for the
-    // lead-in and every leg alike.
+    // docked: 1 only right at a station, fading sharply to 0 a short way out, so the
+    // text and scrim show only while parked. Driven by the x-distance to the nearest
+    // station, so the lead-in and every leg behave alike.
     const nearest = Math.max(1, Math.round(x));
     const dxs = Math.abs(x - nearest);
     const tt = Math.min(1, Math.max(0, (dxs - 0.05) / (0.24 - 0.05)));
     const docked = 1 - tt * tt * (3 - 2 * tt);
     if (x <= 1) {
-      // Lead-in: overview to the first station. approach drives the camera fly-in.
+      // Lead-in overview to first station; approach drives the fly-in.
       const e = x * x * (3 - 2 * x);
       return { u: 0, station: 0, docked, approach: e };
     }
@@ -184,11 +172,10 @@ export function buildRailsCamera(
     };
   }
 
-  // Interpolate between two world points as an orbit around the sun: the azimuth
-  // takes the shorter way (left or right), the radius and height lerp straight. The
-  // camera therefore always travels around the SIDE of the system, never across or
-  // over the top, no matter where start and end sit. Used both for station-to-station
-  // travel and for the overview-to-first-station fly-in.
+  // Interpolate two world points as an orbit around the sun: azimuth takes the
+  // shorter way, radius and height lerp straight. The camera therefore travels
+  // around the side of the system, never across or over the top, whatever the
+  // endpoints. Used for station travel and the overview fly-in.
   function orbitLerp(
     from: THREE.Vector3,
     to: THREE.Vector3,

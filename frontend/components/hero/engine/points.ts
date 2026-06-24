@@ -1,6 +1,5 @@
 // The Points object: one lit point per atom, reading the GPGPU position texture
-// each frame. Geometry attributes and the cloud-look ShaderMaterial are fixed at
-// build time. Pulled verbatim out of createWebglEngine.
+// each frame. Geometry attributes and the ShaderMaterial are fixed at build time.
 
 import * as THREE from "three";
 import { pointsVert, pointsFrag } from "./glsl";
@@ -40,8 +39,8 @@ export function buildPoints(
   pointsGeo.setAttribute("aColor", new THREE.BufferAttribute(data.color, 3));
   pointsGeo.setAttribute("aBodyId", new THREE.BufferAttribute(data.bodyId, 1));
 
-  // Cloud look (individual lit points), fixed at build time: the form and body
-  // toggles from the sandbox are gone, this is the single approved configuration.
+  // Look fixed at build time: the sandbox form and body toggles are gone, this is
+  // the single approved configuration.
   const pointsMat = new THREE.ShaderMaterial({
     uniforms: {
       uPositions: { value: null },
@@ -52,8 +51,7 @@ export function buildPoints(
       uOpenId: { value: -1 },
       uOpen: { value: 0 },
       uDim: { value: 0 },
-      // Quiet mode renders the sun alone; full motion leaves this at 0.
-      uSunOnly: { value: 0 },
+      uSunOnly: { value: 0 }, // quiet mode renders the sun alone; full motion at 0
     },
     vertexShader: pointsVert,
     fragmentShader: pointsFrag,

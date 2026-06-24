@@ -4,14 +4,13 @@ import { AccessButton } from "./LandingContent";
 import { SkillGroup } from "./SkillGroup";
 import { STATIONS } from "./stations";
 
-// The visible station text of the full-motion ride: real DOM text positioned on
-// the active planet via its projected screen coordinates, with a soft scrim
-// behind for legibility. Only the active station is shown. The whole overlay is a
-// visual duplicate of the readable layer, so it is aria-hidden and its controls
-// are out of the tab order; mouse users still click the door. The per-frame
-// position and opacity are written straight to these refs by the engine hook's
-// onStation callback; active only flips a few times and drives the assemble
-// animation on the matching title.
+// The visible station text of the ride: DOM text positioned on the active planet
+// via its projected screen coordinates, with a scrim behind for legibility. Only
+// the active station shows. The overlay is a visual duplicate of the readable
+// layer, so it is aria-hidden and out of the tab order, but mouse users still
+// click the door. The engine hook's onStation callback writes per-frame position
+// and opacity straight to these refs; active flips only a few times and drives
+// the assemble animation on the matching title.
 export function StationsOverlay({
   sectionRefs,
   active,
@@ -39,10 +38,9 @@ export function StationsOverlay({
           style={{ opacity: 0, left: "50%", top: "50%" }}
           className="absolute w-[min(86vw,560px)] -translate-x-1/2 -translate-y-1/2 text-center transition-opacity duration-200"
         >
-          {/* Scrim: a circular darkening over the whole opened planet, darkest
-              at the centre and fading out before the rim, so the busy interior
-              points calm down and the eye rests on the text while the lit rim
-              stays visible. */}
+          {/* Scrim: a circular darkening over the opened planet, darkest at the
+              centre and fading before the rim, so the interior points calm down
+              and the text reads while the lit rim stays visible. */}
           <div
             aria-hidden="true"
             className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 rounded-full"
@@ -54,9 +52,8 @@ export function StationsOverlay({
 
           {kind === "intro" ? (
             <>
-              {/* Small self-hosted portrait; the next/image optimizer is
-                  needless for an 88 KB asset and flaky in dev, so a plain img
-                  is cleaner. */}
+              {/* Plain img: the next/image optimizer is needless for an 88 KB
+                  asset and flaky in dev. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/portrait.jpg"

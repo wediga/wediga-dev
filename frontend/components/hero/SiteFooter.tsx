@@ -2,14 +2,12 @@ import Link from "next/link";
 import { SiteFooter as SharedSiteFooter } from "@/components/site/SiteChrome";
 import { MotionToggle } from "@/components/MotionToggle";
 
-// The site footer: Impressum, Login and the persistent motion switch. Two
-// variants: fixed over the full-motion ride, in-flow at the foot of the quiet
-// column. The switch is the same in both, so the choice is always reachable.
+// The site footer: Impressum, Login and the motion switch. Fixed over the ride
+// or in flow at the foot of the quiet column; the switch is the same in both.
 export function SiteFooter({ variant }: { variant: "fixed" | "pinned" }) {
-  // Full motion: a soft scrim over the ride, the canvas shows through. Quiet: a
-  // solid bar that fully covers the fixed sun behind it, with a top border to
-  // separate it from the content. Either way it sits at the nav layer of the
-  // semantic z-scale, never an arbitrary value.
+  // Full motion: a scrim over the ride, the canvas shows through. Quiet: a solid
+  // bar that covers the fixed sun behind it, with a top border off the content.
+  // Either way it sits at the nav layer of the z-scale, not an arbitrary value.
   const surface =
     variant === "pinned"
       ? "border-t border-line bg-bg"

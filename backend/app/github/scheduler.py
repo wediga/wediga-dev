@@ -1,15 +1,11 @@
 """The scheduled GitHub refresh, run as a background task in the lifespan.
 
-A plain ``asyncio`` loop is enough for one recurring job, so the project stays
-free of a scheduler dependency, the same line it takes with the in-memory login
-limiter. The loop syncs once on start and then every interval, and each run is
-offloaded to a thread so the blocking httpx and sqlite calls never stall the
-event loop. Every run is wrapped so a failed sync only logs and keeps the
-existing cache, the loop survives, and the app start is never blocked because
-the task is created and the lifespan returns at once. The interval comes from
-``GITHUB_SYNC_INTERVAL_SECONDS`` (default six hours) and a value of zero or
-less disables the scheduled run entirely, which keeps tests and local runs
-quiet.
+A plain ``asyncio`` loop keeps the project free of a scheduler dependency. It
+syncs on start and then every interval, each run offloaded to a thread so the
+blocking httpx and sqlite calls never stall the event loop. A failed sync only
+logs and keeps the existing cache, the loop survives. The interval is
+``GITHUB_SYNC_INTERVAL_SECONDS`` (default six hours), and zero or less disables
+the scheduled run, which keeps tests and local runs quiet.
 """
 
 import asyncio
@@ -40,8 +36,8 @@ async def _run_loop(interval: float) -> None:
             count = await asyncio.to_thread(sync_repos)
             logger.info("github sync: %d repos refreshed", count)
         except Exception:
-            # Any failure (API error, rate limit, transport) keeps the existing
-            # cache and the loop alive. The token is never part of the message.
+            # Any failure keeps the existing cache and the loop alive. The
+            # token is never part of the message.
             logger.warning("github sync failed; keeping the existing cache")
         await asyncio.sleep(interval)
 
@@ -49,8 +45,8 @@ async def _run_loop(interval: float) -> None:
 def start_scheduler() -> asyncio.Task | None:
     """Start the background refresh task, or ``None`` when disabled.
 
-    Creating the task returns immediately, so the app start is not blocked by
-    the first sync, which runs concurrently afterwards.
+    Creating the task returns at once, so the first sync runs concurrently and
+    never blocks app start.
     """
     interval = _interval_seconds()
     if interval <= 0:

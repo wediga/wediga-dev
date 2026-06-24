@@ -1,12 +1,10 @@
 """GitHub REST client for the public repos of one account.
 
-The client fetches ``GET /users/{username}/repos`` page by page and maps each
-repo onto the mirrored ``github_repo`` fields. The account comes from
-``GITHUB_USERNAME`` (default ``wediga``) and an optional ``GITHUB_TOKEN`` only
-raises the hourly rate limit, nothing else; the token is read from the
-environment, never logged and never written anywhere. Any non-200 or transport
-failure raises ``GithubApiError`` so the caller can fail cleanly without ever
-touching the cache.
+Fetches ``GET /users/{username}/repos`` page by page and maps each repo onto
+the mirrored ``github_repo`` fields. The account is ``GITHUB_USERNAME``
+(default ``wediga``) and an optional ``GITHUB_TOKEN`` only lifts the hourly
+rate limit, never logged or written anywhere. Any non-200 or transport failure
+raises ``GithubApiError`` so the caller fails without touching the cache.
 """
 
 import os
@@ -33,9 +31,8 @@ def _username() -> str:
 def _headers() -> dict[str, str]:
     """Build request headers, adding the optional token when present.
 
-    The token only lifts the rate limit. It is taken from the environment and
-    placed in the Authorization header for the request alone, so it never
-    reaches a log line or the database.
+    The token goes into the Authorization header for the request alone, so it
+    never reaches a log line or the database.
     """
     headers = {
         "Accept": "application/vnd.github+json",
@@ -62,8 +59,7 @@ def _map_repo(raw: dict) -> dict:
 def _parse_batch(payload) -> list[dict]:
     """Validate one page payload and map its repos to the mirrored fields.
 
-    Raises ``GithubApiError`` when the payload is not a list or any item is not
-    a dict or has no name, so a malformed page never reaches the cache.
+    Raises ``GithubApiError`` on a malformed page so it never reaches the cache.
     """
     if not isinstance(payload, list):
         raise GithubApiError("unexpected GitHub response shape")
@@ -76,10 +72,9 @@ def _parse_batch(payload) -> list[dict]:
 def fetch_repos(*, client: httpx.Client | None = None) -> list[dict]:
     """Return the account's public repos mapped to the mirrored fields.
 
-    The pages are fetched in full before anything is returned, so the caller
-    can write them in one transaction. A ``client`` may be injected for tests;
-    otherwise one is built and closed here. Any failure raises
-    ``GithubApiError`` and never returns a partial list.
+    All pages are fetched before anything returns, so the caller can write them
+    in one transaction and a failure raises ``GithubApiError`` instead of
+    returning a partial list. A ``client`` may be injected for tests.
     """
     owns_client = client is None
     if client is None:
@@ -96,8 +91,8 @@ def fetch_repos(*, client: httpx.Client | None = None) -> list[dict]:
                     params={"per_page": PER_PAGE, "page": page},
                 )
             except httpx.HTTPError as exc:
-                # Surface only the error class, never the request internals,
-                # so nothing sensitive can leak into a log or response.
+                # Surface only the error class, not the request internals, so
+                # nothing sensitive leaks into a log or response.
                 raise GithubApiError(
                     f"request to GitHub failed: {exc.__class__.__name__}"
                 ) from exc

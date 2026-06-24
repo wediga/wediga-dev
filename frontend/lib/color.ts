@@ -1,6 +1,5 @@
-// Shared colour maths. The hero generator and the recruiter accent both turn a
-// hue/sat/light into an rgb triple, so the conversion lives here once instead of
-// in each module. Inputs and outputs are all 0..1 (hue is fractional turns).
+// Shared colour maths, used by both the hero generator and the recruiter accent.
+// Inputs and outputs are all 0..1 (hue is fractional turns).
 
 export function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   const hue2rgb = (p: number, q: number, t: number) => {

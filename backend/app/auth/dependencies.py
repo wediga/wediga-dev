@@ -21,10 +21,8 @@ def require_admin(request: Request) -> None:
 
 
 def require_recruiter_or_admin(request: Request) -> None:
-    """Allow the recruiter views to either a recruiter or an admin session.
-
-    The admin previews the same pages the recruiter sees, so a valid admin
-    session passes this gate too. Neither marker present is a 401.
+    """Pass a recruiter or an admin session, since the admin previews the
+    recruiter pages. Neither marker present is a 401.
     """
     if not (
         request.session.get(RECRUITER_SESSION_KEY)

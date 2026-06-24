@@ -1,15 +1,12 @@
 """Pydantic schemas for the five content types.
 
-Each type has read and write models. The write models carry length limits so
-invalid input is rejected before anything touches the database. About,
-contact and impressum are single values held in ``site_setting``; projects and
-skills are collections in their own tables.
+The write models carry length limits so oversized input is rejected before it
+touches the database.
 """
 
 from pydantic import BaseModel, Field, field_validator
 
-# Generous but bounded limits. Free text is capped well above real content,
-# short fields tightly, so a write can never store unbounded blobs.
+# Bounded limits so a write can never store an unbounded blob.
 SHORT = 200
 MEDIUM = 500
 LONG = 5000
@@ -17,8 +14,8 @@ TEXT = 50000
 
 
 def _validate_web_link(value: str | None) -> str | None:
-    """Allow only http(s) links, so a stored value can never carry a
-    javascript: or data: scheme into an href on the rendered pages."""
+    """Allow only http(s) links, so a stored value never carries a javascript:
+    or data: scheme into an href on the rendered pages."""
     if value is None or value == "":
         return value
     lowered = value.strip().lower()

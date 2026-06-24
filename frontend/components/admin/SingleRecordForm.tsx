@@ -1,11 +1,9 @@
 "use client";
 
-// The shared scaffold for the three single-record content pages (about,
-// contact, impressum). Each of them is the same form around a single backend
-// record: load it on mount, edit it in place, save with one primary write, and
-// delete it behind an inline confirmation. The only per-page differences are
-// the fields, the endpoint, and the messages, so those are passed as config and
-// the fields are rendered through a children render-prop.
+// Shared scaffold for the single-record content pages (about, contact,
+// impressum): load on mount, edit in place, save with one primary write, delete
+// behind an inline confirmation. The fields, endpoint, and messages differ per
+// page, so they are passed as config and the fields render through a children prop.
 
 import { type ReactNode, useEffect, useState } from "react";
 import { apiWrite } from "@/lib/adminClient";
@@ -17,15 +15,13 @@ import {
   useActionFeedback,
 } from "@/components/admin/ui";
 
-// The parsed GET body. The single-record endpoints return free-form JSON whose
-// shape each page knows, so it is read as a loose, nested record and the page's
-// fromResponse picks the fields it needs.
+// The single-record endpoints return free-form nested JSON whose shape each page
+// knows, so it is read loosely and the page's fromResponse picks what it needs.
 export type LoadedRecord = {
   [key: string]: string | number | boolean | null | undefined | LoadedRecord;
 };
 
-// Read one record value as the string the text fields expect, with the same
-// "missing becomes empty" result the pages relied on before.
+// Read one value as the string the text fields expect; missing becomes empty.
 export function recordString(value: LoadedRecord[string]): string {
   return typeof value === "string" ? value : "";
 }
@@ -35,14 +31,12 @@ type SingleRecordFormProps<T> = {
   description: string;
   endpoint: string;
   empty: T;
-  // Only applied when the GET response is ok; a non-ok response leaves the
-  // empty state, matching the per-page behaviour before this scaffold.
+  // Applied only on an ok GET; a non-ok response leaves the empty state.
   fromResponse: (data: LoadedRecord) => T;
   toBody: (value: T) => unknown;
   loadError: string;
   deletePrompt: string;
-  // Spacing of the footer differs per page (about uses mt-4, the two-column
-  // forms use mt-5), so it is threaded through rather than hard-coded.
+  // Footer spacing differs per page (about uses mt-4, the two-column forms mt-5).
   actionsClassName?: string;
   children: (
     form: T,
@@ -73,7 +67,7 @@ export function SingleRecordForm<T>({
         if (data) setForm(fromResponse(data));
       })
       .catch(() => set("load", { state: "error", message: loadError }));
-    // The config is stable per page; only the feedback setter is a dependency.
+    // Config is stable per page; only the feedback setter is a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [set]);
 

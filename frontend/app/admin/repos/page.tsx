@@ -13,8 +13,8 @@ import {
 } from "@/components/admin/ui";
 
 // Only the four curation fields are editable; the mirrored GitHub fields are
-// shown read-only. The sync refreshes the mirrored fields and never touches
-// the curation, so edits here survive every refresh.
+// read-only. The sync refreshes the mirrored fields and never touches curation,
+// so edits here survive every refresh.
 type Curation = {
   visible: boolean;
   pinned: boolean;
@@ -92,9 +92,8 @@ export default function AdminReposPage() {
       { success: "Saved", error: "Couldn't save. Try again." },
     );
 
-  // The sync reports a count on success, so it sets its own message rather than
-  // using a fixed one. A 502 means GitHub was unreachable and the cache is left
-  // unchanged.
+  // The sync reports a count on success, so it sets its own message. A 502 means
+  // GitHub was unreachable and the cache is left unchanged.
   async function syncNow() {
     set("sync", { state: "pending" });
     const response = await apiWrite("/api/github/sync", "POST", token);

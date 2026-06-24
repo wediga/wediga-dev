@@ -1,14 +1,11 @@
 """Migration runner for the SQLite backend.
 
-Migrations are plain SQL files under ``migrations/`` named with a sortable
-prefix (``0001_initial.sql``). The runner records applied versions in the
-``schema_migrations`` table, so it only applies files that have not run yet.
-Each file is run with ``executescript``, which is not transactional across
-statements (it commits any open transaction first), so a multi-statement
-migration is not atomic. The current ``0001_initial.sql`` is made only of
-``CREATE TABLE IF NOT EXISTS`` statements, where a re-run heals a partial
-apply. A future migration with data DML that needs all-or-nothing semantics
-must run its statements one by one inside an explicit transaction instead.
+Migrations are SQL files under ``migrations/`` with a sortable prefix
+(``0001_initial.sql``). The runner records applied versions in
+``schema_migrations`` and applies only the pending files, each via one
+``executescript``. ``executescript`` commits any open transaction first, so a
+multi-statement file is not atomic; ``0001_initial.sql`` is all
+``CREATE TABLE IF NOT EXISTS``, where a re-run heals a partial apply.
 """
 
 from pathlib import Path

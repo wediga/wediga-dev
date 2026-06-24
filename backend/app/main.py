@@ -1,8 +1,7 @@
 """FastAPI application entry point.
 
-Wires up the session middleware and the API router (which carries the auth
-routes and the healthcheck) and runs the admin bootstrap on startup.
-Migrations are never run in the request path; they are applied via
+Wires the session middleware and API router and runs the admin bootstrap on
+startup. Migrations never run in the request path, only via
 ``python -m app.db.migrate``.
 """
 
@@ -25,11 +24,9 @@ async def lifespan(app: FastAPI):
     try:
         ensure_admin()
     except Exception:
-        # A missing schema or unset password must not block startup; the
-        # login route fails cleanly in that case.
+        # A missing schema or unset password must not block startup; the login
+        # route fails cleanly instead.
         pass
-    # The scheduler is a fire-and-forget background task: creating it returns at
-    # once, so the first sync runs concurrently and never blocks the start.
     sync_task = start_scheduler()
     try:
         yield
@@ -50,11 +47,8 @@ app.include_router(api_router)
 async def integrity_error_handler(
     request: Request, exc: sqlite3.IntegrityError
 ) -> JSONResponse:
-    """Turn a constraint violation (e.g. a duplicate name) into a clean 409.
-
-    Without this a unique-constraint hit would surface as an unhandled 500.
-    The exception detail is not echoed back, so no internal data leaks.
-    """
+    """Turn a constraint violation (e.g. a duplicate name) into a 409 instead
+    of an unhandled 500. The exception detail is not echoed back."""
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
         content={"detail": "Resource already exists or violates a constraint"},

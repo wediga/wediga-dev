@@ -1,9 +1,8 @@
-// Generative star-system layout. Given a count of atoms and a seed, it builds a
-// curated star system (one sun plus a handful of planets) and assigns every atom
-// a home: a local offset on its body, the body's orbit parameters, a chaos start
-// position and an impulse delay so the ordering reads as a wave from the centre
-// outward. The output is plain typed arrays the WebGL engine uploads as textures
-// or attributes without reshaping. Same seed gives the same system.
+// Generative star-system layout. From a count of atoms and a seed it builds one
+// sun plus a handful of planets and gives every atom a home: a local offset on
+// its body, the body's orbit parameters, a chaos start position and an impulse
+// delay so the ordering reads as a wave from the centre out. Output is typed
+// arrays the engine uploads as textures or attributes. Same seed, same system.
 
 import { hslToRgb } from "@/lib/color";
 import { mulberry32, shuffle } from "./random";
@@ -19,11 +18,10 @@ export interface StarSystemData {
   // radius, phase, speed, inclination packed as 4 floats per atom.
   misc: Float32Array;
   // delay, spinSpeed, kind (0 = sun, 1 = planet), shade (0..1), per atom.
-  // Per-atom rgb (0..1). The sun runs a warm core-to-rim ramp, each planet a
-  // multi-tone body around a curated base hue. Generated per seed.
+  // Per-atom rgb (0..1).
   color: Float32Array;
-  // Which body each atom belongs to: -1 for the sun, otherwise the planet index
-  // into meta.planets. Lets the engine open a single planet on demand.
+  // Body each atom belongs to: -1 sun, else the planet index into meta.planets.
+  // Lets the engine open a single planet on demand.
   bodyId: Float32Array;
   meta: StarSystemMeta;
 }
@@ -42,13 +40,10 @@ export interface StarSystemMeta {
   seed: number;
   planetCount: number;
   sunAtoms: number;
-  // The sun's body radius in world units. Read-only metadata; the quiet render
-  // mode uses it to frame the sun, and it does not affect the full ride.
+  // Sun body radius in world units; quiet mode uses it to frame the sun.
   sunRadius: number;
   planets: PlanetMeta[];
-  // A representative sun tone (a mid rim sample of the warm core-to-rim ramp).
-  // Read-only metadata for the UI accent; the sun's per-atom colours are
-  // unchanged by this.
+  // A representative sun tone (mid-rim sample of the warm ramp) for the UI accent.
   sunColor: [number, number, number];
 }
 
@@ -56,11 +51,8 @@ function clamp(x: number, lo: number, hi: number): number {
   return x < lo ? lo : x > hi ? hi : x;
 }
 
-// The sun owns warm orange to yellow (roughly 15 to 60), so the planet palette
-// lives on the cool arc 75..350 (green, teal, blue, indigo, violet, magenta,
-// rose), which keeps the sun readable. Planet hues are spread evenly across this
-// arc per system and then shuffled, not picked independently, so planets stay
-// distinct from one another instead of clustering into similar colours.
+// The sun owns warm orange to yellow (~15..60), so the planet palette lives on
+// the cool arc 75..350, which keeps the sun readable.
 const PLANET_HUE_LO = 75;
 const PLANET_HUE_HI = 350;
 
@@ -73,17 +65,16 @@ interface Body {
   inclination: number;
   spinSpeed: number;
   weight: number; // share of the atom budget
-  // Colour basis. The sun ignores these (it ramps by radius); each planet picks a
-  // curated base hue and a small spread so the body carries several tones.
+  // Colour basis. The sun ignores these (it ramps by radius); planets carry a base
+  // hue plus a spread.
   baseHue: number; // degrees
   baseSat: number;
   baseLight: number;
   hueSpread: number; // degrees, half-width of the per-atom hue jitter
 }
 
-// Per-atom colour for the sun: a warm near-white core ramping to an orange rim,
-// varied per atom. rn is the normalised radius (0 core, 1 rim). Draws the rng in
-// the order hue, sat, light, exactly as the inline form did.
+// Sun atom colour: near-white core ramping to an orange rim. rn is the normalised
+// radius (0 core, 1 rim).
 function sunAtomColor(
   rn: number,
   rng: () => number,
@@ -94,9 +85,8 @@ function sunAtomColor(
   return hslToRgb(hue, sat, light);
 }
 
-// Per-atom colour for a planet: several tones around the body's base hue, banded
-// a little by latitude so the self-spin reads. Draws the rng in the order hueDeg,
-// sat, light, exactly as the inline form did.
+// Planet atom colour: tones around the body's base hue, banded by latitude so the
+// self-spin reads.
 function planetAtomColor(
   body: Body,
   latitude: number,
@@ -114,7 +104,6 @@ function planetAtomColor(
   return hslToRgb(hue, sat, light);
 }
 
-// The six per-atom output arrays the fill loop writes into.
 interface AtomArrays {
   initial: Float32Array;
   local: Float32Array;
@@ -124,10 +113,9 @@ interface AtomArrays {
   bodyId: Float32Array;
 }
 
-// Fill every slot for atom i, which belongs to body (bodyIndex is its position in
-// the bodies array; the sun is 0). Lifted out of the double loop verbatim, so the
-// per-atom maths and the rng draw order (u, v, r, chaos r, cu, cv, delay, shade,
-// then the colour helper) are unchanged; the loop body is now a single call.
+// Fill every slot for atom i on its body (bodyIndex is its position in the bodies
+// array, the sun is 0). The rng draw order (u, v, r, chaos r, cu, cv, delay,
+// shade, then the colour helper) is load-bearing for reproducibility per seed.
 function fillAtom(
   arr: AtomArrays,
   i: number,
@@ -137,9 +125,8 @@ function fillAtom(
   rng: () => number,
   rand: (lo: number, hi: number) => number,
 ): void {
-  // Local offset: a point on the body's surface with light radial jitter so the
-  // shell has grain rather than a hard edge. The sun gets some interior fill so
-  // it reads as a solid core, not a hollow sphere.
+  // Local offset: a surface point with radial jitter so the shell has grain. The
+  // sun fills its interior (shellLo 0.35) so it reads as a solid core.
   const u = rng();
   const v = rng();
   const theta = 2 * Math.PI * u;
@@ -157,8 +144,8 @@ function fillAtom(
   // -1 for the sun, otherwise the planet index (body order minus the sun).
   arr.bodyId[i] = body.kind === 0 ? -1 : bodyIndex - 1;
 
-  // Chaos start: a wide, uneven cloud so the "before" state looks like raw
-  // unordered data, not a tidy sphere.
+  // Chaos start: a wide uneven cloud so the before-state reads as raw unordered
+  // data, not a tidy sphere.
   const cr = rand(8, 26);
   const cu = rng();
   const cv = rng();
@@ -178,13 +165,11 @@ function fillAtom(
   arr.misc[i * 4 + 0] = radial * 0.85 + rng() * 0.15; // delay
   arr.misc[i * 4 + 1] = body.spinSpeed;
   arr.misc[i * 4 + 2] = body.kind;
-  // Shade: the sun runs bright, planets sit dimmer, with per-atom variance so the
-  // mass has depth instead of one flat tone.
+  // Shade: sun bright, planets dimmer, with per-atom variance for depth.
   arr.misc[i * 4 + 3] = body.kind === 0 ? rand(0.75, 1.0) : rand(0.3, 0.7);
 
-  // Colour. The sun ramps from a near-white core to an orange rim; each planet
-  // carries several tones around its base hue, banded by latitude (the unit
-  // sphere y) so the self-spin reads. The per-atom maths live in the helpers.
+  // Colour: latitude is the unit-sphere y, so banding by it makes the self-spin
+  // read. Maths in the helpers.
   const [cr_, cg_, cb_] =
     body.kind === 0
       ? sunAtomColor(Math.min(1, r / body.radius), rng)
@@ -194,9 +179,8 @@ function fillAtom(
   arr.color[i * 3 + 2] = cb_;
 }
 
-// The planned layout: the live rng (so the fill loop continues the same stream),
-// the bodies and their planet meta, the per-body atom budget, and the headline
-// counts the result meta reports.
+// The planned layout, including the live rng so the fill loop continues the same
+// stream.
 interface StarSystemPlan {
   rng: () => number;
   bodies: Body[];
@@ -206,10 +190,9 @@ interface StarSystemPlan {
   sunRadius: number;
 }
 
-// Plan the bodies and distribute the atom budget: the sun at the origin plus a
-// curated set of planets on spaced orbits, then the per-body atom counts. Every
-// rng draw for the system layout happens here, in order, before any atom is
-// filled. Pure relocation of the planning block; no maths or draw order changed.
+// Plan the bodies and distribute the atom budget: the sun at the origin plus
+// planets on spaced orbits, then the per-body atom counts. Every layout rng draw
+// happens here, in order, before any atom is filled.
 function planStarSystem(
   count: number,
   seed: number,
@@ -218,14 +201,12 @@ function planStarSystem(
   const rng = mulberry32(seed);
   const rand = (lo: number, hi: number) => lo + (hi - lo) * rng();
 
-  // Curated planet count: enough to feel like a system, never a cluttered mess,
-  // but never fewer than the sections that need a planet to anchor them.
+  // Never fewer planets than the sections that need one to anchor them.
   const planetCount = Math.max(Math.round(rand(4, 9)), minPlanets);
 
   const bodies: Body[] = [];
 
-  // The sun sits at the origin and carries the largest share of atoms so it
-  // reads as a dense glowing core.
+  // The sun carries the largest atom share so it reads as a dense core.
   const sunRadius = rand(2.4, 3.2);
   bodies.push({
     kind: 0,
@@ -242,16 +223,14 @@ function planStarSystem(
     hueSpread: 0,
   });
 
-  // Planets on spaced orbits. Speed falls off with distance (loosely Keplerian),
-  // so inner planets visibly circle while outer ones drift, which keeps the
-  // finished system alive without looking like a spinning turntable. Each planet
-  // gets a different self-spin and a curated base colour.
+  // Speed falls off with distance (loosely Keplerian), so inner planets visibly
+  // circle while outer ones drift, not a uniform turntable.
   const planets: PlanetMeta[] = [];
   let orbitR = sunRadius + rand(2.2, 3.0);
   const planetWeights: number[] = [];
 
-  // Spread the planet base hues evenly across the cool arc, one per slice, then
-  // shuffle so colour is not tied to orbit distance (no rainbow-by-distance).
+  // Even hues across the cool arc, one per slice, then shuffle so colour is not
+  // tied to orbit distance (no rainbow-by-distance).
   const hueSlot = (PLANET_HUE_HI - PLANET_HUE_LO) / planetCount;
   const planetHues: number[] = [];
   for (let p = 0; p < planetCount; p++) {
@@ -267,12 +246,12 @@ function planStarSystem(
     planetWeights.push(w);
 
     const baseHue = planetHues[p];
-    const baseSat = rand(0.4, 0.7); // curated, never neon, a touch more spread
+    const baseSat = rand(0.4, 0.7); // never neon
     const baseLight = rand(0.46, 0.7);
     const hueSpread = rand(8, 16);
     const orbitSpeed =
       (rand(0.18, 0.3) / Math.sqrt(orbitR)) * (rng() > 0.5 ? 1 : -1);
-    const spinSpeed = rand(0.16, 0.5); // dezent but visible once the body is coloured
+    const spinSpeed = rand(0.16, 0.5); // subtle but visible once the body is coloured
     const inclination = rand(-0.22, 0.22);
     const orbitPhase = rand(0, Math.PI * 2);
 
@@ -302,9 +281,8 @@ function planStarSystem(
     orbitR += rand(2.2, 3.2) + pradius;
   }
 
-  // Distribute the atom budget. Sun takes its fixed share, planets split the rest
-  // weighted by size, with a floor so a small planet still holds enough grains to
-  // be visible.
+  // Sun takes its fixed share, planets split the rest by size, with a floor so a
+  // small planet still holds enough grains to be visible.
   const sunShare = bodies[0].weight;
   const sunAtoms = Math.max(1, Math.round(count * sunShare));
   const planetBudget = count - sunAtoms;
@@ -343,8 +321,7 @@ export function generateStarSystem(
   const color = new Float32Array(count * 3);
   const bodyId = new Float32Array(count);
 
-  // The impulse radiates from the centre; an atom's delay grows with how far its
-  // home orbit sits from the core, so the sun forms first and the rim last.
+  // Delay grows with orbit distance, so the sun forms first and the rim last.
   const maxOrbit = bodies.reduce((m, b) => Math.max(m, b.orbitRadius), 1);
 
   const arr: AtomArrays = { initial, local, orbit, misc, color, bodyId };
@@ -358,7 +335,7 @@ export function generateStarSystem(
   }
 
   // A representative sun tone, a mid-to-rim sample of the same warm ramp the sun
-  // atoms run, so the UI accent can read the sun without touching the render.
+  // atoms run, for the UI accent without touching the render.
   const sunRn = 0.75;
   const sunColor = hslToRgb(
     (48 - 30 * sunRn) / 360,

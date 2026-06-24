@@ -1,12 +1,5 @@
-"""Database connection for the SQLite backend.
-
-The whole backend uses one connection helper over the stdlib ``sqlite3``
-driver. wediga.dev is a single-user app with no concurrency, so a second
-async connection layer would only duplicate code without any throughput
-gain. The migration runner, the seed, the bootstrap and the auth routes all
-open a connection the same way, and the request routes run their tiny queries
-in FastAPI's threadpool by being plain ``def`` handlers.
-"""
+"""One SQLite connection helper over the stdlib ``sqlite3`` driver, shared by
+the migration runner, seed, bootstrap and routes."""
 
 import sqlite3
 from contextlib import contextmanager

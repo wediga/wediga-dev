@@ -1,12 +1,10 @@
 """Pydantic schemas for the GitHub repo layer.
 
-A repo row carries two kinds of fields. The mirrored fields come from GitHub
-and are overwritten by every sync (description, language, stars, url, last
-push, last sync). The curation fields are owned by the admin and the sync
-never touches them (visible, pinned, description override, sort order). The
-schemas keep that split visible: ``GithubRepoRead`` is the full admin view,
-``GithubRepoPublic`` is the curated recruiter view, and ``RepoCurationWrite``
-carries only the four curation fields a write may change.
+A repo row splits into mirrored fields (from GitHub, overwritten every sync)
+and curation fields (admin-owned, never touched by the sync). The schemas keep
+that split: ``GithubRepoRead`` is the full admin view, ``GithubRepoPublic`` the
+curated recruiter view, ``RepoCurationWrite`` the four curation fields a write
+may change.
 """
 
 from pydantic import BaseModel, Field
@@ -34,9 +32,8 @@ class GithubRepoRead(BaseModel):
 class GithubRepoPublic(BaseModel):
     """The curated repo as the recruiter view sees it.
 
-    ``description`` here is the effective text: the admin override when set,
-    otherwise the mirrored GitHub description. The repository layer resolves
-    that, so the view never has to know about the override field.
+    ``description`` is the effective text the repository layer resolves: the
+    admin override when set, else the mirrored GitHub description.
     """
 
     name: str
@@ -51,8 +48,8 @@ class GithubRepoPublic(BaseModel):
 class RepoCurationWrite(BaseModel):
     """The curation fields the admin may set on a repo.
 
-    Only these four are writable. The mirrored fields are never accepted from
-    a request, so a write can never spoof the GitHub-sourced data.
+    The mirrored fields are never accepted from a request, so a write cannot
+    spoof the GitHub-sourced data.
     """
 
     visible: bool = True

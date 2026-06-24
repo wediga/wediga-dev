@@ -1,12 +1,11 @@
 """The recruiter read gate, enforced against the live link state.
 
-The marker-only dependencies in ``app.auth.dependencies`` answer „is there a
-session", which is enough to compose on, but a recruiter session must also
+A marker check answers "is there a session", but a recruiter session must also
 stop working the moment the admin revokes the link or it expires. This gate
-therefore re-checks the link behind the session on every recruiter read and
-drops a now-invalid marker, so revocation and expiry close an open session and
-not only the entrance. An admin session passes without a link lookup, because
-the admin previews the same pages.
+re-checks the link behind the session on every recruiter read and drops a
+now-invalid marker, so revocation and expiry cut live sessions, not just new
+ones. An admin session passes without a link lookup, since the admin previews
+the same pages.
 """
 
 from fastapi import HTTPException, Request, status

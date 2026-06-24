@@ -1,9 +1,9 @@
 """Read and write functions for the content tables.
 
-About, contact and impressum live in the key-value ``site_setting`` table,
-contact and impressum as JSON blobs. Projects live in ``project`` with the
-tech stack stored as JSON text. Skills live in ``skill_category`` and
-``skill``. Every query is parameterised, no SQL is built from input.
+About, contact and impressum live in the key-value ``site_setting`` table
+(contact and impressum as JSON blobs). Projects live in ``project`` with the
+tech stack as JSON text, skills in ``skill_category`` and ``skill``. Every
+query is parameterised, no SQL is built from input.
 """
 
 import json

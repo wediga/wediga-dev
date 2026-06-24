@@ -1,9 +1,8 @@
 import { getCvStatus } from "@/lib/content";
 
-// The recruiter CV view. The CV is a single uploaded PDF, so this page offers
-// the download and an inline preview of that same file, both served through the
-// gated BFF download route. On wide screens the action sits in a sidebar beside
-// the preview; on narrow it stacks above. A clean empty state covers no CV yet.
+// The CV is a single uploaded PDF; download and inline preview both come from
+// the gated BFF download route. The action sits in a sidebar on wide screens and
+// stacks above on narrow.
 export default async function CvPage() {
   const { present } = await getCvStatus();
 

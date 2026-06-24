@@ -1,18 +1,17 @@
 """Read and write functions for the ``github_repo`` table.
 
-The central invariant of this phase lives here: the sync upsert writes only the
-mirrored fields and never the curation. The ``ON CONFLICT`` clause lists only
-description, language, stars, url, last push and last sync, so an existing
-row's visible, pinned, description override and sort order survive every sync
-untouched. A brand new row takes the curation defaults from the schema.
-
-Every query is parameterised, no SQL is built from input.
+The invariant: the sync upsert writes only the mirrored fields, never the
+curation. The ``ON CONFLICT`` clause lists only description, language, stars,
+url, last push and last sync, so an existing row's visible, pinned,
+description override and sort order survive every sync. A new row takes the
+schema's curation defaults. Every query is parameterised, no SQL is built from
+input.
 """
 
 from app.db.connection import get_connection
 from app.github.schemas import RepoCurationWrite
 
-# The mirrored columns the sync writes. The curation columns (visible, pinned,
+# Mirrored columns only; the curation columns (visible, pinned,
 # description_override, sort_order) are deliberately absent.
 _UPSERT = (
     "INSERT INTO github_repo "
@@ -31,8 +30,8 @@ _UPSERT = (
 def upsert_repos(repos: list[dict], synced_at: str) -> int:
     """Upsert the mirrored fields of each repo in one transaction.
 
-    The whole batch is written under a single connection and committed once, so
-    either all rows land or none do. Curation is never part of the write.
+    The batch commits once, so either all rows land or none do. Curation is
+    never part of the write.
     """
     with get_connection() as conn:
         for repo in repos:
@@ -48,9 +47,8 @@ def _row_to_read(row) -> dict:
     return data
 
 
-# Pinned repos come first, then the manual sort order, then the name as a
-# stable tie-breaker. This one ordering serves both the admin and the curated
-# recruiter list.
+# Pinned first, then manual sort order, then name as a stable tie-breaker. One
+# ordering serves both the admin and the curated recruiter list.
 _ORDER = " ORDER BY pinned DESC, sort_order, name"
 
 
@@ -68,8 +66,8 @@ def list_all() -> list[dict]:
 def list_curated() -> list[dict]:
     """Return the visible repos for the recruiter view, pinned first.
 
-    The effective description is the admin override when set, otherwise the
-    mirrored GitHub description, resolved here so the view stays simple.
+    ``description`` resolves to the admin override when set, else the mirrored
+    GitHub description, so the view stays simple.
     """
     with get_connection() as conn:
         rows = conn.execute(
@@ -99,8 +97,8 @@ def _get(conn, repo_id: int) -> dict | None:
 def update_curation(repo_id: int, data: RepoCurationWrite) -> dict | None:
     """Set the four curation fields of one repo; return it or ``None``.
 
-    Only the curation columns are written. The mirrored fields are left exactly
-    as the last sync set them.
+    Only the curation columns are written, leaving the mirrored fields as the
+    last sync set them.
     """
     with get_connection() as conn:
         cursor = conn.execute(

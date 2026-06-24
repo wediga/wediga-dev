@@ -3,16 +3,12 @@ import type { SkillCategory } from "@/lib/types";
 import { INTRO, LANDING, accessLead } from "./content";
 import { SkillGroup } from "./SkillGroup";
 
-// The real, readable landing content: an intro teaser (name, role, hook), the
-// public toolkit (skills from the BFF), and the access door. It is always present
-// in the DOM for screen readers, search engines and the E2E suite. The Hero
-// decides where to mount it: the visible, interactive column under reduced
-// motion, or the accessible SEO layer behind the canvas during the full ride.
-// The full About story is intentionally NOT here; the public layer is a teaser
-// plus skills, the About story finds its visible home in the recruiter views.
-// GitHub/LinkedIn are also intentionally absent: the public impressum endpoint
-// only exposes name and email (the impressum split), so the social links stay
-// behind the login and are not surfaced on the public landing.
+// The readable landing content: intro teaser, public toolkit (BFF skills), and
+// the access door. Always in the DOM for screen readers, search engines and the
+// E2E suite. The Hero mounts it as the visible column under reduced motion, or as
+// the SEO layer behind the canvas during the ride. No About story and no
+// GitHub/LinkedIn here: the public impressum exposes only name and email, so the
+// story and the social links stay behind the login.
 export function LandingContent({
   skills,
   isRecruiter,
@@ -22,7 +18,7 @@ export function LandingContent({
 }) {
   return (
     <div className="mx-auto max-w-2xl px-6 py-16">
-      {/* The page's one h1: the name, not the domain. Carries the identity for
+      {/* The page's one h1: the name, not the domain, carrying the identity for
           search engines and the document outline. */}
       <h1 className="text-4xl font-medium tracking-[-0.02em] text-ink">
         {INTRO.name}
@@ -64,12 +60,11 @@ export function LandingContent({
   );
 }
 
-// The access door, two states. Without a recruiter session it leads to the
-// login; with a valid one it goes one door further, into the portfolio. The
-// server decides which state to render. `decorative` drops it from the tab
-// order for the visual duplicate in the hero station. `quiet` swaps the frozen
-// hero's neutral styling for the crimson accent token used by the quiet landing,
-// while keeping the same href and label so the two appearances never diverge.
+// The access door. Without a recruiter session it leads to the login, with a
+// valid one to the portfolio; the server decides which. `decorative` drops it
+// from the tab order for the visual duplicate in the hero station. `quiet` swaps
+// the frozen hero's neutral styling for the crimson accent of the quiet landing,
+// keeping the same href and label so the appearances never diverge.
 export function AccessButton({
   isRecruiter,
   decorative,

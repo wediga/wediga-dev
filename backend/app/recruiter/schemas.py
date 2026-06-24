@@ -1,8 +1,8 @@
 """Pydantic schemas for recruiter magic links.
 
-A link carries a label and an optional expiry the admin picks when creating it.
-The plaintext token leaves the backend exactly once, in the create response,
-and is never stored or returned again; the database only ever holds its hash.
+A link carries a label and an optional expiry. The plaintext token leaves the
+backend once, in the create response, and never again; the database holds only
+its hash.
 """
 
 from datetime import date
@@ -16,8 +16,7 @@ class RecruiterLinkCreate(BaseModel):
     """A link as created from the admin."""
 
     label: str | None = Field(default=None, max_length=LABEL_MAX)
-    # An optional calendar day. The link stays valid through the end of that
-    # day in UTC; left empty the link never expires.
+    # Valid through the end of this day in UTC; empty means never expires.
     expires_on: date | None = None
 
 

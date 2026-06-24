@@ -1,11 +1,8 @@
 """Recruiter routes: admin link management and the public redeem endpoint.
 
-The admin endpoints (create, list, revoke) sit behind ``require_admin`` and,
-for the writes, ``require_csrf``, the same protection the content writes use.
-The redeem endpoint is public because a recruiter has no session yet; it
-validates the token, starts a recruiter session and records the view. The
-recruiter session is a separate marker from the admin one, so redeeming a link
-never grants admin rights.
+Redeem is public because a recruiter has no session yet, and it is rate-limited.
+Its recruiter marker is separate from the admin one, so redeeming never grants
+admin. The admin endpoints use the standard write gate (see WRITE_DEPS).
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -26,7 +23,6 @@ from app.recruiter.tracking import coarse_origin
 
 router = APIRouter(prefix="/recruiter", tags=["recruiter"])
 
-# Writes need both an admin session and a valid CSRF token.
 WRITE_DEPS = [Depends(require_admin), Depends(require_csrf)]
 
 
@@ -69,10 +65,10 @@ def revoke_link(link_id: int) -> dict:
 def redeem(token: str, request: Request) -> dict[str, bool]:
     """Validate a token, start the recruiter session and record the view.
 
-    An unknown token is 404, a revoked or expired one is 410. On success the
-    recruiter marker is set fresh in the session (no fixation carry-over) and a
-    single view row is written with only the coarse origin. A per-IP rate limit
-    caps request floods and view-count inflation from a single source.
+    Unknown token is 404, revoked or expired is 410. On success the recruiter
+    marker is set fresh (no fixation carry-over) and one view row is written
+    with only the coarse origin. The per-IP rate limit caps request floods and
+    view-count inflation from one source.
     """
     if not redeem_limiter.hit(client_ip(request)):
         raise HTTPException(
@@ -97,8 +93,8 @@ def redeem(token: str, request: Request) -> dict[str, bool]:
 def session_check() -> dict[str, bool]:
     """Return success when a recruiter or admin session is active and valid.
 
-    The recruiter route group calls this server-side to gate its pages, the
-    same way the admin layout calls ``/auth/me``. It uses the same live gate as
-    the reads, so a revoked or expired link redirects the visitor out.
+    The recruiter route group calls this server-side to gate its pages, like
+    the admin layout calls ``/auth/me``. It runs the same live gate as the
+    reads, so a revoked or expired link redirects the visitor out.
     """
     return {"ok": True}

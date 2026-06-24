@@ -4,13 +4,12 @@ import { headers } from "next/headers";
 import { backendUrl } from "@/lib/backend";
 import { RecruiterShell } from "@/components/recruiter/RecruiterShell";
 
-// Server-side guard for the recruiter views (portfolio, CV, contact). It asks
-// the backend whether the forwarded session is a recruiter or admin session.
-// Without one the visitor is sent to the landing page, so these pages never
-// render for someone who has not redeemed a valid link. The raw cookie header
-// is forwarded verbatim, the same way the BFF route handlers do it, because
-// re-serializing the cookies (cookies().toString()) re-encodes the signed
-// session value and the backend then rejects it.
+// Server-side guard for the recruiter views (portfolio, CV, contact): ask the
+// backend whether the forwarded session is a recruiter or admin session, send
+// the visitor to the landing page otherwise. The raw cookie header is forwarded
+// verbatim (the BFF route handlers do the same) because re-serializing via
+// cookies().toString() re-encodes the signed session value and the backend
+// then rejects it.
 export default async function RecruiterLayout({
   children,
 }: {

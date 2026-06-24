@@ -1,11 +1,8 @@
 """GitHub routes: admin curation and the curated recruiter read.
 
-The admin endpoints (list every repo, set curation, trigger a sync) sit behind
-``require_admin`` and, for the writes, ``require_csrf``, the same protection the
-content and recruiter writes use. The curated list is a recruiter read behind
-``require_recruiter_view``, which an admin session also satisfies and which
-re-checks the link state. The mirrored fields are never writable through any
-route, only the four curation fields are.
+The mirrored fields are never writable through any route, only the four
+curation fields are. Writes and recruiter reads use the standard gates (see
+WRITE_DEPS and ``require_recruiter_view``).
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -25,11 +22,7 @@ from app.recruiter.dependencies import require_recruiter_view
 
 router = APIRouter(prefix="/github", tags=["github"])
 
-# Writes need both an admin session and a valid CSRF token.
 WRITE_DEPS = [Depends(require_admin), Depends(require_csrf)]
-
-# Recruiter-facing read (the curated repo list) sits behind the recruiter gate,
-# which an admin session also satisfies and which re-checks the link state.
 RECRUITER_READ_DEPS = [Depends(require_recruiter_view)]
 
 NOT_FOUND = not_found()

@@ -4,10 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { getCsrfToken } from "@/lib/adminClient";
 import { Feedback, useActionFeedback } from "@/components/admin/ui";
 
-// The CV is a single uploaded PDF. This page shows whether one is present and
-// lets the admin upload or replace it. The upload posts the file through the
-// BFF, which forwards the multipart body, the session cookie and the CSRF token
-// to the admin-gated backend endpoint.
+// The multipart upload goes through the BFF, which attaches the session cookie
+// and CSRF token before forwarding to the admin-gated backend endpoint.
 export default function AdminCvPage() {
   const [present, setPresent] = useState<boolean | null>(null);
   const { get, set } = useActionFeedback();

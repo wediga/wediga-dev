@@ -1,9 +1,8 @@
 """Password hashing with argon2id.
 
-A single ``PasswordHasher`` instance uses argon2-cffi defaults (Argon2id,
-time_cost=3, memory_cost=64 MiB, parallelism=4), which sit above the OWASP
-minimum and are tuned for roughly 50 ms per hash, so no custom tuning is
-applied.
+One ``PasswordHasher`` on argon2-cffi defaults (time_cost=3, memory_cost=64
+MiB, parallelism=4), above the OWASP minimum at roughly 50 ms per hash, so no
+custom tuning.
 """
 
 from argon2 import PasswordHasher
@@ -20,10 +19,8 @@ def hash_password(password: str) -> str:
 def verify_password(stored_hash: str, password: str) -> bool:
     """Verify a password against a stored hash.
 
-    Returns ``True`` on a match and ``False`` otherwise. A mismatch, a corrupt
-    stored hash or any other verification failure is treated as a rejected
-    login, not a server error, so a damaged database value cannot turn the
-    login into an HTTP 500.
+    A mismatch or a corrupt stored hash is treated as a rejected login, not a
+    server error, so a damaged database value cannot turn login into a 500.
     """
     try:
         _hasher.verify(stored_hash, password)

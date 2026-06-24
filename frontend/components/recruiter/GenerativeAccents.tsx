@@ -4,16 +4,14 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { hslToRgb } from "@/lib/color";
 
-// The generative UI accent. The landing reads the hero's own system colours and
-// stores them in sessionStorage; here the recruiter views read that snapshot and
-// paint two, and only two, places: the toolkit/tech dots (each cycles through the
-// planet colours) and the demo/github underline (one shared colour per system,
-// the brightest planet). Everything else stays the fixed crimson accent.
+// The landing stores the hero's system colours in sessionStorage; the recruiter
+// views read that snapshot and paint two places: the tech dots (each cycles
+// through the planet colours) and the demo/github underline (the brightest
+// planet, one per system). Everything else stays the fixed crimson accent.
 //
-// This is a read-only, additive enhancement: the markup already renders with the
-// crimson fallback baked in via CSS, and this script only overrides the dot and
-// underline custom properties when a snapshot exists. Without a snapshot (a view
-// reached without the landing) the accent stays crimson.
+// Additive: the markup renders with the crimson fallback from CSS, and this only
+// overrides the dot and underline custom properties when a snapshot exists.
+// Without one (a view reached without the landing) the accent stays crimson.
 
 type Snapshot = {
   sun: [number, number, number];
@@ -35,9 +33,9 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   return [h, s, l];
 }
 
-// Clamp a planet colour into a band that stays legible on the dark surface: a
-// floor on lightness so dim planets still read, a ceiling so bright ones do not
-// blow out, and a saturation floor so the colour does not wash out to grey.
+// Clamp a planet colour into a band legible on the dark surface: a lightness
+// floor so dim planets read, a ceiling so bright ones do not blow out, and a
+// saturation floor so it does not wash out to grey.
 function legible([r, g, b]: [number, number, number]): string {
   const [h, s, l] = rgbToHsl(r, g, b);
   const cl = Math.min(0.82, Math.max(0.58, l));
@@ -52,7 +50,7 @@ function relLuminance([r, g, b]: [number, number, number]): number {
 
 export function GenerativeAccents() {
   // The active view swaps under a persistent shell; re-run so the dots on the
-  // newly rendered page get coloured too.
+  // newly rendered page get coloured.
   const pathname = usePathname();
 
   useEffect(() => {
@@ -83,7 +81,7 @@ export function GenerativeAccents() {
     });
 
     return () => {
-      // Leave the underline on the crimson fallback when the views unmount.
+      // Back to the crimson fallback when the views unmount.
       document.documentElement.style.removeProperty("--gen-underline");
     };
   }, [pathname]);

@@ -1,6 +1,6 @@
-// Client-side helpers used by the admin forms. The CSRF token is fetched from
-// the BFF once and then sent on every write as the X-CSRF-Token header, which
-// the backend compares against the session in constant time.
+// Client-side helpers for the admin forms. The CSRF token is fetched once and
+// sent on every write as the X-CSRF-Token header, which the backend compares
+// against the session in constant time.
 
 export async function getCsrfToken(): Promise<string> {
   const response = await fetch("/api/csrf", { cache: "no-store" });

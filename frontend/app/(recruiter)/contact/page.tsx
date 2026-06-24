@@ -59,8 +59,8 @@ export default async function ContactPage() {
   );
 }
 
-// One labelled contact row. The hairline above each row groups them into a quiet
-// table that runs in two columns on wider screens and stacks on narrow.
+// One labelled contact row, with a hairline above it. Two columns on wide
+// screens, stacked on narrow.
 function Field({
   label,
   reveal,

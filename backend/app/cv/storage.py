@@ -1,19 +1,17 @@
 """Storage for the single uploaded CV PDF.
 
-The CV is one uploaded PDF, kept under a fixed name in the data volume. There
-is no database row, the file's presence is the whole state. The fixed name
-means a client filename never reaches the path, so an upload can neither
-traverse out of the directory nor collide with another file. The write goes
-through a temporary file in the same directory and an atomic ``replace``, so a
-swap is all-or-nothing and an interrupted upload never leaves a half-written
-PDF at the served path.
+The PDF is kept under a fixed name in the data volume, its presence is the
+whole state (no database row). The fixed name keeps the client filename off the
+path, so an upload can neither traverse out of the directory nor collide. The
+write goes through a temporary file and an atomic ``replace``, so an
+interrupted upload never leaves a half-written PDF at the served path.
 """
 
 from pathlib import Path
 
 from app.paths import cv_dir
 
-# The fixed on-disk name. The client filename is never used.
+# Fixed on-disk name; the client filename is never used.
 CV_FILENAME = "cv.pdf"
 
 
@@ -33,5 +31,5 @@ def save_cv(data: bytes) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     tmp = directory / f".{CV_FILENAME}.tmp"
     tmp.write_bytes(data)
-    # Atomic on the same filesystem, so the served file is never half-written.
+    # Atomic within the same filesystem.
     tmp.replace(cv_path())

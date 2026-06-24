@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// The admin section nav. Client-side only so it can mark the current section;
-// it carries no auth logic, the server layout still gates every render.
+// Client-side so it can mark the current section; carries no auth logic, the
+// server layout still gates every render.
 const NAV = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/about", label: "About" },
@@ -24,7 +24,7 @@ export function AdminNav() {
     <nav className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm">
       {NAV.map((item) => {
         // Overview matches only itself; the others match their subtree, so a
-        // nested page still highlights its section.
+        // nested page highlights its section.
         const active =
           item.href === "/admin"
             ? pathname === "/admin"

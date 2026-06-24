@@ -1,8 +1,7 @@
 """Authentication routes: login, logout and the current-session check.
 
-The handlers are plain ``def`` functions, so FastAPI runs their small SQLite
-queries in its threadpool. That keeps a single synchronous connection helper
-across the whole backend instead of a second async layer for one query.
+The handlers are plain ``def`` functions, so FastAPI runs their SQLite queries
+in its threadpool and the backend keeps one synchronous connection helper.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -26,9 +25,8 @@ class LoginRequest(BaseModel):
 def login(request: Request, body: LoginRequest) -> dict[str, bool]:
     """Validate the password against the admin hash and start a session.
 
-    A per-IP rate limit guards the brute-force surface: too many attempts in
-    the window return 429 before the password is even checked, so the argon2
-    verify cannot be used as a timing or load amplifier.
+    The per-IP rate limit returns 429 before the password is checked, so the
+    argon2 verify cannot be used as a timing or load amplifier.
     """
     ip = client_ip(request)
     if not login_limiter.hit(ip):
@@ -48,11 +46,11 @@ def login(request: Request, body: LoginRequest) -> dict[str, bool]:
             detail="Invalid password",
         )
 
-    # A correct password clears the counter, so a legitimate admin is never
-    # locked out by earlier mistyped attempts.
+    # A correct password clears the counter, so earlier mistyped attempts
+    # never lock out a legitimate admin.
     login_limiter.reset(ip)
     request.session[ADMIN_SESSION_KEY] = True
-    # Mint the CSRF token now, so the admin can read it right after login.
+    # Mint the CSRF token now so the admin can read it right after login.
     issue_csrf_token(request)
     return {"ok": True}
 

@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// The three recruiter views, in fixed order. Navigation between them lives in the
-// shared shell; this marks the current one with the crimson accent and an
-// underline, the others stay muted until hovered.
+// The three recruiter views in fixed order. The current one gets the crimson
+// accent underline, the others stay muted until hovered.
 const VIEWS = [
   { href: "/portfolio", label: "Portfolio" },
   { href: "/cv", label: "Lebenslauf" },

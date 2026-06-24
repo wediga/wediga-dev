@@ -1,7 +1,5 @@
-// GPGPU setup for the hero engine: the static per-atom data textures and the
-// GPUComputationRenderer that runs the atom simulation as ping-pong float
-// textures. Pulled verbatim out of createWebglEngine; same textures, same
-// uniforms, same init, in the same order.
+// GPGPU setup: the static per-atom data textures and the GPUComputationRenderer
+// that runs the atom simulation as ping-pong float textures.
 
 import * as THREE from "three";
 import { GPUComputationRenderer } from "three/examples/jsm/misc/GPUComputationRenderer.js";
@@ -12,10 +10,8 @@ type GpuVariable = ReturnType<GPUComputationRenderer["addVariable"]>;
 
 export interface GpgpuHandle {
   gpu: GPUComputationRenderer;
-  // The position variable: read each frame for the current position texture and
-  // for its own uDelta uniform.
   posVar: GpuVariable;
-  // The velocity material's uniforms, the engine's per-frame control surface.
+  // Velocity material uniforms, the engine's per-frame control surface.
   vu: { [uniform: string]: THREE.IUniform };
   localTex: THREE.DataTexture;
   orbitTex: THREE.DataTexture;

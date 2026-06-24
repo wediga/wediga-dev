@@ -1,8 +1,7 @@
 """The sync step that ties the client to the repository layer.
 
-The order is what keeps the cache safe: the repos are fetched in full first,
-and only a complete fetch reaches the transactional upsert. If the fetch raises
-(a non-200, a rate limit, a transport error), the database is never touched and
+The order keeps the cache safe: repos are fetched in full before the
+transactional upsert, so if the fetch raises the database is never touched and
 the existing cache stays whole.
 """
 

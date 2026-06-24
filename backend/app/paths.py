@@ -1,9 +1,7 @@
-"""Filesystem paths and locations used across the backend.
+"""Filesystem paths used across the backend.
 
-The repository root contains ``backend/``, ``content/`` and ``data/``.
-Both ``data/`` and ``content/`` are gitignored. Environment variables allow
-overriding the database file and content directory, which keeps tests and
-alternative deployments isolated from the defaults.
+The database file and content directory can be overridden by environment
+variable, which keeps tests and alternative deployments off the defaults.
 """
 
 import os
@@ -18,8 +16,8 @@ DATA_DIR = REPO_ROOT / "data"
 def db_path() -> Path:
     """Return the SQLite database file path.
 
-    ``WEDIGA_DB_PATH`` overrides the full path when set, otherwise the file
-    lives at ``data/wediga.db``. The parent directory is created on demand.
+    ``WEDIGA_DB_PATH`` overrides the full path, else ``data/wediga.db``. The
+    parent directory is created on demand.
     """
     override = os.environ.get("WEDIGA_DB_PATH")
     path = Path(override) if override else DATA_DIR / "wediga.db"
@@ -30,8 +28,8 @@ def db_path() -> Path:
 def content_dir() -> Path:
     """Return the content directory.
 
-    ``WEDIGA_CONTENT_DIR`` overrides the location, otherwise ``content/`` at
-    the repository root is used.
+    ``WEDIGA_CONTENT_DIR`` overrides the location, else ``content/`` at the
+    repository root.
     """
     override = os.environ.get("WEDIGA_CONTENT_DIR")
     return Path(override) if override else REPO_ROOT / "content"
@@ -40,9 +38,8 @@ def content_dir() -> Path:
 def cv_dir() -> Path:
     """Return the directory holding the uploaded CV PDF.
 
-    It sits next to the database file, so it lands in the same writable data
-    volume. Deriving it from ``db_path().parent`` means the ``WEDIGA_DB_PATH``
-    override (set in the hardened container, where the repository root is
-    read-only) carries over without a second environment variable.
+    Derived from ``db_path().parent`` so it lands in the same writable data
+    volume and the ``WEDIGA_DB_PATH`` override (set in the hardened container
+    with a read-only repository root) carries over without a second variable.
     """
     return db_path().parent / "cv"

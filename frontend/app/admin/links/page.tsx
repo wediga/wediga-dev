@@ -13,15 +13,15 @@ import {
   useActionFeedback,
 } from "@/components/admin/ui";
 
-// One source of truth for a link's state: the label and the tone are derived
-// together, so the rendered word and its colour cannot drift apart.
+// Label and tone are derived together, so the rendered word and its colour
+// cannot drift apart.
 function linkStatus(link: RecruiterLink): { label: string; tone: string } {
   if (link.revoked_at) return { label: "Revoked", tone: "text-danger" };
   if (!link.active) return { label: "Expired", tone: "text-muted" };
   return { label: "Active", tone: "text-success" };
 }
 
-// Show a timestamp as a short, readable value without pulling in a date library.
+// Short readable timestamp without a date library.
 function fmt(value: string | null): string {
   if (!value) return "-";
   return value.slice(0, 16).replace("T", " ");
@@ -65,7 +65,7 @@ export default function AdminLinksPage() {
         );
         if (response.ok) {
           const created = (await response.json()) as RecruiterLinkCreated;
-          // The plaintext token is shown exactly once, right here.
+          // The plaintext token is shown exactly once, here.
           setCreatedUrl(`${window.location.origin}/r/${created.token}`);
           setLabel("");
           setExpiresOn("");

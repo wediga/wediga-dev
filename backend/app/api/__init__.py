@@ -1,8 +1,5 @@
-"""API layer: central place that wires the service routers.
-
-This module binds the feature routers (auth so far) and the healthcheck into
-one ``api_router``, which ``app.main`` includes. Later phases add their
-routers here, so ``main`` stays a thin entry point.
+"""API layer: binds the feature routers and the healthcheck into one
+``api_router`` that ``app.main`` includes, keeping ``main`` thin.
 """
 
 from fastapi import APIRouter

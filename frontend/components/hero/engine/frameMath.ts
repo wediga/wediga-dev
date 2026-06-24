@@ -1,14 +1,11 @@
-// Pure per-frame maths lifted out of renderFrame: the pitch clamp and the open
-// spring. No THREE, no shared state, no rng; same operations and same order as the
-// inline blocks, so the rendered result is unchanged. Kept separate so the loop
-// reads as wiring and this maths stays testable on its own.
+// Pure per-frame maths: the pitch clamp and the open spring. No THREE, no shared
+// state, kept separate so the maths stays testable on its own.
 
 // Clamp the camera pitch below MAX_PITCH so the forward vector never approaches
 // vertical, the angle at which lookAt with a world-up flips the horizon. Returns
 // the (possibly nudged) camera x/z and the refreshed last healthy horizontal
-// direction, which the caller writes back. Only nudges in a degenerate
-// near-overhead pose; at every station the pitch is ~20deg, so this never touches
-// the normal framing.
+// direction. Only nudges in a degenerate near-overhead pose; at every station the
+// pitch is ~20deg, so this never touches the normal framing.
 export function clampPitch(
   camX: number,
   camY: number,
@@ -45,9 +42,8 @@ export function clampPitch(
   return { x, z, lastHx, lastHz };
 }
 
-// Advance the scrim/text open spring one frame toward the open target, identical
-// to the atoms' spring (k=14, c=4.5), so the darkening tracks the visible planet
-// form. Same operations, same order as the inline block.
+// Advance the scrim/text open spring one frame, identical to the atoms' spring
+// (k=14, c=4.5), so the darkening tracks the visible planet form.
 export function stepOpenSpring(
   openVisual: number,
   openVel: number,

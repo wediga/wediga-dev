@@ -1,13 +1,11 @@
-// Orbital lines: one fine ring per planet, traced on the exact tilted path the
-// planet follows. They start invisible and fade in once forming is complete, so
-// the lines read as "the order is now set". Pulled verbatim out of
-// createWebglEngine, including its teardown.
+// Orbital lines: one ring per planet on the planet's tilted path. They start
+// invisible and fade in once forming is complete, so the order reads as set.
 
 import * as THREE from "three";
 import type { StarSystemData } from "./starSystem";
 
 export interface OrbitLinesHandle {
-  // Drives the orbit-line fade from a forming-progress value (0..1).
+  // Fades the orbit lines from a forming-progress value (0..1).
   setOrbitOpacity(progress: number): void;
   dispose(): void;
 }
@@ -41,7 +39,6 @@ export function buildOrbitLines(
     const line = new THREE.Line(g, mat);
     line.frustumCulled = false;
     orbitGroup.add(line);
-    // Outer, larger orbits get a touch dimmer so the rim stays calm.
     orbitLines.push({ mat, target: 0.28 });
   }
 

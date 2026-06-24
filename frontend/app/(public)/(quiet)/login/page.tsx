@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-// Sign-in for the protected area. Presentation only: the form still posts to
-// /api/login and, on success, lands the browser on /admin with a refresh so the
-// server gate re-reads the new session. Nothing about the auth flow changed.
+// Sign-in for the protected area. The form posts to /api/login and on success
+// lands on /admin with a refresh so the server gate re-reads the new session.
 export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);

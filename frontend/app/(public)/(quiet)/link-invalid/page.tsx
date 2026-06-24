@@ -5,9 +5,8 @@ export const metadata: Metadata = {
   title: "Link nicht mehr gültig",
 };
 
-// The dead end a failed magic-link redeem lands on. A calm, friendly close with
-// one clear way back to the landing. No behaviour changed; this is the same
-// route the redeem handler redirects to, now in the quiet dark shell.
+// Where a failed magic-link redeem lands, with one way back to the landing. The
+// redeem handler redirects here.
 export default function LinkInvalidPage() {
   return (
     <div className="quiet-enter w-full max-w-md">

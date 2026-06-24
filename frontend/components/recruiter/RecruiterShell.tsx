@@ -3,15 +3,13 @@ import { GenerativeAccents } from "./GenerativeAccents";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { SiteHeader, SiteFooter, ChromeLink } from "@/components/site/SiteChrome";
 
-// The shared chrome around the three recruiter views. Dark and consistent with
-// the quiet public pages, it carries navigation between the views and a way back
-// to the landing (the brand wordmark). It sits inside the gate in
-// (recruiter)/layout.tsx, which is untouched; this is presentation only.
+// Shared chrome around the three recruiter views: navigation between them and a
+// way back to the landing (the brand wordmark). It sits inside the gate in
+// (recruiter)/layout.tsx; this is presentation only.
 //
-// Layout: a sticky single-line header, a wide content area that lets each view
-// use the full canvas (the views cap their own prose), and a quiet footer. The
-// header and footer are the shared site chrome; the generative accent is wired
-// once here for every view underneath.
+// A sticky single-line header, a wide content area (the views cap their own
+// prose), and a footer, all from the shared site chrome. The generative accent
+// is wired once here for every view underneath.
 export function RecruiterShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-bg text-ink">

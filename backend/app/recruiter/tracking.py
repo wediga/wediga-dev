@@ -1,21 +1,15 @@
 """Data-sparse origin for the link-view tracking.
 
-The tracking keeps when a link was opened and roughly from where, never the
-full client IP. The address is first coarsened to its network prefix (a /24
-for IPv4, a /48 for IPv6) so the host bits are dropped, and that prefix is
-then hashed with a per-deployment salt. The stored value is therefore a stable
-opaque token: two opens from the same rough network share a token so the admin
-sees repeat origins, yet the value cannot be reversed to an address, and even a
-leaked salt would only expose a network prefix and never a full IP. A regulator
-view treats a bare truncated or unsalted-hashed IP as still identifying, which
-is why both steps are applied together here. An address that cannot be parsed
-is recorded as ``unknown``.
+The client IP is coarsened to its network prefix (/24 for IPv4, /48 for IPv6),
+then hashed with a per-deployment salt. Two opens from the same rough network
+share a token so the admin sees repeat origins, but the value cannot be
+reversed to an address. Both steps run together because under GDPR a bare
+truncated or unsalted-hashed IP can still identify a person. An unparseable
+address is recorded as ``unknown``.
 
-The salt comes from ``TRACKING_SALT`` when set, otherwise it falls back to the
-already configured ``SESSION_SECRET`` so grouping stays stable across restarts
-in any real deployment without a second secret to manage. Only when neither is
-set, as in a bare local run, a random per-process salt is used, which keeps
-grouping within that process and resets on restart, because tracking is not
+The salt is ``TRACKING_SALT``, else ``SESSION_SECRET`` so grouping stays stable
+across restarts without a second secret. With neither set (a bare local run) a
+random per-process salt is used, resetting on restart, since tracking is not
 security-critical and must never block startup.
 """
 
@@ -50,6 +44,5 @@ def coarse_origin(ip: str | None) -> str:
     if prefix is None:
         return "unknown"
     digest = hashlib.sha256(f"{_SALT}:{prefix}".encode("utf-8")).hexdigest()
-    # A short prefix of the digest is enough to tell origins apart while
-    # keeping the stored value compact.
+    # A short digest prefix tells origins apart and keeps the stored value compact.
     return digest[:16]

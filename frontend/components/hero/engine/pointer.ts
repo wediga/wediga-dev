@@ -1,6 +1,5 @@
-// Pointer input: a ray from the camera through the cursor, published to the
-// velocity uniforms so the atoms get pushed at any depth and height. Pulled
-// verbatim out of createWebglEngine, including its listener teardown.
+// Pointer input: a camera ray through the cursor, published to the velocity
+// uniforms so atoms get pushed at any depth and height.
 
 import * as THREE from "three";
 
@@ -35,8 +34,8 @@ export function buildPointer(
       vu.uCursorActive.value = 0;
       return;
     }
-    // Pass the camera ray (origin + direction) instead of a flat-plane hit point,
-    // so the push works at any depth and height, not just on y = 0.
+    // Camera ray (origin + direction) instead of a flat-plane hit point, so the
+    // push works at any depth and height, not just on y = 0.
     rayOrigin.copy(camera.position);
     rayDir.set(ndc.x, ndc.y, 0.5).unproject(camera).sub(rayOrigin).normalize();
     vu.uCursorOrigin.value.copy(rayOrigin);

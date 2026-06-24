@@ -1,16 +1,12 @@
 "use client";
 
-// The landing hero: an unordered mass of atoms forms into a stilisiertes star
-// system on load, then a scroll-driven on-rails camera rides from planet to
-// planet. Ported unchanged in feel from the approved /hero-lab sandbox; the
-// engine and its motion constants are the frozen contract. Phase H2 changes only
-// the content carried on the planets, not the camera, scrim, spring or timing.
-//
-// This shell is only state, wiring and render: the engine lifecycle and the
-// scroll behaviour live in hooks (useHeroEngine, useScrollReset, useScrollSnap),
-// the visible station text in StationsOverlay, and the two appearances
-// (full-motion ride, quiet landing) in their own components. The keyframes for
-// hero-assemble and hero-rise live in globals.css with the site's other reveals.
+// The landing hero: atoms assemble into a stylized star system, then a
+// scroll-driven on-rails camera rides planet to planet. The engine and its
+// motion constants are a frozen contract, so changes touch only the content on
+// the planets. This shell is state, wiring and render; the lifecycle and scroll
+// behaviour live in hooks, the station text in StationsOverlay, the two
+// appearances in their own components. hero-assemble and hero-rise keyframes are
+// in globals.css.
 
 import type { SkillCategory } from "@/lib/types";
 import { useMotionMode } from "@/lib/useMotionMode";
@@ -30,14 +26,12 @@ export function Hero({
   skills: SkillCategory[];
   isRecruiter: boolean;
 }) {
-  // The resolved site-wide motion mode (the on-page switch wins over the OS
-  // setting). Reduced motion swaps the whole hero for the quiet, sun-anchored
-  // landing instead of the scroll-driven ride.
+  // The on-page switch wins over the OS setting. Reduced motion swaps the whole
+  // hero for the quiet sun-anchored landing.
   const reducedMotion = useMotionMode() === "reduced";
 
-  // The engine lifecycle owns the canvas and section refs and the active station;
-  // the scroll-reset shares the engine's [seed, reducedMotion] so a rebuild always
-  // restarts at the overview, and scroll-snap is active only during the ride.
+  // scroll-reset shares the engine's [seed, reducedMotion] so a rebuild restarts
+  // at the overview; scroll-snap runs only during the ride.
   const { canvasRef, sectionRefs, seed, active } = useHeroEngine(reducedMotion);
   useScrollReset(seed, reducedMotion);
   useScrollSnap(reducedMotion);
@@ -45,9 +39,8 @@ export function Hero({
   return (
     <main className="relative bg-bg text-ink">
       {reducedMotion ? (
-        // The quiet landing: its own design, not the ride pushed back. A living,
-        // cursor-reactive sun anchors one side while the same public content
-        // (intro teaser, toolkit, access door) reads down a calm column beside it.
+        // Its own design, not the ride pushed back: a cursor-reactive sun anchors
+        // one side while the same public content reads down a column beside it.
         <QuietLanding
           canvasRef={canvasRef}
           skills={skills}
@@ -61,10 +54,10 @@ export function Hero({
             aria-hidden="true"
           />
 
-          {/* The real BFF content stays in the DOM behind the canvas: present for
-              screen readers, search engines and the E2E suite while the ride
-              plays. It is the accessible source of truth; the visible stations
-              below are its visual duplicate. */}
+          {/* The real BFF content stays in the DOM behind the canvas, the
+              accessible source of truth for screen readers, search engines and
+              the E2E suite while the ride plays. The visible stations below are
+              its visual duplicate. */}
           <div
             className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
             aria-hidden="false"
@@ -72,9 +65,8 @@ export function Hero({
             {readable}
           </div>
 
-          {/* Visible station text, real DOM text positioned on the active planet
-              via its projected screen coordinates, with a soft scrim behind for
-              legibility. Only the active station is shown. */}
+          {/* Visible station text positioned on the active planet via its
+              projected screen coordinates. Only the active station shows. */}
           <StationsOverlay
             sectionRefs={sectionRefs}
             active={active}
@@ -82,9 +74,9 @@ export function Hero({
             isRecruiter={isRecruiter}
           />
 
-          {/* Scroll track: one full-viewport snap section per stop (overview first,
-              then one per station), so the wheel locks onto a station instead of
-              leaving you in an in-between. The camera reads scrollY in the frame. */}
+          {/* Scroll track: one full-viewport snap section per stop (overview,
+              then one per station), so the wheel locks onto a station. The camera
+              reads scrollY in the frame. */}
           {Array.from({ length: STATIONS.length + 1 }).map((_, i) => (
             <div
               key={i}
@@ -94,8 +86,7 @@ export function Hero({
             />
           ))}
 
-          {/* Impressum, Login and the motion switch stay reachable throughout the
-              ride. */}
+          {/* Impressum, Login and the motion switch stay reachable during the ride. */}
           <SiteFooter variant="fixed" />
         </>
       )}

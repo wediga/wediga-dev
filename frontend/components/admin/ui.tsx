@@ -1,11 +1,8 @@
 "use client";
 
-// The shared admin design system. One small set of primitives the eight
-// maintenance pages build on, so every form looks and behaves the same: the
-// same input, the same three button weights, the same per-action feedback, and
-// the same inline confirmation before a destructive write. Everything is dark
-// and drawn from the central Sakura tokens in globals.css; the generative hero
-// accents of the recruiter views are deliberately not used here.
+// Shared primitives for the admin maintenance pages: input, button, per-action
+// feedback, and the inline destructive confirmation. Dark, drawn from the Sakura
+// tokens in globals.css, without the generative hero accents of the recruiter views.
 
 import {
   type ButtonHTMLAttributes,
@@ -17,9 +14,8 @@ import {
   useState,
 } from "react";
 
-// One status per write action. Pages key these by action (e.g. "save",
-// "delete-12") so each control reports its own outcome instead of sharing a
-// single page-wide string.
+// Pages key status by action (e.g. "save", "delete-12") so each control reports
+// its own outcome instead of sharing one page-wide string.
 export type ActionStatus =
   | { state: "idle" }
   | { state: "pending" }
@@ -28,10 +24,9 @@ export type ActionStatus =
 
 const IDLE: ActionStatus = { state: "idle" };
 
-// Drives the per-action feedback. run() flips the keyed status to pending,
-// awaits the write, then settles on success or error; success fades back to
-// idle on its own so the form rests quietly, errors stay until the next try.
-// set() is for non-write feedback such as a failed initial load.
+// run() awaits a write and reports its outcome. Success self-clears back to idle
+// after a delay, errors stay until the next try. set() is for non-write feedback
+// such as a failed initial load.
 export function useActionFeedback() {
   const [map, setMap] = useState<Record<string, ActionStatus>>({});
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -93,9 +88,8 @@ export function useActionFeedback() {
   return { run, get, set };
 }
 
-// Inline feedback anchored next to the action that produced it. Announced to
-// assistive tech, and never colour-only: the word carries the meaning, the
-// colour reinforces it.
+// Inline feedback next to the action that produced it. Never colour-only: the
+// word carries the meaning, the colour reinforces it.
 export function Feedback({
   status,
   pendingLabel = "Saving…",
@@ -127,9 +121,8 @@ export function Feedback({
   );
 }
 
-// One input look shared by AdminField and the few inline edit fields (skills,
-// repos), so the form controls cannot drift apart. Width is set per use. Focus
-// uses the same crimson outline idiom as the login and recruiter surfaces.
+// One input look shared by AdminField and the inline edit fields (skills, repos)
+// so the controls cannot drift apart. Width is set per use.
 export const ADMIN_INPUT =
   "rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted transition-colors duration-150 ease-out hover:border-muted-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 disabled:cursor-not-allowed disabled:opacity-60";
 
@@ -140,9 +133,9 @@ const VARIANTS: Record<Variant, string> = {
   primary: "bg-accent text-bg hover:bg-accent/90",
   secondary:
     "border border-line bg-transparent text-ink hover:border-muted-2 hover:bg-surface",
-  // Outline danger for the first click of a destructive action…
+  // Outline danger for the first click of a destructive action,
   danger: "border border-danger/50 bg-transparent text-danger hover:bg-danger/10",
-  // …solid danger once it is confirmed, so the committed step reads heavier.
+  // solid danger once confirmed, so the committed step reads heavier.
   "danger-solid": "bg-danger text-bg hover:bg-danger/90",
 };
 
@@ -189,8 +182,8 @@ type FieldProps = {
 };
 
 // Label above the control, optional hint below it, never a placeholder standing
-// in for the label. Errors are reported per action by the Feedback component,
-// anchored at the button that triggered the write, not inline on the field.
+// in for the label. Errors are reported per action by Feedback at the button
+// that triggered the write, not inline on the field.
 export function AdminField({
   label,
   value,
@@ -244,8 +237,7 @@ export function AdminField({
   );
 }
 
-// A teaching empty state: it says what is missing and where to add the first
-// item, rather than just "nothing here".
+// Names what is missing and where to add the first item, not just "nothing here".
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
     <p className="rounded-sm border border-dashed border-line px-4 py-6 text-center text-sm text-muted">
@@ -254,10 +246,9 @@ export function EmptyState({ children }: { children: ReactNode }) {
   );
 }
 
-// Two-step destructive confirmation, kept in the DOM rather than a native
-// window.confirm: the first click arms it, a clear prompt plus a heavier
-// confirm and a cancel appear in place, and only the second click sends. This
-// is presentation around the existing write; it never changes the request.
+// Two-step destructive confirmation in the DOM rather than window.confirm: the
+// first click arms it, the prompt and confirm/cancel appear in place, and only
+// the second click sends. Presentation around the write, never changes the request.
 export function ConfirmButton({
   label,
   prompt,

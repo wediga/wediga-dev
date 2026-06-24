@@ -1,13 +1,10 @@
 """Idempotent seed of database content from the content directory.
 
-The seed reads ``about.md``, ``contact.json``, ``impressum.json``,
-``projects.json`` and ``skills.json`` and writes them into the database
-without ever modifying the files. Each row has a stable natural key and is
-written with ``INSERT ... ON CONFLICT ... DO UPDATE`` (upsert), so a second
-run produces no duplicates and pulls in content edits made in the files. The
-admin-managed ``visible`` flag on a project is left untouched on update, so a
-re-seed never re-shows a project the admin hid. The returned summary counts
-the entries processed from the files, not the rows that actually changed.
+Reads the content files and upserts them on a stable natural key, so a re-run
+makes no duplicates and pulls in file edits, never writing back to the files.
+The admin-managed ``visible`` flag on a project survives a re-seed, so it never
+re-shows a project the admin hid. The summary counts entries processed, not
+rows changed.
 """
 
 import json

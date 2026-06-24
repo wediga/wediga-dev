@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { backendUrl } from "@/lib/backend";
 import { sessionCookieHeader } from "@/lib/forwarding";
 
-// The 10 MB file cap lives on the backend; this bound covers the multipart
+// The 10 MB file cap lives on the backend, this bound covers the multipart
 // envelope around it, so the BFF rejects an oversized body up front instead of
 // buffering it whole in the frontend process.
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 
-// The CV upload is a multipart file upload, so it cannot go through the JSON
-// proxy. This forwards the session cookie, the CSRF token and the raw multipart
-// body (with its boundary) to the admin-gated backend endpoint.
+// A multipart upload cannot go through the JSON proxy, so this forwards the
+// session cookie, the CSRF token and the raw multipart body (boundary intact)
+// to the admin-gated backend endpoint.
 export async function POST(request: NextRequest) {
   const declared = Number(request.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > MAX_UPLOAD_BYTES) {

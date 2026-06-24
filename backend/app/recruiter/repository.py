@@ -1,13 +1,11 @@
 """Read and write functions for recruiter links and their call tracking.
 
-The token is generated with high entropy from ``secrets`` and only its SHA-256
-hash reaches the database, so a database leak exposes no usable link. A leaked
-hash cannot be reversed and a fresh random token of this length is infeasible
-to guess, which is why a fast hash is enough here and a slow password hash
-would add cost without buying security. The plaintext is returned once from
-``create_link`` and never again.
-
-Every query is parameterised, no SQL is built from input.
+The token comes from ``secrets`` and only its SHA-256 hash reaches the
+database, so a leak exposes no usable link. A fast hash is enough because a
+256-bit random token is infeasible to guess, so a slow password hash would add
+cost without buying security. The plaintext is returned once from
+``create_link`` and never again. Every query is parameterised, no SQL is built
+from input.
 """
 
 import hashlib
@@ -16,7 +14,7 @@ from datetime import date, datetime, time, timezone
 
 from app.db.connection import get_connection, now
 
-# 32 bytes of randomness, url-safe, gives a token with 256 bits of entropy.
+# 32 url-safe random bytes, a 256-bit token.
 _TOKEN_BYTES = 32
 
 
@@ -28,8 +26,8 @@ def _hash_token(token: str) -> str:
 def _expiry_iso(expires_on: date | None) -> str | None:
     """Turn a calendar day into an end-of-day UTC timestamp, or ``None``.
 
-    A link with an expiry stays valid through the whole chosen day, so the
-    stored instant is that day at 23:59:59 UTC.
+    A link stays valid through the whole chosen day, so the stored instant is
+    that day at 23:59:59 UTC.
     """
     if expires_on is None:
         return None
@@ -102,9 +100,8 @@ def list_links() -> list[dict]:
 def revoke_link(link_id: int) -> dict | None:
     """Revoke a link by stamping ``revoked_at``; return its read view or None.
 
-    Revoking is idempotent: an already revoked link keeps its first revoke
-    time and still returns successfully, while a missing link returns None so
-    the router can answer 404.
+    Idempotent: an already revoked link keeps its first revoke time, a missing
+    link returns None so the router can answer 404.
     """
     with get_connection() as conn:
         exists = conn.execute(
@@ -124,9 +121,9 @@ def revoke_link(link_id: int) -> dict | None:
 def validate_token(token: str) -> tuple[str, int | None]:
     """Look a token up by its hash and classify it.
 
-    Returns one of ``("ok", id)``, ``("revoked", id)``, ``("expired", id)`` or
-    ``("invalid", None)``. The lookup matches on the stored hash, so the
-    plaintext never has to be compared against a stored secret.
+    Returns ``("ok", id)``, ``("revoked", id)``, ``("expired", id)`` or
+    ``("invalid", None)``. The lookup matches on the stored hash, never the
+    plaintext.
     """
     with get_connection() as conn:
         row = conn.execute(
@@ -145,8 +142,8 @@ def validate_token(token: str) -> tuple[str, int | None]:
 def link_is_active(link_id: int | None) -> bool:
     """Return whether the link behind a recruiter session is still usable.
 
-    The gate calls this on every recruiter read, so a revoked or expired link
-    cuts an already redeemed session instead of only blocking a new redeem.
+    Called on every recruiter read, so revoking or expiring a link cuts an
+    already redeemed session, not just a new redeem.
     """
     if not link_id:
         return False

@@ -1,9 +1,9 @@
 """Content routes: public reads and admin-protected writes.
 
-Reads are public GET endpoints so the Server Components can render the site.
-Writes (create, update, delete) sit behind ``require_admin`` for the session
-and ``require_csrf`` for the synchronizer token, so a write without a session
-is 401 and a write without a valid token is 403.
+About and skills are public so the Server Components render the public site.
+Impressum keeps its name-and-email split (public read vs full admin read).
+Writes and recruiter reads use the standard gates (see WRITE_DEPS and
+``require_recruiter_view``).
 """
 
 from fastapi import APIRouter, Depends, status
@@ -27,14 +27,7 @@ from app.content.schemas import (
 
 router = APIRouter(prefix="/content", tags=["content"])
 
-# Writes need both an admin session and a valid CSRF token.
 WRITE_DEPS = [Depends(require_admin), Depends(require_csrf)]
-
-# Recruiter-facing reads (the full portfolio and the contact details) sit
-# behind the recruiter gate, which an admin session also satisfies and which
-# re-checks the link state, so a revoked or expired link loses access. About
-# and skills stay public because they feed the public landing page, and the
-# public impressum keeps its own name-and-email split.
 RECRUITER_READ_DEPS = [Depends(require_recruiter_view)]
 
 NOT_FOUND = not_found()
@@ -92,7 +85,7 @@ def remove_contact() -> dict[str, bool]:
 
 @router.get("/impressum", response_model=ImpressumContent | None)
 def read_impressum() -> ImpressumContent | None:
-    """Public read: only name and email, matching the documented split."""
+    """Public read: only name and email."""
     data = repo.get_impressum()
     if data is None:
         return None
@@ -131,7 +124,7 @@ def remove_impressum() -> dict[str, bool]:
     dependencies=RECRUITER_READ_DEPS,
 )
 def read_projects() -> list[dict]:
-    """Recruiter read: only visible projects, gated behind the recruiter view."""
+    """Recruiter read: only visible projects."""
     return repo.list_projects(include_hidden=False)
 
 

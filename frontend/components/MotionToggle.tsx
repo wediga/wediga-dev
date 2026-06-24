@@ -1,11 +1,10 @@
 "use client";
 
-// The visible, persistent motion switch. It overrides the OS setting and
-// remembers the choice (localStorage, via setMotionChoice), and because it writes
-// the data-motion attribute that the CSS reveals and the hero both read, one
-// switch governs the whole site, not just this page. Two pills mirror the mock:
-// the pressed one reflects the resolved mode, clicking the other stores that
-// choice. Colours come from the tokens, never a raw hex.
+// The persistent motion switch. It overrides the OS setting and remembers the
+// choice (localStorage, via setMotionChoice). Because it writes the data-motion
+// attribute the CSS reveals and the hero both read, one switch governs the whole
+// site. Two pills: the pressed one reflects the resolved mode, clicking the other
+// stores that choice. Colours come from the tokens, never a raw hex.
 
 import { setMotionChoice, type MotionMode } from "@/lib/motion";
 import { useMotionMode } from "@/lib/useMotionMode";

@@ -3,8 +3,7 @@ import { safeHref } from "@/lib/url";
 import { STATUS_CLASS, statusKind } from "@/lib/projectStatus";
 import type { Project } from "@/lib/types";
 
-// Keep the entrance stagger short no matter how long the lists grow: late items
-// should not wait seconds to appear.
+// Cap the entrance stagger so late items in a long list do not wait seconds.
 const revealVar = (i: number) =>
   ({ "--reveal-i": String(Math.min(i, 6)) }) as React.CSSProperties;
 
@@ -48,9 +47,9 @@ export default async function PortfolioPage() {
   );
 }
 
-// One project. The name and status sit on a baseline row, the tagline carries
-// the crimson accent, the three prose fields stay within a readable measure, and
-// the tech stack plus links close it out. Stacked on narrow, two per row on wide.
+// One project: name and status on a baseline row, the tagline in the crimson
+// accent, then the prose fields, tech stack, and links. Stacked on narrow, two
+// per row on wide.
 function ProjectArticle({ project, index }: { project: Project; index: number }) {
   const kind = statusKind(project.status);
   const demo = safeHref(project.demo_link);

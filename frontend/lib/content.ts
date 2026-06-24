@@ -9,9 +9,9 @@ import type {
   SkillCategory,
 } from "./types";
 
-// Server-side reads for the public and recruiter views. Server Components call
-// these, so the Next.js server talks to the backend and the browser only ever
-// sees the frontend origin. Reads are uncached so an admin edit shows at once.
+// Server-side reads for the public and recruiter views. Called from Server
+// Components, so the backend is reached only by the Next.js server and the
+// browser sees just the frontend origin. Uncached, so an admin edit shows at once.
 async function getJson<T>(path: string): Promise<T | null> {
   try {
     const response = await fetch(backendUrl(path), { cache: "no-store" });
@@ -22,12 +22,12 @@ async function getJson<T>(path: string): Promise<T | null> {
   }
 }
 
-// Gated reads forward the visitor's session cookie, so the backend can apply
-// the recruiter-or-admin gate. The page itself is guarded by the recruiter
-// layout, this only carries the session through to the data fetch. The raw
-// cookie header is forwarded verbatim, the same way the BFF route handlers do
-// it, because re-serializing the cookies (cookies().toString()) re-encodes the
-// signed session value and the backend then rejects it.
+// Gated reads forward the visitor's session cookie so the backend can apply the
+// recruiter-or-admin gate. The recruiter layout already guards the page, this
+// only carries the session into the data fetch. The raw cookie header is
+// forwarded verbatim, like the BFF route handlers, because re-serializing it
+// (cookies().toString()) re-encodes the signed session value and the backend
+// then rejects it.
 async function getJsonWithSession<T>(path: string): Promise<T | null> {
   try {
     const cookieHeader = (await headers()).get("cookie");
@@ -42,11 +42,11 @@ async function getJsonWithSession<T>(path: string): Promise<T | null> {
   }
 }
 
-// Whether the visitor carries a valid recruiter (or admin) session, asked of the
-// backend the same way the recruiter layout gates its pages. Read-only: the
-// landing uses it to flip the access door between login and portfolio, it does
-// not gate any content. The raw cookie header is forwarded verbatim, like the
-// gated reads, so the signed session value is not re-encoded.
+// Whether the visitor carries a valid recruiter or admin session, asked of the
+// backend the way the recruiter layout gates its pages. The landing uses it to
+// flip the access door between login and portfolio, it gates no content itself.
+// Cookie header forwarded verbatim like the gated reads, so the signed value is
+// not re-encoded.
 export async function getRecruiterSession(): Promise<boolean> {
   try {
     const cookieHeader = (await headers()).get("cookie");
@@ -76,8 +76,8 @@ export async function getSkills(): Promise<SkillCategory[]> {
   return (await getJson<SkillCategory[]>("/content/skills")) ?? [];
 }
 
-// Whether a CV PDF is currently uploaded, gated like the portfolio. The page
-// uses this to decide whether to show the download and preview.
+// Whether a CV PDF is uploaded, gated like the portfolio. The page uses this to
+// decide whether to show the download and preview.
 export async function getCvStatus(): Promise<CvStatus> {
   return (await getJsonWithSession<CvStatus>("/cv/status")) ?? { present: false };
 }

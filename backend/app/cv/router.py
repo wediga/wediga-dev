@@ -1,12 +1,7 @@
 """CV routes: admin PDF upload and recruiter-gated download.
 
-The CV is a single uploaded PDF. The admin replaces it through a multipart
-upload behind ``require_admin`` for the session and ``require_csrf`` for the
-synchronizer token, so a write without a session is 401 and one without a valid
-token is 403. The recruiter downloads it behind ``require_recruiter_view``,
-which an admin session also satisfies and which re-checks the link state on
-every read, so a revoked or expired link loses access. A status endpoint
-reports whether a PDF is present, used by the admin page and the recruiter view.
+The CV is a single uploaded PDF. Writes and recruiter reads use the standard
+gates (see WRITE_DEPS and ``require_recruiter_view``).
 
 The upload is the real attack surface, so a file is accepted only when its
 multipart part declares ``application/pdf`` and its bytes start with the
@@ -29,11 +24,11 @@ router = APIRouter(prefix="/cv", tags=["cv"])
 WRITE_DEPS = [Depends(require_admin), Depends(require_csrf)]
 RECRUITER_READ_DEPS = [Depends(require_recruiter_view)]
 
-# A CV PDF is small; 10 MB is generous and caps a hostile upload.
+# A CV PDF is small; 10 MB caps a hostile upload.
 MAX_PDF_BYTES = 10 * 1024 * 1024
 _CHUNK = 64 * 1024
 PDF_SIGNATURE = b"%PDF-"
-# Neutral download name, so no personal data lives in committed code.
+# Neutral name, so no personal data lives in committed code.
 DOWNLOAD_FILENAME = "Lebenslauf.pdf"
 
 
@@ -63,12 +58,12 @@ def download_cv(inline: bool = False) -> FileResponse:
         filename=DOWNLOAD_FILENAME,
         content_disposition_type="inline" if inline else "attachment",
         headers={
-            # Gated personal content must not be kept in a shared cache.
+            # Gated personal content must not sit in a shared cache.
             "Cache-Control": "private, no-store",
-            # Pin the type so a polyglot upload is never sniffed as HTML, which
-            # together with the %PDF signature check closes any inline-XSS path.
+            # nosniff plus the %PDF signature check stops a polyglot upload
+            # being sniffed as HTML, closing the inline-XSS path.
             "X-Content-Type-Options": "nosniff",
-            # The PDF needs no resources of its own, so lock it all down.
+            # The PDF loads no resources of its own.
             "Content-Security-Policy": "default-src 'none'",
         },
     )
@@ -96,10 +91,8 @@ async def upload_cv(file: UploadFile) -> dict[str, bool]:
 
 
 async def _read_capped(file: UploadFile) -> bytes:
-    """Read the upload in chunks, rejecting anything past the size cap.
-
-    Reading in blocks and bailing at the cap means an oversized upload never
-    sits whole in memory.
+    """Read the upload in chunks, bailing at the cap so an oversized upload
+    never sits whole in memory.
     """
     chunks: list[bytes] = []
     total = 0

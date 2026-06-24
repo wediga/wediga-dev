@@ -1,8 +1,4 @@
-"""Shared HTTP error construction.
-
-A single factory builds every 404 so the routers stay consistent, while each
-caller keeps its own case-specific detail text.
-"""
+"""Shared 404 factory so the routers stay consistent on the detail shape."""
 
 from fastapi import HTTPException, status
 

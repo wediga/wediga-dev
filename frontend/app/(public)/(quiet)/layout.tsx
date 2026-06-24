@@ -1,12 +1,10 @@
 import { SiteHeader, SiteFooter, ChromeLink } from "@/components/site/SiteChrome";
 
 // The quiet shell for the non-landing public pages (login, impressum,
-// link-invalid). It carries the dark Landing surface so these pages read as
-// the same site, but stays still and typographic: no hero, no WebGL, no ride.
-// Route groups do not change the URL, so /login, /impressum and /link-invalid
-// keep their paths; only their presentation moves into this common shell. The
-// header and footer come from the shared site chrome, so they cannot drift from
-// the recruiter views or the landing ride.
+// link-invalid). It carries the dark Landing surface so these read as the same
+// site, but stays still and typographic: no hero, no WebGL, no ride. The route
+// group does not change the URL, so the paths stay. Header and footer come from
+// the shared chrome, so they cannot drift from the recruiter views or the ride.
 export default function QuietLayout({
   children,
 }: {

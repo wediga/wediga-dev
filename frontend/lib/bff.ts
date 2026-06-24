@@ -6,11 +6,11 @@ import { sessionCookieHeader } from "./forwarding";
 // promise, so each handler awaits it before reading the id.
 export type Params = { params: Promise<{ id: string }> };
 
-// Forward a browser request to the backend and relay the response back.
-// The incoming session cookie and the CSRF header travel to the backend, and
-// every Set-Cookie the backend returns is passed back to the browser one by
-// one via getSetCookie(), which keeps each cookie's attributes intact instead
-// of folding them into a single comma-joined header.
+// Forward a browser request to the backend and relay the response back. The
+// incoming session cookie and CSRF header travel to the backend unchanged, and
+// each Set-Cookie the backend returns is appended one by one via getSetCookie(),
+// which keeps every cookie's attributes intact instead of folding them into one
+// comma-joined header.
 export async function proxyToBackend(
   request: NextRequest,
   backendPath: string,
@@ -23,9 +23,9 @@ export async function proxyToBackend(
   const csrf = request.headers.get("x-csrf-token");
   if (csrf) headers["x-csrf-token"] = csrf;
 
-  // Carry the real client IP through to the backend, so the login rate limit
-  // keys on the visitor and not on the single frontend container. Caddy sets
-  // this header; locally it is absent and the backend falls back to the peer.
+  // Carry the real client IP through, so the login rate limit keys on the
+  // visitor and not the single frontend container. Caddy sets this header,
+  // locally it is absent and the backend falls back to the peer.
   const forwardedFor = request.headers.get("x-forwarded-for");
   if (forwardedFor) headers["x-forwarded-for"] = forwardedFor;
 
