@@ -231,3 +231,41 @@ body {
 [data-motion="reduced"] .quiet-press:active {
   transform: none;
 }
+
+/*
+  The full-motion hero reveals. heroAssemble forms each station title as the
+  camera docks; heroRise lifts the toolkit groups in a short stagger on the same
+  dock moment, riding the camera and scrim timing without changing it. hero-door
+  is the physical press feedback on the access door. Moved out of an inline
+  <style> in Hero.tsx; the names, timings and easing are unchanged. The
+  reduced-motion block stays keyed to the OS media query (not the data-motion
+  attribute), so it matches the prior inline behaviour exactly: it only bites
+  when the full-motion ride renders while the OS asks for reduced motion (a
+  deliberate "Voll" choice over an OS reduced-motion preference).
+*/
+@keyframes heroAssemble {
+  from { opacity: 0; filter: blur(10px); transform: translateY(10px) scale(0.98); letter-spacing: 0.3em; }
+  to { opacity: 1; filter: blur(0); transform: none; letter-spacing: normal; }
+}
+.hero-assemble { animation: heroAssemble 760ms cubic-bezier(0.16,1,0.3,1) both; }
+@keyframes heroRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.hero-rise > * { opacity: 0; animation: heroRise 560ms cubic-bezier(0.16,1,0.3,1) both; }
+.hero-rise > *:nth-child(1) { animation-delay: 40ms; }
+.hero-rise > *:nth-child(2) { animation-delay: 100ms; }
+.hero-rise > *:nth-child(3) { animation-delay: 160ms; }
+.hero-rise > *:nth-child(4) { animation-delay: 220ms; }
+.hero-rise > *:nth-child(5) { animation-delay: 280ms; }
+.hero-rise > *:nth-child(6) { animation-delay: 340ms; }
+.hero-rise > *:nth-child(7) { animation-delay: 400ms; }
+.hero-rise > *:nth-child(8) { animation-delay: 460ms; }
+.hero-door { transition: transform 160ms cubic-bezier(0.16,1,0.3,1), background-color 200ms ease; }
+.hero-door:active { transform: scale(0.97); }
+@media (prefers-reduced-motion: reduce) {
+  .hero-assemble { animation: none; }
+  .hero-rise > * { animation: none; opacity: 1; }
+  .hero-door { transition: background-color 200ms ease; }
+  .hero-door:active { transform: none; }
+}
