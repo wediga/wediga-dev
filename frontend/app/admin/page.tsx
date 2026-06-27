@@ -9,6 +9,7 @@ const SECTIONS = [
   { href: "/admin/repos", label: "Repos", hint: "GitHub sync and curation" },
   { href: "/admin/cv", label: "CV", hint: "Upload the CV PDF" },
   { href: "/admin/links", label: "Links", hint: "Recruiter magic links" },
+  { href: "/admin/security", label: "Security", hint: "Two-factor login" },
 ];
 
 export default function AdminPage() {

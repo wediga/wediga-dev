@@ -21,10 +21,11 @@ def _reset_login_limiter():
     repeated logins and redeems across the suite would accumulate and a later
     test could hit a limit by accident.
     """
-    from app.auth.ratelimit import login_limiter, redeem_limiter
+    from app.auth.ratelimit import login_limiter, redeem_limiter, totp_limiter
 
     login_limiter.clear()
     redeem_limiter.clear()
+    totp_limiter.clear()
     yield
 
 

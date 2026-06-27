@@ -22,10 +22,10 @@ def test_migrations_create_all_tables(temp_db) -> None:
 
 def test_migrations_are_idempotent(temp_db) -> None:
     first = run_migrations()
-    assert first["applied"] == ["0001_initial"]
+    assert first["applied"] == ["0001_initial", "0002_admin_totp"]
     assert first["skipped"] == []
 
     second = run_migrations()
     assert second["applied"] == []
-    assert second["skipped"] == ["0001_initial"]
+    assert second["skipped"] == ["0001_initial", "0002_admin_totp"]
     assert set(list_tables()) == EXPECTED_TABLES

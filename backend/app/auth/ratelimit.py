@@ -79,3 +79,9 @@ login_limiter = RateLimiter(max_attempts=10, window_seconds=300)
 # 256 bits of entropy, so this only caps request floods and view-count
 # inflation from one source, not guessing.
 redeem_limiter = RateLimiter(max_attempts=30, window_seconds=300)
+
+# TOTP code: five attempts per five minutes per IP. A six-digit code has a
+# million-value space, so this caps online guessing on the second factor while
+# leaving room for a few mistyped codes. The same limiter covers the login code
+# step and the setup confirmation.
+totp_limiter = RateLimiter(max_attempts=5, window_seconds=300)

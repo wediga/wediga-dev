@@ -23,6 +23,11 @@ ADMIN_SESSION_KEY = "admin"
 # Holds the id of the redeemed link.
 RECRUITER_SESSION_KEY = "recruiter"
 
+# Set after a correct password when the second factor is active. It carries no
+# admin rights on its own and is cleared once the TOTP step promotes the session
+# to a full admin session.
+PENDING_2FA_SESSION_KEY = "pending_2fa"
+
 
 def _session_secret() -> str:
     secret = os.environ.get("SESSION_SECRET")

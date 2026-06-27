@@ -6,6 +6,7 @@ startup. Migrations never run in the request path, only via
 """
 
 import asyncio
+import os
 import sqlite3
 from contextlib import asynccontextmanager, suppress
 
@@ -37,7 +38,19 @@ async def lifespan(app: FastAPI):
                 await sync_task
 
 
-app = FastAPI(title="wediga-backend", lifespan=lifespan)
+# The interactive API docs are off by default, so the schema and the auth
+# endpoints are not exposed. The backend has no host port and is reached only
+# through the BFF, so this is defence in depth; set ENABLE_DOCS=true locally to
+# bring /docs, /redoc and /openapi.json back for development.
+_docs_enabled = os.environ.get("ENABLE_DOCS", "").lower() == "true"
+
+app = FastAPI(
+    title="wediga-backend",
+    lifespan=lifespan,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
+)
 
 add_session_middleware(app)
 app.include_router(api_router)
