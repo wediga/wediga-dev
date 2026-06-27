@@ -3,16 +3,16 @@
 # vercel/next.js examples/with-docker Dockerfile, using npm and the
 # standalone output. Build context is the sibling ../frontend directory.
 
-ARG NODE_VERSION=24.13.0
+ARG NODE_VERSION=24.18.0
 
-FROM node:${NODE_VERSION}-slim@sha256:4660b1ca8b28d6d1906fd644abe34b2ed81d15434d26d845ef0aced307cf4b6f AS deps
+FROM node:${NODE_VERSION}-slim@sha256:b31e7a42fdf8b8aa5f5ed477c72d694301273f1069c5a2f71d53c6482e99a2fc AS deps
 WORKDIR /app
 
 # Install dependencies based on the lockfile only, for a cached layer.
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:${NODE_VERSION}-slim@sha256:4660b1ca8b28d6d1906fd644abe34b2ed81d15434d26d845ef0aced307cf4b6f AS builder
+FROM node:${NODE_VERSION}-slim@sha256:b31e7a42fdf8b8aa5f5ed477c72d694301273f1069c5a2f71d53c6482e99a2fc AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -23,13 +23,18 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
 
 RUN npm run build
 
-FROM node:${NODE_VERSION}-slim@sha256:4660b1ca8b28d6d1906fd644abe34b2ed81d15434d26d845ef0aced307cf4b6f AS runner
+FROM node:${NODE_VERSION}-slim@sha256:b31e7a42fdf8b8aa5f5ed477c72d694301273f1069c5a2f71d53c6482e99a2fc AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0
+
+# The runtime only runs the standalone server, so npm is not needed. Dropping
+# the npm that ships in the base image removes a large set of npm-only CVEs and
+# shrinks the attack surface.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 # Copy the standalone server, static assets and public files.
 COPY --from=builder /app/public ./public
