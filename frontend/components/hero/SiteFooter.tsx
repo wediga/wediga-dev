@@ -2,8 +2,8 @@ import Link from "next/link";
 import { SiteFooter as SharedSiteFooter } from "@/components/site/SiteChrome";
 import { MotionToggle } from "@/components/MotionToggle";
 
-// The site footer: Impressum, Login and the motion switch. Fixed over the ride
-// or in flow at the foot of the quiet column; the switch is the same in both.
+// The site footer: Impressum and the motion switch. Fixed over the ride or in
+// flow at the foot of the quiet column; the switch is the same in both.
 export function SiteFooter({ variant }: { variant: "fixed" | "pinned" }) {
   // Full motion: a scrim over the ride, the canvas shows through. Quiet: a solid
   // bar that covers the fixed sun behind it, with a top border off the content.
@@ -21,9 +21,6 @@ export function SiteFooter({ variant }: { variant: "fixed" | "pinned" }) {
       <div className="flex gap-5 text-sm text-muted">
         <Link href="/impressum" className="transition-colors hover:text-ink">
           Impressum
-        </Link>
-        <Link href="/login" className="transition-colors hover:text-ink">
-          Login
         </Link>
       </div>
       <MotionToggle />

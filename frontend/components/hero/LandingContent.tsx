@@ -60,11 +60,13 @@ export function LandingContent({
   );
 }
 
-// The access door. Without a recruiter session it leads to the login, with a
-// valid one to the portfolio; the server decides which. `decorative` drops it
-// from the tab order for the visual duplicate in the hero station. `quiet` swaps
-// the frozen hero's neutral styling for the crimson accent of the quiet landing,
-// keeping the same href and label so the appearances never diverge.
+// The access door. A redeemed recruiter session gets the button into the
+// portfolio; everyone else gets a plain note pointing at the public impressum
+// instead of a dead-end admin login, until the request flow (Backlog point 1)
+// replaces it. `decorative` drops the interactive element from the tab order for
+// the visual duplicate in the hero station. `quiet` swaps the frozen hero's
+// neutral styling for the crimson accent of the quiet landing, so the
+// appearances never diverge.
 export function AccessButton({
   isRecruiter,
   decorative,
@@ -74,16 +76,29 @@ export function AccessButton({
   decorative?: boolean;
   quiet?: boolean;
 }) {
-  const className = quiet
-    ? "quiet-press inline-block rounded-md border border-accent px-7 py-3 text-sm uppercase tracking-[0.12em] text-ink transition-colors hover:bg-accent/15 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60"
-    : "hero-door rounded-md border border-white/25 px-6 py-2 text-sm uppercase tracking-[0.14em] text-white transition-colors hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60";
+  const tabIndex = decorative ? -1 : undefined;
+
+  if (isRecruiter) {
+    const className = quiet
+      ? "quiet-press inline-block rounded-md border border-accent px-7 py-3 text-sm uppercase tracking-[0.12em] text-ink transition-colors hover:bg-accent/15 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60"
+      : "hero-door rounded-md border border-white/25 px-6 py-2 text-sm uppercase tracking-[0.14em] text-white transition-colors hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60";
+    return (
+      <Link href="/portfolio" tabIndex={tabIndex} className={className}>
+        Weiter ins Portfolio
+      </Link>
+    );
+  }
+
+  const linkClass = quiet
+    ? "text-accent underline-offset-4 transition-colors hover:text-ink"
+    : "text-white underline underline-offset-4 transition-colors hover:text-white/80";
   return (
-    <Link
-      href={isRecruiter ? "/portfolio" : "/login"}
-      tabIndex={decorative ? -1 : undefined}
-      className={className}
-    >
-      {isRecruiter ? "Weiter ins Portfolio" : "Login"}
-    </Link>
+    <p className={quiet ? "text-base text-muted" : "text-sm text-muted"}>
+      Kontakt über das{" "}
+      <Link href="/impressum" tabIndex={tabIndex} className={linkClass}>
+        Impressum
+      </Link>
+      .
+    </p>
   );
 }

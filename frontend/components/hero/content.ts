@@ -16,9 +16,9 @@ export const LANDING = {
 } as const;
 
 // The access lead depends on the recruiter session: a redeemed link is told the
-// door is open, everyone else is pointed at the login.
+// door is open, everyone else learns the portfolio is available on request.
 export function accessLead(isRecruiter: boolean): string {
   return isRecruiter
     ? "Ihr Zugang ist freigeschaltet."
-    : "Das vollständige Portfolio liegt hinter dem Login.";
+    : "Das vollständige Portfolio ist auf Anfrage zugänglich.";
 }

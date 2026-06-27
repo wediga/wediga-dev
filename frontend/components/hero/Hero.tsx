@@ -86,7 +86,7 @@ export function Hero({
             />
           ))}
 
-          {/* Impressum, Login and the motion switch stay reachable during the ride. */}
+          {/* Impressum and the motion switch stay reachable during the ride. */}
           <SiteFooter variant="fixed" />
         </>
       )}

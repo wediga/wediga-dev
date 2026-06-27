@@ -24,7 +24,6 @@ export default function QuietLayout({
 
       <SiteFooter rowClassName="mx-auto flex w-full max-w-3xl items-center justify-end gap-6 px-6 py-6 text-sm text-muted-2">
         <ChromeLink href="/impressum">Impressum</ChromeLink>
-        <ChromeLink href="/login">Login</ChromeLink>
       </SiteFooter>
     </div>
   );
