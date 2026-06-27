@@ -1,0 +1,12 @@
+# Keep the build context small and stop host artifacts from leaking into the
+# image. Dependencies are installed fresh in the deps stage, so a local
+# node_modules must never overwrite them, and the local .next build output must
+# never be copied in.
+node_modules/
+.next/
+.git/
+.gitignore
+.dockerignore
+npm-debug.log*
+.env
+.env.*

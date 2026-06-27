@@ -1,0 +1,14 @@
+# Keep the build context small and stop host artifacts from leaking into the
+# image. The image builds its own virtualenv with uv, so a local .venv must
+# never be copied in.
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.git/
+.gitignore
+.dockerignore
+.env
+.env.*
