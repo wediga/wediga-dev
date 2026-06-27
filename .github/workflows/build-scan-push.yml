@@ -50,27 +50,40 @@ jobs:
           DOCKER_BUILDKIT: "1"
         run: docker build -t "${{ matrix.image }}:${{ github.sha }}" -f "${{ matrix.dockerfile }}" "${{ matrix.context }}"
 
-      # One scan does both jobs: it writes the report and fails the build on
-      # fixable HIGH/CRITICAL. Documented exceptions live in .trivyignore.
-      - name: Scan image
+      # Report: all fixable findings across every severity, written to SARIF for
+      # the Security tab. This never fails the build (no exit-code). The action
+      # always builds the SARIF with all severities, which is why it cannot also
+      # serve as the gate.
+      - name: Scan image (report)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ matrix.image }}:${{ github.sha }}
           format: sarif
           output: trivy-${{ matrix.name }}.sarif
-          severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: "1"
           trivyignores: .trivyignore
 
-      # Always upload, even when the scan failed, so the findings are visible in
-      # the Security tab.
+      # Always upload, even when the gate below fails, so the findings stay
+      # visible in the Security tab.
       - name: Upload report to Security tab
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-${{ matrix.name }}.sarif
           category: trivy-${{ matrix.name }}
+
+      # Gate: fails the build only on fixable HIGH/CRITICAL. Table format keeps
+      # the severity filter authoritative for the exit code, which the SARIF
+      # report above does not. Documented exceptions live in .trivyignore.
+      - name: Scan image (gate)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ matrix.image }}:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore
 
       # Push only when the scan passed and this is not a pull request. The
       # success() is required: a custom if drops the implicit success check, so
