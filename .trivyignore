@@ -1,0 +1,13 @@
+# Documented exceptions for the Trivy image scan.
+#
+# The gate blocks the build on fixable HIGH/CRITICAL findings. This file is the
+# pressure valve for the rare case where a single finding is flagged but does
+# not apply (false positive, an unused code path) or has to be accepted for a
+# short, deliberate window.
+#
+# Rules:
+#   - One vulnerability ID per line (e.g. CVE-2026-12345).
+#   - Always add a comment with the reason and a review date.
+#   - Keep it short. An entry that no longer applies gets removed.
+#
+# Empty on purpose: no exceptions yet.

@@ -1,0 +1,41 @@
+# Keeps dependencies current and flags vulnerable versions automatically.
+# One entry per part of the monorepo. Minor and patch bumps are grouped into
+# a single pull request per ecosystem to keep the noise down; majors still
+# arrive on their own so they get a deliberate review.
+#
+# The container base images are intentionally not covered here: Dependabot's
+# docker ecosystem only detects files named exactly "Dockerfile", not the
+# deploy/Dockerfile.backend and deploy/Dockerfile.frontend variants. Trivy
+# scans the built images for base-image vulnerabilities instead.
+version: 2
+updates:
+  # Python backend (uv lockfile)
+  - package-ecosystem: "uv"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      backend-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # Next.js frontend (npm lockfile)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # The GitHub Actions workflows themselves
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions-all:
+        patterns: ["*"]

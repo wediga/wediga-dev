@@ -1,0 +1,88 @@
+name: Build, scan, push
+
+# Weg 2: GitHub builds the container images, Trivy scans them, and only images
+# that pass the gate are pushed to GHCR. The server later pulls these exact
+# images, so the scan reflects what actually runs.
+#
+#   - pull_request to main : build and scan only (the gate), nothing is pushed
+#   - push to main         : build, scan, push (tags: commit sha + "main")
+#   - workflow_dispatch     : build, scan, push, used to produce a test image
+#                            from a branch before merge so the Podman stack can
+#                            be set up against a real image
+#
+# The Trivy action is pinned to an immutable commit (v0.36.0) rather than a tag,
+# because the action's tags were hijacked in a March 2026 supply-chain attack.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write        # push images to GHCR
+  security-events: write # upload the Trivy report to the Security tab
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: backend
+            dockerfile: deploy/Dockerfile.backend
+            image: ghcr.io/wediga/wediga-dev-backend
+          - name: frontend
+            context: frontend
+            dockerfile: deploy/Dockerfile.frontend
+            image: ghcr.io/wediga/wediga-dev-frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build once, locally. The same image is scanned and (if it passes) pushed,
+      # so scanned equals pushed. BuildKit is required for the Dockerfile mounts.
+      - name: Build image
+        env:
+          DOCKER_BUILDKIT: "1"
+        run: docker build -t "${{ matrix.image }}:${{ github.sha }}" -f "${{ matrix.dockerfile }}" "${{ matrix.context }}"
+
+      # One scan does both jobs: it writes the report and fails the build on
+      # fixable HIGH/CRITICAL. Documented exceptions live in .trivyignore.
+      - name: Scan image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ matrix.image }}:${{ github.sha }}
+          format: sarif
+          output: trivy-${{ matrix.name }}.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore
+
+      # Always upload, even when the scan failed, so the findings are visible in
+      # the Security tab.
+      - name: Upload report to Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.name }}.sarif
+          category: trivy-${{ matrix.name }}
+
+      # Push only when the scan passed and this is not a pull request. The
+      # success() is required: a custom if drops the implicit success check, so
+      # without it a failed gate would still push.
+      - name: Push image
+        if: success() && github.event_name != 'pull_request'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "${{ matrix.image }}:${{ github.sha }}"
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            docker tag "${{ matrix.image }}:${{ github.sha }}" "${{ matrix.image }}:main"
+            docker push "${{ matrix.image }}:main"
+          fi

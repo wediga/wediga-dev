@@ -82,9 +82,6 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Build
-        run: npm run build
-
   # End-to-end tests boot the real stack (backend plus the Next.js production
   # build) and drive the critical flows through the browser, so the job needs
   # both the Python toolchain (the backend runs via uv) and Node. It runs when
