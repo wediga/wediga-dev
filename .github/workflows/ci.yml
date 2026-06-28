@@ -121,3 +121,22 @@ jobs:
         env:
           # The admin password comes from the environment, never from code.
           E2E_ADMIN_PASSWORD: e2e-admin-password
+
+  # A single stable check for branch protection. It passes when every test job
+  # either succeeded or was skipped (path filter), and fails if any failed or
+  # was cancelled. Requiring this one check gates a merge on the tests without
+  # blocking doc-only PRs where the path-filtered jobs do not run.
+  ci-success:
+    needs: [changes, backend, frontend, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify no CI job failed
+        run: |
+          for r in "${{ needs.changes.result }}" "${{ needs.backend.result }}" "${{ needs.frontend.result }}" "${{ needs.e2e.result }}"; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "a CI job did not pass: $r"
+              exit 1
+            fi
+          done
+          echo "all CI jobs passed or were skipped"

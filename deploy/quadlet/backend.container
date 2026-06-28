@@ -6,8 +6,9 @@ Requires=backend-migrate.service
 After=backend-migrate.service
 
 [Container]
-# Test image (commit-pinned). Switched to the :main tag at go-live after merge.
-Image=ghcr.io/wediga/wediga-dev-backend:110bad1bc4943959e2e86d4fbf3e43649a481b6b
+# Default tag for manual setup. The deploy rewrites this to the exact commit it
+# builds, so a restart is reproducible and never a surprise upgrade.
+Image=ghcr.io/wediga/wediga-dev-backend:main
 ContainerName=backend
 Network=wediga.network
 EnvironmentFile=/home/web/wediga-dev/.env

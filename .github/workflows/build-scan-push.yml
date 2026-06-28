@@ -99,3 +99,34 @@ jobs:
             docker tag "${{ matrix.image }}:${{ github.sha }}" "${{ matrix.image }}:main"
             docker push "${{ matrix.image }}:main"
           fi
+
+  # After a successful build and push to main, trigger the server to deploy this
+  # exact commit. The SSH key on the server is forced to deploy.sh, so it can do
+  # nothing else; the commit SHA is passed as the SSH command so the server pins
+  # precisely this build instead of a moving tag.
+  deploy:
+    needs: images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-main
+      cancel-in-progress: false
+    steps:
+      - name: Trigger deploy over SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          ssh -o BatchMode=yes -o ConnectTimeout=15 \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "${{ github.sha }}"
+      - name: Remove deploy key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

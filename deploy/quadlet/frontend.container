@@ -5,8 +5,9 @@ Description=wediga.dev frontend (Next.js)
 After=backend.service
 
 [Container]
-# Test image (commit-pinned). Switched to the :main tag at go-live after merge.
-Image=ghcr.io/wediga/wediga-dev-frontend:23257d4eb03bdef348d4e82966db027f64c7684b
+# Default tag for manual setup. The deploy rewrites this to the exact commit it
+# builds, so a restart is reproducible and never a surprise upgrade.
+Image=ghcr.io/wediga/wediga-dev-frontend:main
 ContainerName=frontend
 Network=wediga.network
 # Reaches the backend by name over the internal network.
