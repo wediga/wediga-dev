@@ -1,0 +1,24 @@
+[Unit]
+Description=Apply database migrations before the backend starts
+
+[Container]
+# Same image as the backend, run once with the migration command instead of the
+# server. Migrations are idempotent: already-applied versions are skipped, so
+# this runs safely on every boot and deploy without touching existing data.
+Image=ghcr.io/wediga/wediga-dev-backend:110bad1bc4943959e2e86d4fbf3e43649a481b6b
+ContainerName=backend-migrate
+Environment=WEDIGA_DB_PATH=/app/data/wediga.db
+Volume=wediga-data.volume:/app/data:U
+Exec=python -m app.db.migrate
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+Tmpfs=/tmp
+
+[Service]
+# Run to completion, then count as active so the backend can order after it.
+Type=oneshot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target
