@@ -1,0 +1,11 @@
+{
+	email wedig.alexander@gmail.com
+}
+
+wediga.dev {
+	redir https://www.wediga.dev{uri} permanent
+}
+
+www.wediga.dev {
+	reverse_proxy frontend:3000
+}

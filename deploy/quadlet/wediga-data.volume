@@ -1,0 +1,6 @@
+[Unit]
+Description=Persistent SQLite data for the wediga.dev backend
+
+# Quadlet creates a Podman named volume "systemd-wediga-data". It holds the
+# backend's SQLite database and survives container recreation.
+[Volume]

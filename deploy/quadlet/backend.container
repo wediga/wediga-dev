@@ -1,0 +1,30 @@
+[Unit]
+Description=wediga.dev backend (FastAPI)
+# The schema must exist before the backend serves. Migrations run as a separate
+# one-shot unit that this one requires and starts after.
+Requires=backend-migrate.service
+After=backend-migrate.service
+
+[Container]
+# Default tag for manual setup. The deploy rewrites this to the exact commit it
+# builds, so a restart is reproducible and never a surprise upgrade.
+Image=ghcr.io/wediga/wediga-dev-backend:main
+ContainerName=backend
+Network=wediga.network
+EnvironmentFile=/home/web/wediga-dev/.env
+Environment=WEDIGA_DB_PATH=/app/data/wediga.db
+# :U chowns the named volume to the container's non-root user so it can write.
+Volume=wediga-data.volume:/app/data:U
+# Hardening, mirrors the old compose: non-root image user, no new privileges,
+# all capabilities dropped, read-only root filesystem, only /tmp and the data
+# volume are writable.
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+Tmpfs=/tmp
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

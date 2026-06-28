@@ -1,0 +1,6 @@
+[Unit]
+Description=Caddy TLS certificates and state
+
+# Persisting /data keeps the Let's Encrypt certificates across restarts so
+# Caddy does not re-request them (and risk rate limits) on every recreation.
+[Volume]

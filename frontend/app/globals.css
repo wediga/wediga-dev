@@ -1,0 +1,271 @@
+@import "tailwindcss";
+
+/*
+  One central colour source for the whole site. Every fixed colour the pages use
+  lives here as a named token, so recolouring or removing a colour is a single
+  edit in this block. The pages reference only these tokens, never a raw hex
+  value. The one exception is the generative accent, which is written at runtime
+  from the hero's own system colours (see components/recruiter/GenerativeAccents).
+
+  Palette "Sakura, generativ": a stable anthracite base with a crimson accent for
+  the load-bearing UI (titles, link text, taglines), three fixed semantic status
+  colours on a warm arc, and a little real variance carried in from the hero only
+  on the toolkit dots and the demo/github underline. The generative planet and
+  sun colours of the hero itself are not part of this block and stay untouched.
+*/
+:root {
+  /* Base. --bg matches the hero's WebGL clear colour exactly, so the dark
+     surface is seamless across the landing, the quiet pages and the recruiter
+     views. */
+  --bg: #05060a;
+  --surface: #0e0e11;
+  --ink: #ededf0;
+  --muted: #95969e;
+  --muted-2: #74757d;
+  --line: #1d1e22;
+
+  /* Crimson accent, the one locked colour for everything that carries weight. */
+  --accent: #db6a74;
+
+  /* Three fixed status colours, semantic and clearly separated on a warm arc:
+     gold (done, ripe), orange-red (in progress, alive), rose-mauve (early,
+     tender). Status carries meaning, so it is never the generative colour. */
+  --status-done: #e7a34c;
+  --status-wip: #ea6a38;
+  --status-early: #c98aae;
+
+  /* Feedback colours for the admin forms. Two semantic tokens, deliberately
+     outside the warm Sakura arc so they read as system feedback, not as the
+     crimson accent or a warm status: a clear green for a confirmed write and a
+     clear red for a failed or destructive one. Both clear AA on the dark
+     surface as text, and they carry borders and tinted blocks via opacity
+     utilities, so the pages never need a raw hex of their own. */
+  --success: #5ec98a;
+  --danger: #ef5d61;
+
+  /* Generative accent fallbacks. The runtime script overrides --gen-dot per
+     toolkit item and --gen-underline once per system; without a hero snapshot
+     (a direct view without the landing) both fall back to the crimson accent. */
+  --gen-underline: var(--accent);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* Semantic z-scale, no arbitrary values. */
+  --z-nav: 50;
+
+  /* Motion curves (Emil). Transitions stay under 300ms, transform + opacity only. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-status-done: var(--status-done);
+  --color-status-wip: var(--status-wip);
+  --color-status-early: var(--status-early);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+
+  --font-sans: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+}
+
+/*
+  Global default body. The landing paints its own dark surface in the Hero; the
+  quiet pages and the recruiter shell set the dark surface from --bg themselves.
+*/
+body {
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  /* The whole site is dark, so native controls (date pickers, checkboxes,
+     scrollbars) should render in their dark variant rather than light-on-dark. */
+  color-scheme: dark;
+}
+
+/*
+  Scrim utility, a soft radial backdrop that keeps text legible over a busy
+  background. Used by the site Footer behind its text.
+*/
+.scrim::before {
+  content: "";
+  position: absolute;
+  inset: -40% -18%;
+  z-index: -1;
+  background: radial-gradient(
+    58% 58% at 50% 50%,
+    rgba(6, 6, 11, 0.85),
+    rgba(6, 6, 11, 0.45) 52%,
+    transparent 76%
+  );
+  pointer-events: none;
+}
+
+/*
+  Quiet pages (login, impressum, link-invalid). One restrained entrance: the
+  content settles in once on load. The resting state is fully visible, so the
+  keyframe only enhances an already-readable page and reduced motion collapses
+  it to instant via the block below.
+*/
+@keyframes quiet-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The entrance plays only in full motion. The resting state is fully visible, so
+   reduced motion (whether from the OS or the on-page switch) simply shows the
+   page at rest. Driven by the data-motion attribute, not the media query, so the
+   switch governs it site-wide. */
+[data-motion="full"] .quiet-enter {
+  animation: quiet-enter 420ms var(--ease-out) both;
+}
+
+/* Press feedback on the quiet buttons/links, transform only. */
+.quiet-press {
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 160ms var(--ease-out);
+}
+
+.quiet-press:active {
+  transform: scale(0.98);
+}
+
+/*
+  Recruiter views. The dense content settles in with a short stagger so the page
+  feels alive without a hero. The resting state is fully visible (opacity 1); the
+  entrance only plays under no-preference, so reduced motion and headless renders
+  always show the content immediately. Stagger delay comes from --reveal-i set
+  inline per item.
+*/
+@keyframes recruiter-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Only in full motion; the resting state is fully visible, so reduced motion and
+   headless renders always show the content immediately. Driven by the
+   data-motion attribute so the on-page switch governs it site-wide. */
+[data-motion="full"] .reveal {
+  animation: recruiter-reveal 560ms var(--ease-out) both;
+  animation-delay: calc(var(--reveal-i, 0) * 70ms);
+}
+
+/*
+  The link underline used by the recruiter views. The stroke colour is the
+  generative --gen-underline (one colour per system, the brightest planet),
+  falling back to the crimson accent. The text itself stays the crimson accent,
+  never gradient text.
+*/
+.gen-link {
+  color: var(--accent);
+  text-decoration: none;
+  background-image: linear-gradient(
+    90deg,
+    var(--gen-underline),
+    var(--gen-underline)
+  );
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 1.5px;
+  padding-bottom: 2px;
+  transition: background-size 160ms var(--ease-out);
+}
+
+.gen-link:hover {
+  background-size: 100% 2.5px;
+}
+
+/*
+  A small leading dot before a toolkit/tech item, coloured per item by a hero
+  planet (the runtime script sets --gen-dot, falling back to the crimson
+  accent). The text stays ink, so the list never becomes a row of coloured
+  pills.
+*/
+.gen-dot::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--gen-dot, var(--accent));
+  flex: none;
+}
+
+/* Reduced motion, driven by the resolved data-motion attribute rather than the
+   media query, so the on-page switch overrides the OS setting in both
+   directions. The init script folds prefers-reduced-motion into this attribute
+   before paint, so an OS preference still lands here unless a deliberate "Voll"
+   choice overrides it. */
+[data-motion="reduced"] *,
+[data-motion="reduced"] *::before,
+[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+[data-motion="reduced"] .quiet-press:active {
+  transform: none;
+}
+
+/*
+  The full-motion hero reveals. heroAssemble forms each station title as the
+  camera docks; heroRise lifts the toolkit groups in a short stagger on the same
+  dock moment, riding the camera and scrim timing without changing it. hero-door
+  is the physical press feedback on the access door. Moved out of an inline
+  <style> in Hero.tsx; the names, timings and easing are unchanged. The
+  reduced-motion block stays keyed to the OS media query (not the data-motion
+  attribute), so it matches the prior inline behaviour exactly: it only bites
+  when the full-motion ride renders while the OS asks for reduced motion (a
+  deliberate "Voll" choice over an OS reduced-motion preference).
+*/
+@keyframes heroAssemble {
+  from { opacity: 0; filter: blur(10px); transform: translateY(10px) scale(0.98); letter-spacing: 0.3em; }
+  to { opacity: 1; filter: blur(0); transform: none; letter-spacing: normal; }
+}
+.hero-assemble { animation: heroAssemble 760ms cubic-bezier(0.16,1,0.3,1) both; }
+@keyframes heroRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.hero-rise > * { opacity: 0; animation: heroRise 560ms cubic-bezier(0.16,1,0.3,1) both; }
+.hero-rise > *:nth-child(1) { animation-delay: 40ms; }
+.hero-rise > *:nth-child(2) { animation-delay: 100ms; }
+.hero-rise > *:nth-child(3) { animation-delay: 160ms; }
+.hero-rise > *:nth-child(4) { animation-delay: 220ms; }
+.hero-rise > *:nth-child(5) { animation-delay: 280ms; }
+.hero-rise > *:nth-child(6) { animation-delay: 340ms; }
+.hero-rise > *:nth-child(7) { animation-delay: 400ms; }
+.hero-rise > *:nth-child(8) { animation-delay: 460ms; }
+.hero-door { transition: transform 160ms cubic-bezier(0.16,1,0.3,1), background-color 200ms ease; }
+.hero-door:active { transform: scale(0.97); }
+@media (prefers-reduced-motion: reduce) {
+  .hero-assemble { animation: none; }
+  .hero-rise > * { animation: none; opacity: 1; }
+  .hero-door { transition: background-color 200ms ease; }
+  .hero-door:active { transform: none; }
+}
