@@ -1,0 +1,26 @@
+[Unit]
+Description=wediga.dev frontend (Next.js)
+# Start order only, not a hard requirement, so a slow backend never blocks the
+# frontend. The frontend reaches the backend at request time.
+After=backend.service
+
+[Container]
+# Test image (commit-pinned). Switched to the :main tag at go-live after merge.
+Image=ghcr.io/wediga/wediga-dev-frontend:110bad1bc4943959e2e86d4fbf3e43649a481b6b
+ContainerName=frontend
+Network=wediga.network
+# Reaches the backend by name over the internal network.
+Environment=BACKEND_URL=http://backend:8000
+# Hardening: the standalone server only writes to /tmp and its on-disk cache,
+# both backed by tmpfs, so the root filesystem stays read-only.
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+Tmpfs=/tmp
+Tmpfs=/app/.next/cache
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

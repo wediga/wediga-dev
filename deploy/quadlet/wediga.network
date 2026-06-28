@@ -1,0 +1,6 @@
+[Unit]
+Description=Internal network for the wediga.dev stack
+
+# Quadlet creates a Podman network named "systemd-wediga". Containers that
+# reference this file resolve each other by container name over it.
+[Network]

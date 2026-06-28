@@ -1,0 +1,25 @@
+[Unit]
+Description=wediga.dev backend (FastAPI)
+
+[Container]
+# Test image (commit-pinned). Switched to the :main tag at go-live after merge.
+Image=ghcr.io/wediga/wediga-dev-backend:110bad1bc4943959e2e86d4fbf3e43649a481b6b
+ContainerName=backend
+Network=wediga.network
+EnvironmentFile=/home/web/wediga-dev/.env
+Environment=WEDIGA_DB_PATH=/app/data/wediga.db
+# :U chowns the named volume to the container's non-root user so it can write.
+Volume=wediga-data.volume:/app/data:U
+# Hardening, mirrors the old compose: non-root image user, no new privileges,
+# all capabilities dropped, read-only root filesystem, only /tmp and the data
+# volume are writable.
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+Tmpfs=/tmp
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
