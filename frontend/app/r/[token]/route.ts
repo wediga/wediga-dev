@@ -23,11 +23,20 @@ export async function GET(
     { method: "POST", headers, cache: "no-store", redirect: "manual" },
   );
 
+  // Relative redirects: the browser resolves them against the public URL in the
+  // address bar. Building an absolute URL from request.url would use the internal
+  // bind host (0.0.0.0:3000) behind the reverse proxy and send the recruiter there.
   if (!backendResponse.ok) {
-    return NextResponse.redirect(new URL("/link-invalid", request.url));
+    return new NextResponse(null, {
+      status: 303,
+      headers: { Location: "/link-invalid" },
+    });
   }
 
-  const response = NextResponse.redirect(new URL("/", request.url));
+  const response = new NextResponse(null, {
+    status: 303,
+    headers: { Location: "/" },
+  });
   for (const value of backendResponse.headers.getSetCookie()) {
     response.headers.append("set-cookie", value);
   }
