@@ -6,7 +6,7 @@ After=backend.service
 
 [Container]
 # Test image (commit-pinned). Switched to the :main tag at go-live after merge.
-Image=ghcr.io/wediga/wediga-dev-frontend:110bad1bc4943959e2e86d4fbf3e43649a481b6b
+Image=ghcr.io/wediga/wediga-dev-frontend:23257d4eb03bdef348d4e82966db027f64c7684b
 ContainerName=frontend
 Network=wediga.network
 # Reaches the backend by name over the internal network.
