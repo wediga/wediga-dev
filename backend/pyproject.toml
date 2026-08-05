@@ -5,7 +5,7 @@ description = "FastAPI backend for the wediga.dev portfolio site"
 requires-python = ">=3.12"
 dependencies = [
     "argon2-cffi>=25.1.0",
-    "cryptography>=49.0.0",
+    "cryptography>=50.0.0",
     "fastapi[standard]>=0.136.3",
     "httpx>=0.28.1",
     "itsdangerous>=2.2.0",
