@@ -32,6 +32,9 @@ export interface HeroEngine {
   seed: number;
   // Drives which title gets the assemble animation.
   active: number;
+  // True once the browser refused a WebGL context or lost it mid-visit. The hero
+  // then falls back to the quiet landing without the sun.
+  webglFailed: boolean;
 }
 
 export function useHeroEngine(reducedMotion: boolean): HeroEngine {
@@ -46,12 +49,18 @@ export function useHeroEngine(reducedMotion: boolean): HeroEngine {
   // reveal is written to the DOM directly in the callback to avoid re-rendering
   // every frame.
   const [active, setActive] = useState(-1);
+  // Not stored as a motion choice, so a later visit with a working browser starts
+  // normally again.
+  const [webglFailed, setWebglFailed] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || webglFailed) return;
     let cancelled = false;
     let handle: EngineHandle | null = null;
+    // A GPU reset or driver crash can take the context away mid-visit.
+    const onContextLost = () => setWebglFailed(true);
+    canvas.addEventListener("webglcontextlost", onContextLost);
 
     const onStation = (
       index: number,
@@ -107,6 +116,9 @@ export function useHeroEngine(reducedMotion: boolean): HeroEngine {
           { onStation },
         );
       } catch {
+        // No WebGL context (hardware acceleration off, remote desktop, blocked
+        // driver), so the hero falls back to the quiet landing.
+        if (!cancelled) setWebglFailed(true);
         return;
       }
       if (cancelled) {
@@ -129,10 +141,11 @@ export function useHeroEngine(reducedMotion: boolean): HeroEngine {
 
     return () => {
       cancelled = true;
+      canvas.removeEventListener("webglcontextlost", onContextLost);
       handle?.dispose();
       engineRef.current = null;
     };
-  }, [seed, reducedMotion]);
+  }, [seed, reducedMotion, webglFailed]);
 
-  return { canvasRef, sectionRefs, seed, active };
+  return { canvasRef, sectionRefs, seed, active, webglFailed };
 }

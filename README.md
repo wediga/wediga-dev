@@ -16,7 +16,7 @@ What came out is one site with three faces. The public landing stays minimal, a 
 
 ## What It Does
 
-The public landing is a single animated page with my skills and a legal imprint, and nothing beyond that. Invited visitors reach the rest through a personal, revocable link, which opens the full portfolio, my CV as a downloadable PDF with an inline preview, and my contact details. From the admin area I edit the content, upload the CV, hand out or revoke those links, and curate the mirrored GitHub repositories. Sessions are cookie-based with CSRF protection and rate limiting on the sensitive routes, and the content lives in a SQLite database so nothing personal ends up in the repo.
+The public landing is a single animated page with my skills and a legal imprint, and nothing beyond that. If a browser can't run the WebGL animation, the page switches to its quiet layout on its own and tells the visitor why, so nobody lands on an empty screen. Invited visitors reach the rest through a personal, revocable link, which opens the full portfolio, my CV as a downloadable PDF with an inline preview, and my contact details. From the admin area I edit the content, upload the CV, hand out or revoke those links, and curate the mirrored GitHub repositories. Sessions are cookie-based with CSRF protection and rate limiting on the sensitive routes, and the content lives in a SQLite database so nothing personal ends up in the repo.
 
 ## Tech Stack
 

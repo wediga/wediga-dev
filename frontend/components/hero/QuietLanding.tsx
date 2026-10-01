@@ -13,10 +13,12 @@ export function QuietLanding({
   canvasRef,
   skills,
   isRecruiter,
+  webglFailed,
 }: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   skills: SkillCategory[];
   isRecruiter: boolean;
+  webglFailed: boolean;
 }) {
   return (
     <div className="relative min-h-[100dvh] px-[max(28px,6vw)]">
@@ -24,10 +26,13 @@ export function QuietLanding({
           at 75% width) and sized to stay within it, so it never crosses into the
           text. On narrow screens it sits in flow above the content. The canvas is
           square so the sun stays round, and the engine keeps margin inside it so
-          the cursor never clips. */}
-      <div className="mx-auto mb-[2vh] flex aspect-square w-full max-w-[440px] items-center justify-center xl:fixed xl:left-3/4 xl:top-1/2 xl:z-0 xl:mx-0 xl:mb-0 xl:aspect-auto xl:h-[min(84vh,42vw)] xl:w-[min(84vh,42vw)] xl:max-w-none xl:-translate-x-1/2 xl:-translate-y-1/2">
-        <canvas ref={canvasRef} className="h-full w-full" aria-hidden="true" />
-      </div>
+          the cursor never clips. Without WebGL there is no sun to draw, so the
+          box is left out instead of leaving an empty square. */}
+      {webglFailed ? null : (
+        <div className="mx-auto mb-[2vh] flex aspect-square w-full max-w-[440px] items-center justify-center xl:fixed xl:left-3/4 xl:top-1/2 xl:z-0 xl:mx-0 xl:mb-0 xl:aspect-auto xl:h-[min(84vh,42vw)] xl:w-[min(84vh,42vw)] xl:max-w-none xl:-translate-x-1/2 xl:-translate-y-1/2">
+          <canvas ref={canvasRef} className="h-full w-full" aria-hidden="true" />
+        </div>
+      )}
 
       {/* Content. The text column sits in the left half, anchored to its right
           edge so it meets the centre line, with the sun beside it in the right
@@ -92,7 +97,7 @@ export function QuietLanding({
       </div>
 
       {/* Pinned to the bottom edge of the viewport, covering the sun behind it. */}
-      <SiteFooter variant="pinned" />
+      <SiteFooter variant="pinned" webglFailed={webglFailed} />
     </div>
   );
 }

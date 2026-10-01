@@ -30,21 +30,25 @@ export function Hero({
   // hero for the quiet sun-anchored landing.
   const reducedMotion = useMotionMode() === "reduced";
 
-  // scroll-reset shares the engine's [seed, reducedMotion] so a rebuild restarts
-  // at the overview; scroll-snap runs only during the ride.
-  const { canvasRef, sectionRefs, seed, active } = useHeroEngine(reducedMotion);
-  useScrollReset(seed, reducedMotion);
-  useScrollSnap(reducedMotion);
+  const { canvasRef, sectionRefs, seed, active, webglFailed } =
+    useHeroEngine(reducedMotion);
+  // Without WebGL the ride cannot render, so the quiet landing takes over.
+  const quiet = reducedMotion || webglFailed;
+  // scroll-reset follows the engine's seed and the shown mode so a rebuild or
+  // fallback restarts at the top; scroll-snap runs only during the ride.
+  useScrollReset(seed, quiet);
+  useScrollSnap(quiet);
 
   return (
     <main className="relative bg-bg text-ink">
-      {reducedMotion ? (
+      {quiet ? (
         // Its own design, not the ride pushed back: a cursor-reactive sun anchors
         // one side while the same public content reads down a column beside it.
         <QuietLanding
           canvasRef={canvasRef}
           skills={skills}
           isRecruiter={isRecruiter}
+          webglFailed={webglFailed}
         />
       ) : (
         <>
