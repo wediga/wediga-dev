@@ -3,16 +3,16 @@
 # vercel/next.js examples/with-docker Dockerfile, using npm and the
 # standalone output. Build context is the sibling ../frontend directory.
 
-ARG NODE_VERSION=24.18.0
+ARG NODE_VERSION=24.21.0
 
-FROM node:${NODE_VERSION}-slim@sha256:b31e7a42fdf8b8aa5f5ed477c72d694301273f1069c5a2f71d53c6482e99a2fc AS deps
+FROM node:${NODE_VERSION}-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS deps
 WORKDIR /app
 
 # Install dependencies based on the lockfile only, for a cached layer.
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:${NODE_VERSION}-slim@sha256:b31e7a42fdf8b8aa5f5ed477c72d694301273f1069c5a2f71d53c6482e99a2fc AS builder
+FROM node:${NODE_VERSION}-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -23,7 +23,7 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
 
 RUN npm run build
 
-FROM node:${NODE_VERSION}-slim@sha256:b31e7a42fdf8b8aa5f5ed477c72d694301273f1069c5a2f71d53c6482e99a2fc AS runner
+FROM node:${NODE_VERSION}-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production \
