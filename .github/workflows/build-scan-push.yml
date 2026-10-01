@@ -41,7 +41,7 @@ jobs:
             dockerfile: deploy/Dockerfile.frontend
             image: ghcr.io/wediga/wediga-dev-frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Build once, locally. The same image is scanned and (if it passes) pushed,
       # so scanned equals pushed. BuildKit is required for the Dockerfile mounts.
