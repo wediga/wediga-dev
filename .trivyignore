@@ -10,4 +10,11 @@
 #   - Always add a comment with the reason and a review date.
 #   - Keep it short. An entry that no longer applies gets removed.
 #
-# Empty on purpose: no exceptions yet.
+# libpcre2-8-0 in the Debian 12 base of both images. The fix (10.42-1+deb12u2)
+# is in bookworm-security, but python:3.12-slim-bookworm and node:24-slim have
+# not been rebuilt on top of it yet. The flaw needs an attacker-supplied regular
+# expression and the PCRE2 JIT API, and neither Python nor Node uses libpcre2
+# for its own regex engine. Remove this entry once the base image digests in
+# deploy/Dockerfile.backend and deploy/Dockerfile.frontend are bumped.
+# Review by 2026-10-18.
+CVE-2026-103111
