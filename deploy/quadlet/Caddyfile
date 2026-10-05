@@ -9,3 +9,9 @@ wediga.dev {
 www.wediga.dev {
 	reverse_proxy frontend:3000
 }
+
+# The CR Predictor lives in its own repository. Its container joins the same
+# internal network, so its route is kept here next to the others.
+cr-prediction.wediga.dev {
+	reverse_proxy cr-predictor:8000
+}
