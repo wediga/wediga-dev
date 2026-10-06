@@ -31,6 +31,13 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0
 
+# Apply the Debian security updates published since the base image was built.
+# The upstream image is only rebuilt every few days, and the image gate fails
+# on every fixable finding in the meantime.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 # The runtime only runs the standalone server, so npm is not needed. Dropping
 # the npm that ships in the base image removes a large set of npm-only CVEs and
 # shrinks the attack surface.
