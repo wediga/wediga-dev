@@ -1,0 +1,6 @@
+[Unit]
+Description=PostgreSQL data for authentik
+
+# Quadlet creates a Podman named volume "systemd-authentik-db". It holds every
+# account, group and setting of the identity provider.
+[Volume]

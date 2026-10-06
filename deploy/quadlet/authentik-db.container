@@ -1,0 +1,36 @@
+[Unit]
+Description=PostgreSQL for authentik
+
+[Container]
+# Version and digest are pinned. Dependabot does not watch this file, so the
+# image is raised by hand.
+Image=docker.io/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+ContainerName=authentik-db
+Network=authentik.network
+
+# The password comes from a file that only exists on the server.
+EnvironmentFile=/home/web/authentik/authentik-db.env
+Environment=POSTGRES_USER=authentik
+Environment=POSTGRES_DB=authentik
+
+Volume=authentik-db.volume:/var/lib/postgresql/data
+
+HealthCmd=pg_isready -d authentik -U authentik
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=5
+HealthStartPeriod=20s
+
+# The entrypoint starts as root, fixes the ownership of the data directory and
+# then drops to the postgres user. Only the capabilities that step needs are
+# kept. Under rootless Podman, root in the container is the unprivileged host
+# user anyway.
+NoNewPrivileges=true
+DropCapability=ALL
+AddCapability=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETGID CAP_SETUID
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

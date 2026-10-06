@@ -1,0 +1,6 @@
+[Unit]
+Description=File storage for authentik
+
+# Quadlet creates a Podman named volume "systemd-authentik-data". The server and
+# the worker share it for uploaded files such as logos and icons.
+[Volume]

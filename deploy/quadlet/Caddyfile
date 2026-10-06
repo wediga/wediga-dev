@@ -15,3 +15,9 @@ www.wediga.dev {
 cr-prediction.wediga.dev {
 	reverse_proxy cr-predictor:8000
 }
+
+# The identity provider. Login pages, admin interface and API are all served
+# by the authentik server container.
+auth.wediga.dev {
+	reverse_proxy authentik-server:9000
+}

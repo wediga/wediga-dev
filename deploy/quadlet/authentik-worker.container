@@ -1,0 +1,35 @@
+[Unit]
+Description=authentik worker (background tasks)
+# Start order only. authentik waits for the database on its own and retries
+# until it answers.
+After=authentik-db.service
+
+[Container]
+# Version and digest are pinned. Dependabot does not watch this file, so the
+# image is raised by hand. Keep it identical to authentik-server.container.
+Image=ghcr.io/goauthentik/server:2026.8.3@sha256:ab9b4e8cc4ab3f8d1198d2db6aeea66bafea1963b3f2843589e0d163f97d9849
+ContainerName=authentik-worker
+Exec=worker
+
+# The worker only talks to the database. The upstream compose file runs it as
+# root with the container socket mounted so it can start extra containers. That
+# is left out on purpose: the worker keeps the image's non-root user and gets
+# no socket.
+Network=authentik.network
+
+EnvironmentFile=/home/web/authentik/authentik.env
+Environment=AUTHENTIK_POSTGRESQL__HOST=authentik-db
+Environment=AUTHENTIK_POSTGRESQL__USER=authentik
+Environment=AUTHENTIK_POSTGRESQL__NAME=authentik
+
+Volume=authentik-data.volume:/data:U
+ShmSize=512m
+
+NoNewPrivileges=true
+DropCapability=ALL
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

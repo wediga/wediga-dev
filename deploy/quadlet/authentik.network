@@ -1,0 +1,8 @@
+[Unit]
+Description=Internal network for the authentik stack
+
+# Quadlet creates a Podman network named "systemd-authentik". Only the three
+# authentik containers join it, so the database is not reachable from the
+# wediga.dev frontend or backend. The authentik server additionally joins
+# wediga.network, which is how Caddy reaches it.
+[Network]

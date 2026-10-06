@@ -1,0 +1,40 @@
+[Unit]
+Description=authentik server (login pages, admin interface, API)
+# Start order only. authentik waits for the database on its own and retries
+# until it answers.
+After=authentik-db.service
+
+[Container]
+# Version and digest are pinned. Dependabot does not watch this file, so the
+# image is raised by hand. Keep it identical to authentik-worker.container.
+Image=ghcr.io/goauthentik/server:2026.8.3@sha256:ab9b4e8cc4ab3f8d1198d2db6aeea66bafea1963b3f2843589e0d163f97d9849
+ContainerName=authentik-server
+Exec=server
+
+# wediga.network is where Caddy reaches the server on port 9000,
+# authentik.network is where the server reaches its database. No host port is
+# published.
+Network=wediga.network
+Network=authentik.network
+
+# Secret key and database password come from a file that only exists on the
+# server.
+EnvironmentFile=/home/web/authentik/authentik.env
+Environment=AUTHENTIK_POSTGRESQL__HOST=authentik-db
+Environment=AUTHENTIK_POSTGRESQL__USER=authentik
+Environment=AUTHENTIK_POSTGRESQL__NAME=authentik
+
+# :U chowns the named volume to the container's non-root user so it can write.
+Volume=authentik-data.volume:/data:U
+ShmSize=512m
+
+# The image runs as a non-root user and listens above port 1024, so no
+# capability is needed.
+NoNewPrivileges=true
+DropCapability=ALL
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
