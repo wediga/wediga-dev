@@ -9,6 +9,7 @@ Everything on the server runs as rootless Podman containers under one unprivileg
 | Quadlet units (`quadlet/*.container`, `*.volume`, `*.network`) | `~/.config/containers/systemd/` |
 | Caddyfile and the app's `.env` | `~/wediga-dev/` |
 | Secrets for the identity provider | `~/authentik/authentik.env`, `~/authentik/authentik-db.env` |
+| Setup of the identity provider (`authentik/blueprints/`) | `~/authentik/blueprints/` |
 | Database dumps of the identity provider | `~/authentik/backups/` |
 | Backup script, service and timer (`systemd/`) | `~/authentik/backup.sh`, `~/.config/systemd/user/` |
 
@@ -18,7 +19,7 @@ Caddy is the only container that publishes host ports. Every other container is 
 
 A push to `main` builds both app images, scans them and, if the scan passes, triggers the deploy script on the server. The script
 
-1. downloads the Quadlet units and the Caddyfile from `main`,
+1. downloads the Quadlet units, the Caddyfile and the identity provider's setup file from `main`,
 2. pins the app units to the images of that commit,
 3. restarts the backend and the frontend.
 
@@ -30,6 +31,21 @@ After a change to the Caddyfile:
 podman exec caddy caddy validate --config /etc/caddy/Caddyfile
 podman exec caddy caddy reload --config /etc/caddy/Caddyfile
 ```
+
+## Changing the identity provider's setup
+
+`authentik/blueprints/wediga.yaml` describes the groups, the mandatory second factor, the recovery flow's second-factor step and the default language. authentik reads the file from `/blueprints/custom` and applies it on startup and whenever it changes.
+
+That file owns what it lists. A change made by hand in the admin interface to one of those settings is reverted the next time the file is applied, so such changes go through the file and a pull request. Accounts, passwords and second factors are not part of it.
+
+The recovery flow itself comes from the example blueprint that ships with authentik (`example/flows-recovery-email-verification.yaml`). On a fresh install it has to be created once under Customization, Blueprints and applied there.
+
+Adding someone:
+
+1. Create the user in the admin interface as an internal user, set Locale to `en` and add the group.
+2. Create a recovery link on the user's page and pass it on. The link asks for the username, makes them set up a second factor and then lets them choose a password.
+
+Someone lost their authenticator: delete the old device on the user's page under Credentials / Tokens first. A recovery link asks for the second factor before it lets anyone set a password, so without that step the link is useless to them.
 
 ## Updating the identity provider
 
@@ -46,7 +62,7 @@ systemctl --user daemon-reload
 systemctl --user restart authentik-server.service authentik-worker.service
 ```
 
-6. Check `podman logs --tail 30 authentik-server` and log in once.
+6. Check `podman logs --tail 30 authentik-server`, log in once and confirm that the second factor is still asked for.
 
 ## Backup and restore
 

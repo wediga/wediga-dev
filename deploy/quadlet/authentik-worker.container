@@ -23,6 +23,9 @@ Environment=AUTHENTIK_POSTGRESQL__USER=authentik
 Environment=AUTHENTIK_POSTGRESQL__NAME=authentik
 
 Volume=authentik-data.volume:/data:U
+# The site-specific setup (groups, second factor, recovery) as a blueprint
+# file. authentik applies everything it finds under /blueprints.
+Volume=/home/web/authentik/blueprints:/blueprints/custom:ro
 ShmSize=512m
 
 NoNewPrivileges=true

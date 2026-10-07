@@ -26,6 +26,9 @@ Environment=AUTHENTIK_POSTGRESQL__NAME=authentik
 
 # :U chowns the named volume to the container's non-root user so it can write.
 Volume=authentik-data.volume:/data:U
+# The site-specific setup (groups, second factor, recovery) as a blueprint
+# file. authentik applies everything it finds under /blueprints.
+Volume=/home/web/authentik/blueprints:/blueprints/custom:ro
 ShmSize=512m
 
 # The image runs as a non-root user and listens above port 1024, so no
