@@ -1,0 +1,8 @@
+[Unit]
+Description=Dump the authentik database
+After=authentik-db.service
+Requires=authentik-db.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/authentik/backup.sh

@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily dump of the authentik database
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+# Catch up after a reboot if the server was down at the scheduled time.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
