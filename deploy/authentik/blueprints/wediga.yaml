@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json
+#
+# The parts of the authentik setup that are specific to this site. authentik
+# reads this file from /blueprints/custom and brings the listed objects to the
+# described state, on startup and whenever the file changes.
+#
+# Everything listed here is owned by this file: a change made by hand in the
+# admin interface is reverted the next time the file is applied. Accounts,
+# passwords and second factors are not part of it and only live in the database.
+#
+# The recovery flow itself comes from the example blueprint that ships with
+# authentik (example/flows-recovery-email-verification.yaml). On a fresh install
+# that one has to be applied once in the admin interface before this file can
+# attach the second-factor step to it.
+version: 1
+metadata:
+  name: wediga.dev - groups, second factor and recovery
+entries:
+  # Wait for the flows this file refers to.
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Default - Authentication flow
+      required: false
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Default - TOTP MFA setup flow
+      required: false
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Default - WebAuthn MFA setup flow
+      required: false
+
+  # Groups. Neither grants any rights inside authentik. Applications map them
+  # to their own roles.
+  - model: authentik_core.group
+    identifiers:
+      name: wediga-admins
+    attrs:
+      is_superuser: false
+  - model: authentik_core.group
+    identifiers:
+      name: friends
+    attrs:
+      is_superuser: false
+
+  # A second factor is mandatory for everyone. Whoever has none yet has to set
+  # one up during login, as an authenticator app or a security key. SMS, email
+  # and Duo are not accepted.
+  - model: authentik_stages_authenticator_validate.authenticatorvalidatestage
+    identifiers:
+      name: default-authentication-mfa-validation
+    attrs:
+      not_configured_action: configure
+      device_classes:
+        - static
+        - totp
+        - webauthn
+      configuration_stages:
+        - !Find [authentik_stages_authenticator_totp.authenticatortotpstage, [name, default-authenticator-totp-setup]]
+        - !Find [authentik_stages_authenticator_webauthn.authenticatorwebauthnstage, [name, default-authenticator-webauthn-setup]]
+
+  # The same step sits in the recovery flow, before the new password is set.
+  # A recovery link on its own can then neither sign in nor change a password.
+  - model: authentik_flows.flowstagebinding
+    conditions:
+      - !Find [authentik_flows.flow, [slug, default-recovery-flow]]
+    identifiers:
+      target: !Find [authentik_flows.flow, [slug, default-recovery-flow]]
+      stage: !Find [authentik_stages_authenticator_validate.authenticatorvalidatestage, [name, default-authentication-mfa-validation]]
+      order: 25
+    attrs:
+      evaluate_on_plan: false
+      re_evaluate_policies: true
+      policy_engine_mode: any
+      invalid_response_action: retry
+
+  # English as the default interface language, and the recovery flow that the
+  # admin's recovery links use.
+  - model: authentik_brands.brand
+    identifiers:
+      domain: authentik-default
+    attrs:
+      flow_recovery: !Find [authentik_flows.flow, [slug, default-recovery-flow]]
+      attributes:
+        settings:
+          locale: en
