@@ -24,7 +24,8 @@ The public landing is a single animated page with my skills and a legal imprint,
 - **FastAPI** on **Python 3.12** with **uv** for the backend
 - **SQLite** for storage, signed session cookies for auth
 - **Tailwind CSS** and a **Three.js** WebGL hero for the look
-- **Docker** behind a **Caddy** reverse proxy, shipped via GitHub Actions
+- Container images built and scanned in GitHub Actions, running under rootless **Podman** behind a **Caddy** reverse proxy
+- **authentik** as a self-hosted identity provider on its own subdomain, with its setup kept in a blueprint file. The site does not sign anyone in through it yet
 
 ## Project Structure
 
@@ -32,7 +33,7 @@ The public landing is a single animated page with my skills and a legal imprint,
 wediga-dev/
   frontend/         # Next.js app (public, protected and admin views) + BFF route handlers
   backend/          # FastAPI app: auth, content, CV, recruiter links, GitHub sync, SQLite
-  deploy/           # Dockerfiles, compose, Caddy snippet
+  deploy/           # Dockerfiles, Quadlet units, authentik blueprint, compose for local use
   content.example/  # Sample content (in Git)
   content/          # Personal content (NOT in Git)
   data/             # SQLite database (NOT in Git)
@@ -67,6 +68,8 @@ docker compose up --build
 ```
 
 The database and content are mounted as volumes, so they change without rebuilding the images.
+
+The compose file is for local use only. Production runs the same two images from the Quadlet units in `deploy/quadlet/`, and `deploy/README.md` describes how the server is laid out and what a deploy does.
 
 ## License
 
