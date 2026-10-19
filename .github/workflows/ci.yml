@@ -25,6 +25,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      authentik: ${{ steps.filter.outputs.authentik }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -34,10 +35,16 @@ jobs:
             backend:
               - 'backend/**'
               - 'deploy/Dockerfile.backend'
+              - 'deploy/authentik-test/*.py'
               - '.github/workflows/ci.yml'
             frontend:
               - 'frontend/**'
               - 'deploy/Dockerfile.frontend'
+              - '.github/workflows/ci.yml'
+            authentik:
+              - 'deploy/authentik/**'
+              - 'deploy/authentik-test/**'
+              - 'deploy/quadlet/authentik-*'
               - '.github/workflows/ci.yml'
 
   backend:
@@ -57,11 +64,12 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
+      # The setup script of the test authentik follows the backend's rules.
       - name: Check formatting
-        run: uv run ruff format --check .
+        run: uv run ruff format --check --config pyproject.toml . ../deploy/authentik-test
 
       - name: Lint
-        run: uv run ruff check .
+        run: uv run ruff check --config pyproject.toml . ../deploy/authentik-test
 
       - name: Run tests
         run: uv run pytest
@@ -92,12 +100,26 @@ jobs:
   # build) and drive the critical flows through the browser, so the job needs
   # both the Python toolchain (the backend runs via uv) and Node. It runs when
   # either side changed, because an integration break can come from either.
+  # The test authentik from deploy/authentik-test runs next to it, with the
+  # same images and blueprint as production, so the job also runs when its
+  # setup changed.
   e2e:
     needs: changes
-    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.authentik == 'true'
     runs-on: ubuntu-latest
+    env:
+      AUTHENTIK_URL: http://localhost:9000
+      AUTHENTIK_ACCOUNTS: ${{ github.workspace }}/frontend/e2e/.tmp/authentik-accounts.json
     steps:
       - uses: actions/checkout@v7
+
+      - name: Check the test authentik runs the production images
+        run: bash deploy/authentik-test/check-images.sh
+
+      # Started first, so authentik boots while the toolchains install.
+      - name: Start the test authentik
+        run: docker compose up -d
+        working-directory: deploy/authentik-test
 
       - uses: astral-sh/setup-uv@v7
         with:
@@ -106,6 +128,9 @@ jobs:
       - name: Install backend dependencies
         run: uv sync --frozen
         working-directory: backend
+
+      - name: Set up the test authentik
+        run: uv run --project backend python deploy/authentik-test/setup.py
 
       - uses: actions/setup-node@v7
         with:
@@ -127,6 +152,11 @@ jobs:
         env:
           # The admin password comes from the environment, never from code.
           E2E_ADMIN_PASSWORD: e2e-admin-password
+
+      - name: Show the test authentik's logs
+        if: failure()
+        run: docker compose logs
+        working-directory: deploy/authentik-test
 
   # A single stable check for branch protection. It passes when every test job
   # either succeeded or was skipped (path filter), and fails if any failed or
