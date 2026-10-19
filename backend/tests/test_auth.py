@@ -55,3 +55,17 @@ def test_me_after_login_then_logout(client) -> None:
 
     me_again = client.get("/auth/me")
     assert me_again.status_code == 401
+
+
+def test_failed_admin_bootstrap_is_logged(temp_db, monkeypatch, caplog) -> None:
+    # Without migrations the admin table is missing, so the bootstrap fails.
+    # Startup must still go through, with a warning that says why the login
+    # will not work.
+    monkeypatch.setenv("ADMIN_PASSWORD", ADMIN_PASSWORD)
+    monkeypatch.setenv("GITHUB_SYNC_INTERVAL_SECONDS", "0")
+    main = importlib.import_module("app.main")
+
+    with TestClient(main.app) as client:
+        assert client.get("/health").status_code == 200
+
+    assert "admin bootstrap failed" in caplog.text
