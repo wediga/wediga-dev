@@ -8,12 +8,12 @@ in its threadpool and the backend keeps one synchronous connection helper.
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from app.auth import totp
 from app.auth.csrf import issue_csrf_token, require_csrf
 from app.auth.dependencies import require_admin
 from app.auth.passwords import verify_password
 from app.auth.ratelimit import client_ip, login_limiter, totp_limiter
 from app.auth.sessions import ADMIN_SESSION_KEY, PENDING_2FA_SESSION_KEY
-from app.auth import totp
 from app.db.connection import get_connection
 
 router = APIRouter(prefix="/auth", tags=["auth"])

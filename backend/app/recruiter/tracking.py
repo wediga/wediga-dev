@@ -43,6 +43,6 @@ def coarse_origin(ip: str | None) -> str:
     prefix = _network_prefix(ip)
     if prefix is None:
         return "unknown"
-    digest = hashlib.sha256(f"{_SALT}:{prefix}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{_SALT}:{prefix}".encode()).hexdigest()
     # A short digest prefix tells origins apart and keeps the stored value compact.
     return digest[:16]

@@ -2,16 +2,16 @@
 the migration runner, seed, bootstrap and routes."""
 
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import Iterator
+from datetime import UTC, datetime
 
 from app.paths import db_path
 
 
 def now() -> str:
     """Return the current UTC timestamp as an ISO 8601 string."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @contextmanager

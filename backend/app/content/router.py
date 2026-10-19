@@ -11,8 +11,6 @@ from fastapi import APIRouter, Depends, status
 from app.auth.csrf import require_csrf
 from app.auth.dependencies import require_admin
 from app.content import repository as repo
-from app.errors import not_found
-from app.recruiter.dependencies import require_recruiter_view
 from app.content.schemas import (
     AboutContent,
     ContactContent,
@@ -24,6 +22,8 @@ from app.content.schemas import (
     SkillRead,
     SkillWrite,
 )
+from app.errors import not_found
+from app.recruiter.dependencies import require_recruiter_view
 
 router = APIRouter(prefix="/content", tags=["content"])
 

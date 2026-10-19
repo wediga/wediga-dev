@@ -10,7 +10,7 @@ from input.
 
 import hashlib
 import secrets
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 
 from app.db.connection import get_connection, now
 
@@ -31,7 +31,7 @@ def _expiry_iso(expires_on: date | None) -> str | None:
     """
     if expires_on is None:
         return None
-    end_of_day = datetime.combine(expires_on, time(23, 59, 59), tzinfo=timezone.utc)
+    end_of_day = datetime.combine(expires_on, time(23, 59, 59), tzinfo=UTC)
     return end_of_day.isoformat()
 
 
@@ -39,7 +39,7 @@ def _is_expired(expires_at: str | None) -> bool:
     """Return whether an expiry instant has passed. No expiry never expires."""
     if expires_at is None:
         return False
-    return datetime.fromisoformat(expires_at) <= datetime.now(timezone.utc)
+    return datetime.fromisoformat(expires_at) <= datetime.now(UTC)
 
 
 def _is_active(expires_at: str | None, revoked_at: str | None) -> bool:
