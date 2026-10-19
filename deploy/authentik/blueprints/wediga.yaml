@@ -16,7 +16,8 @@ version: 1
 metadata:
   name: wediga.dev - groups, second factor and recovery
 entries:
-  # Wait for the flows this file refers to.
+  # Wait for the flows and the brand this file refers to. Without the brand, a
+  # fresh install would create it below without its default flows.
   - model: authentik_blueprints.metaapplyblueprint
     attrs:
       identifiers:
@@ -31,6 +32,11 @@ entries:
     attrs:
       identifiers:
         name: Default - WebAuthn MFA setup flow
+      required: false
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Default - Brand
       required: false
 
   # Groups. Neither grants any rights inside authentik. Applications map them
