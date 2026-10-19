@@ -35,7 +35,7 @@ async def _run_loop(interval: float) -> None:
         try:
             count = await asyncio.to_thread(sync_repos)
             logger.info("github sync: %d repos refreshed", count)
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Any failure keeps the existing cache and the loop alive. The
             # token is never part of the message.
             logger.warning("github sync failed; keeping the existing cache")

@@ -74,5 +74,5 @@ def trigger_sync() -> dict:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="GitHub sync failed; the existing cache is unchanged",
-        )
+        ) from None
     return {"ok": True, "synced": count}

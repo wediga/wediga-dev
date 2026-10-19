@@ -54,7 +54,7 @@ def _decrypt_secret_or_500(stored: str) -> str:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Second factor is unavailable",
-        )
+        ) from None
 
 
 @router.post("/login")
@@ -204,7 +204,7 @@ def totp_setup() -> dict[str, str]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Second factor is unavailable",
-        )
+        ) from None
 
     with get_connection() as conn:
         conn.execute(
