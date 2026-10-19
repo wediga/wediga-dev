@@ -1,0 +1,89 @@
+# A throwaway authentik for local development and the CI, never for the server.
+# It runs the same images and the same blueprint as production, so a change to
+# either is tested here first. Start it from this directory with
+# "podman compose up -d" (locally) or "docker compose up -d" (CI), then run
+# setup.py once. deploy/README.md describes the whole procedure.
+#
+# Every secret below is a fixed test value that only exists in this file. The
+# bootstrap token gives setup.py its API key, production never sets it.
+
+name: authentik-test
+
+x-db-password: &db-password test-only-db-password
+
+x-authentik-env: &authentik-env
+  AUTHENTIK_SECRET_KEY: test-only-secret-key-never-used-in-production-0123456789
+  AUTHENTIK_POSTGRESQL__HOST: authentik-db
+  AUTHENTIK_POSTGRESQL__USER: authentik
+  AUTHENTIK_POSTGRESQL__NAME: authentik
+  AUTHENTIK_POSTGRESQL__PASSWORD: *db-password
+  AUTHENTIK_BOOTSTRAP_TOKEN: test-only-bootstrap-token
+  AUTHENTIK_BOOTSTRAP_EMAIL: akadmin@example.com
+
+services:
+  authentik-db:
+    # Keep the image identical to deploy/quadlet/authentik-db.container,
+    # check-images.sh compares them.
+    image: docker.io/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_DB: authentik
+      POSTGRES_PASSWORD: *db-password
+    volumes:
+      - authentik-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "authentik", "-U", "authentik"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - "ALL"
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+
+  authentik-server:
+    # Keep the image identical to deploy/quadlet/authentik-server.container.
+    image: ghcr.io/goauthentik/server:2026.8.4@sha256:e7226ae116dac5aa0a5643803e735b010038f492c401e08e16b3bf1ac54c090c
+    command: server
+    environment: *authentik-env
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+    volumes:
+      - authentik-data:/data
+      - ../authentik/blueprints:/blueprints/custom:ro
+    shm_size: 512m
+    # Only reachable from this machine.
+    ports:
+      - "127.0.0.1:9000:9000"
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - "ALL"
+
+  authentik-worker:
+    # Keep the image identical to deploy/quadlet/authentik-worker.container.
+    image: ghcr.io/goauthentik/server:2026.8.4@sha256:e7226ae116dac5aa0a5643803e735b010038f492c401e08e16b3bf1ac54c090c
+    command: worker
+    environment: *authentik-env
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+    volumes:
+      - authentik-data:/data
+      - ../authentik/blueprints:/blueprints/custom:ro
+    shm_size: 512m
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - "ALL"
+
+volumes:
+  authentik-db:
+  authentik-data:
