@@ -35,7 +35,15 @@ SITE_BLUEPRINT = "custom/wediga.yaml"
 LOGIN_FLOW = "default-authentication-flow"
 
 STATUS_SUCCESSFUL = "successful"
-STATUS_UNKNOWN = "unknown"
+# Every task state except the final ones, "done" and "rejected".
+PENDING_TASK_STATES = (
+    "waiting_for_dependencies",
+    "queued",
+    "consumed",
+    "preprocess",
+    "running",
+    "postprocess",
+)
 
 PASSWORD = "test-only-password"
 ACCOUNTS = (
@@ -116,25 +124,34 @@ def not_successful(api: httpx.Client) -> list[dict]:
     return [b for b in blueprints(api) if b["status"] != STATUS_SUCCESSFUL]
 
 
-def startup_blueprints_done(api: httpx.Client) -> bool:
-    instances = blueprints(api)
+def task_count(api: httpx.Client, state: str) -> int:
+    response = api.get("/tasks/tasks/", params={"state": state})
 
-    return any(b["path"] == SITE_BLUEPRINT for b in instances) and all(
-        b["status"] != STATUS_UNKNOWN for b in instances
-    )
+    return response.json()["pagination"]["count"]
+
+
+def worker_idle(api: httpx.Client) -> bool:
+    return not any(task_count(api, state) for state in PENDING_TASK_STATES)
+
+
+def wait_for_worker(api: httpx.Client) -> None:
+    wait_for("the worker", lambda: worker_idle(api), APPLY_TIMEOUT_SECONDS)
+
+
+def startup_blueprints_done(api: httpx.Client) -> bool:
+    # The worker finds the blueprint files in a task that queues every apply,
+    # so once the file below is known, an idle worker has applied them all.
+    return blueprint_by_path(api, SITE_BLUEPRINT) is not None and worker_idle(api)
 
 
 def apply_blueprint(api: httpx.Client, instance: dict) -> None:
-    """Apply a blueprint and wait until the worker has finished it."""
-    before = instance["last_applied"]
+    """Apply a blueprint and wait until the worker has finished it.
+
+    Waiting for the whole worker instead of this blueprint keeps two runs from
+    overlapping, which can deadlock in the database and slows both down.
+    """
     api.post(f"/managed/blueprints/{instance['pk']}/apply/")
-
-    def applied() -> bool:
-        current = api.get(f"/managed/blueprints/{instance['pk']}/").json()
-
-        return current["last_applied"] != before and current["status"] != STATUS_UNKNOWN
-
-    wait_for(instance["path"], applied, APPLY_TIMEOUT_SECONDS)
+    wait_for_worker(api)
 
 
 def recovery_instance(api: httpx.Client) -> dict:
@@ -143,30 +160,15 @@ def recovery_instance(api: httpx.Client) -> dict:
     if existing is not None:
         return existing
 
-    def created() -> bool:
-        # authentik has the worker check the path, and that check times out
-        # with a 500 while the worker is still busy after a fresh start.
-        try:
-            api.post(
-                "/managed/blueprints/",
-                json={
-                    "name": RECOVERY_INSTANCE_NAME,
-                    "path": RECOVERY_BLUEPRINT,
-                    "enabled": True,
-                    "context": {},
-                },
-            )
-        except httpx.HTTPStatusError as error:
-            if error.response.is_server_error:
-                return False
-
-            raise
-
-        return True
-
-    wait_for("the recovery blueprint to be created", created, APPLY_TIMEOUT_SECONDS)
-
-    return blueprint_by_path(api, RECOVERY_BLUEPRINT)
+    return api.post(
+        "/managed/blueprints/",
+        json={
+            "name": RECOVERY_INSTANCE_NAME,
+            "path": RECOVERY_BLUEPRINT,
+            "enabled": True,
+            "context": {},
+        },
+    ).json()
 
 
 def prepare_blueprints(api: httpx.Client) -> None:
