@@ -97,9 +97,7 @@ def fetch_repos(*, client: httpx.Client | None = None) -> list[dict]:
                     f"request to GitHub failed: {exc.__class__.__name__}"
                 ) from exc
             if response.status_code != 200:
-                raise GithubApiError(
-                    f"GitHub returned status {response.status_code}"
-                )
+                raise GithubApiError(f"GitHub returned status {response.status_code}")
             batch = response.json()
             repos.extend(_parse_batch(batch))
             if len(batch) < PER_PAGE:

@@ -41,8 +41,7 @@ def run_migrations() -> dict[str, list[str]]:
             try:
                 conn.executescript(sql)
                 conn.execute(
-                    "INSERT INTO schema_migrations (version, applied_at) "
-                    "VALUES (?, ?)",
+                    "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
                     (version, now()),
                 )
                 conn.commit()

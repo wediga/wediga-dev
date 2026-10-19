@@ -148,7 +148,9 @@ def create_project(body: ProjectWrite) -> dict:
     return repo.create_project(body)
 
 
-@router.put("/projects/{project_id}", response_model=ProjectRead, dependencies=WRITE_DEPS)
+@router.put(
+    "/projects/{project_id}", response_model=ProjectRead, dependencies=WRITE_DEPS
+)
 def update_project(project_id: int, body: ProjectWrite) -> dict:
     updated = repo.update_project(project_id, body)
     if updated is None:

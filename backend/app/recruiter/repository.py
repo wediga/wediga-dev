@@ -92,7 +92,8 @@ def list_links() -> list[dict]:
     """Return every link with its view count and last view, newest first."""
     with get_connection() as conn:
         rows = conn.execute(
-            _SELECT_WITH_STATS + "GROUP BY rl.id ORDER BY rl.created_at DESC, rl.id DESC"
+            _SELECT_WITH_STATS
+            + "GROUP BY rl.id ORDER BY rl.created_at DESC, rl.id DESC"
         ).fetchall()
     return [_row_to_read(row) for row in rows]
 

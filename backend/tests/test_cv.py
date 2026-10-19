@@ -38,7 +38,9 @@ def client(app):
 
 def _login(app) -> TestClient:
     client = TestClient(app, base_url="https://testserver")
-    assert client.post("/auth/login", json={"password": ADMIN_PASSWORD}).status_code == 200
+    assert (
+        client.post("/auth/login", json={"password": ADMIN_PASSWORD}).status_code == 200
+    )
     return client
 
 

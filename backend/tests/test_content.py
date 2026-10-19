@@ -73,8 +73,12 @@ def test_about_crud(admin_client) -> None:
 
 
 def test_contact_crud(admin_client) -> None:
-    payload = {"name": "Alexander", "email": "a@example.com", "github": None,
-               "linkedin": None}
+    payload = {
+        "name": "Alexander",
+        "email": "a@example.com",
+        "github": None,
+        "linkedin": None,
+    }
     assert admin_client.put("/content/contact", json=payload).status_code == 200
     got = admin_client.get("/content/contact").json()
     assert got["name"] == "Alexander"
@@ -158,29 +162,43 @@ def test_skills_crud(admin_client) -> None:
     assert skills[0]["name"] == "Languages"
     assert skills[0]["skills"][0]["name"] == "Python"
 
-    assert admin_client.put(
-        f"/content/skills/{skill_id}", json={"name": "Python 3"}
-    ).status_code == 200
-    assert admin_client.put(
-        f"/content/skills/categories/{category_id}", json={"name": "Langs"}
-    ).status_code == 200
+    assert (
+        admin_client.put(
+            f"/content/skills/{skill_id}", json={"name": "Python 3"}
+        ).status_code
+        == 200
+    )
+    assert (
+        admin_client.put(
+            f"/content/skills/categories/{category_id}", json={"name": "Langs"}
+        ).status_code
+        == 200
+    )
 
     assert admin_client.delete(f"/content/skills/{skill_id}").status_code == 200
-    assert admin_client.delete(
-        f"/content/skills/categories/{category_id}"
-    ).status_code == 200
+    assert (
+        admin_client.delete(f"/content/skills/categories/{category_id}").status_code
+        == 200
+    )
     assert admin_client.get("/content/skills").json() == []
 
 
 def test_create_skill_in_missing_category_is_404(admin_client) -> None:
-    assert admin_client.post(
-        "/content/skills/categories/999/skills", json={"name": "X"}
-    ).status_code == 404
+    assert (
+        admin_client.post(
+            "/content/skills/categories/999/skills", json={"name": "X"}
+        ).status_code
+        == 404
+    )
 
 
 def test_duplicate_project_name_is_409(admin_client) -> None:
-    assert admin_client.post("/content/projects", json={"name": "Dup"}).status_code == 201
-    assert admin_client.post("/content/projects", json={"name": "Dup"}).status_code == 409
+    assert (
+        admin_client.post("/content/projects", json={"name": "Dup"}).status_code == 201
+    )
+    assert (
+        admin_client.post("/content/projects", json={"name": "Dup"}).status_code == 409
+    )
 
 
 def test_setting_delete_is_idempotent(admin_client) -> None:
@@ -216,9 +234,9 @@ def test_writes_without_session_are_401(client) -> None:
 
 def test_writes_without_csrf_are_403(session_client) -> None:
     assert session_client.put("/content/about", json={"text": "x"}).status_code == 403
-    assert session_client.post(
-        "/content/projects", json={"name": "X"}
-    ).status_code == 403
+    assert (
+        session_client.post("/content/projects", json={"name": "X"}).status_code == 403
+    )
 
 
 def test_writes_with_wrong_csrf_are_403(session_client) -> None:

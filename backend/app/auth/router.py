@@ -190,9 +190,7 @@ def totp_setup() -> dict[str, str]:
     the QR code and is never persisted in the clear.
     """
     with get_connection() as conn:
-        active = conn.execute(
-            "SELECT totp_enabled FROM admin WHERE id = 1"
-        ).fetchone()
+        active = conn.execute("SELECT totp_enabled FROM admin WHERE id = 1").fetchone()
     if active and active["totp_enabled"]:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -241,9 +239,7 @@ def totp_confirm(request: Request, body: CodeRequest) -> dict[str, bool]:
         )
 
     with get_connection() as conn:
-        row = conn.execute(
-            "SELECT totp_secret FROM admin WHERE id = 1"
-        ).fetchone()
+        row = conn.execute("SELECT totp_secret FROM admin WHERE id = 1").fetchone()
 
     if row is None or not row["totp_secret"]:
         raise HTTPException(
