@@ -68,8 +68,9 @@ def admin_client(app):
 # --- helpers -------------------------------------------------------------
 
 
-def _raw_repo(name, description=None, language="Python", stars=1,
-              pushed="2026-01-01T00:00:00Z"):
+def _raw_repo(
+    name, description=None, language="Python", stars=1, pushed="2026-01-01T00:00:00Z"
+):
     """A GitHub API repo object with the fields the client reads."""
     return {
         "name": name,
@@ -81,8 +82,13 @@ def _raw_repo(name, description=None, language="Python", stars=1,
     }
 
 
-def _mapped(name, description="github desc", language="Python", stars=1,
-            last_push="2026-01-01T00:00:00Z"):
+def _mapped(
+    name,
+    description="github desc",
+    language="Python",
+    stars=1,
+    last_push="2026-01-01T00:00:00Z",
+):
     """A repo already mapped to the mirrored fields, as the client returns them.
 
     Used to stub ``fetch_repos`` directly, so the sync and curation tests do not
@@ -166,10 +172,14 @@ def test_sync_creates_then_preserves_curation(migrated_db, monkeypatch):
     from app.github import sync
     from app.github.schemas import RepoCurationWrite
 
-    monkeypatch.setattr(gh, "fetch_repos", lambda **_: [
-        _mapped("alpha", "first alpha", stars=1),
-        _mapped("beta", "first beta", stars=2),
-    ])
+    monkeypatch.setattr(
+        gh,
+        "fetch_repos",
+        lambda **_: [
+            _mapped("alpha", "first alpha", stars=1),
+            _mapped("beta", "first beta", stars=2),
+        ],
+    )
     assert sync.sync_repos() == 2
 
     rows = {r["name"]: r for r in repo.list_all()}
@@ -179,20 +189,26 @@ def test_sync_creates_then_preserves_curation(migrated_db, monkeypatch):
     # Curate: hide beta, pin alpha, override alpha's description, set sort order.
     repo.update_curation(
         alpha_id,
-        RepoCurationWrite(visible=True, pinned=True,
-                          description_override="curated text", sort_order=5),
+        RepoCurationWrite(
+            visible=True, pinned=True, description_override="curated text", sort_order=5
+        ),
     )
     repo.update_curation(
         beta_id,
-        RepoCurationWrite(visible=False, pinned=False,
-                          description_override=None, sort_order=0),
+        RepoCurationWrite(
+            visible=False, pinned=False, description_override=None, sort_order=0
+        ),
     )
 
     # Second sync with changed mirrored data (new stars, new descriptions).
-    monkeypatch.setattr(gh, "fetch_repos", lambda **_: [
-        _mapped("alpha", "second alpha", stars=99),
-        _mapped("beta", "second beta", stars=88),
-    ])
+    monkeypatch.setattr(
+        gh,
+        "fetch_repos",
+        lambda **_: [
+            _mapped("alpha", "second alpha", stars=99),
+            _mapped("beta", "second beta", stars=88),
+        ],
+    )
     assert sync.sync_repos() == 2
 
     rows = {r["name"]: r for r in repo.list_all()}
@@ -212,20 +228,31 @@ def test_curated_read_orders_and_applies_override(migrated_db, monkeypatch):
     from app.github import sync
     from app.github.schemas import RepoCurationWrite
 
-    monkeypatch.setattr(gh, "fetch_repos", lambda **_: [
-        _mapped("alpha"), _mapped("beta"), _mapped("gamma"),
-    ])
+    monkeypatch.setattr(
+        gh,
+        "fetch_repos",
+        lambda **_: [
+            _mapped("alpha"),
+            _mapped("beta"),
+            _mapped("gamma"),
+        ],
+    )
     sync.sync_repos()
     rows = {r["name"]: r for r in repo.list_all()}
 
     # gamma pinned, alpha visible with override, beta hidden.
-    repo.update_curation(rows["gamma"]["id"],
-                         RepoCurationWrite(visible=True, pinned=True, sort_order=0))
-    repo.update_curation(rows["alpha"]["id"],
-                         RepoCurationWrite(visible=True, pinned=False,
-                                           description_override="my words", sort_order=1))
-    repo.update_curation(rows["beta"]["id"],
-                         RepoCurationWrite(visible=False, pinned=False, sort_order=0))
+    repo.update_curation(
+        rows["gamma"]["id"], RepoCurationWrite(visible=True, pinned=True, sort_order=0)
+    )
+    repo.update_curation(
+        rows["alpha"]["id"],
+        RepoCurationWrite(
+            visible=True, pinned=False, description_override="my words", sort_order=1
+        ),
+    )
+    repo.update_curation(
+        rows["beta"]["id"], RepoCurationWrite(visible=False, pinned=False, sort_order=0)
+    )
 
     curated = repo.list_curated()
     names = [r["name"] for r in curated]
@@ -243,7 +270,9 @@ def test_empty_override_falls_back_to_github_description(migrated_db, monkeypatc
     from app.github import sync
     from app.github.schemas import RepoCurationWrite
 
-    monkeypatch.setattr(gh, "fetch_repos", lambda **_: [_mapped("alpha", "github desc")])
+    monkeypatch.setattr(
+        gh, "fetch_repos", lambda **_: [_mapped("alpha", "github desc")]
+    )
     sync.sync_repos()
     alpha_id = repo.list_all()[0]["id"]
 
@@ -251,8 +280,9 @@ def test_empty_override_falls_back_to_github_description(migrated_db, monkeypatc
     # an empty line in the recruiter view.
     repo.update_curation(
         alpha_id,
-        RepoCurationWrite(visible=True, pinned=False,
-                          description_override="", sort_order=0),
+        RepoCurationWrite(
+            visible=True, pinned=False, description_override="", sort_order=0
+        ),
     )
     curated = repo.list_curated()
     assert curated[0]["description"] == "github desc"
@@ -263,9 +293,13 @@ def test_failed_sync_keeps_cache(migrated_db, monkeypatch):
     from app.github import repository as repo
     from app.github import sync
 
-    monkeypatch.setattr(gh, "fetch_repos", lambda **_: [
-        _mapped("alpha", "cached", stars=3),
-    ])
+    monkeypatch.setattr(
+        gh,
+        "fetch_repos",
+        lambda **_: [
+            _mapped("alpha", "cached", stars=3),
+        ],
+    )
     sync.sync_repos()
     before = repo.list_all()
     assert len(before) == 1
@@ -317,9 +351,7 @@ def test_admin_can_read_curated_and_admin_lists(admin_client, monkeypatch):
 def test_sync_endpoint_runs_and_curation_write_works(admin_client, monkeypatch):
     from app.github import sync
 
-    monkeypatch.setattr(
-        sync, "sync_repos", lambda: 4
-    )
+    monkeypatch.setattr(sync, "sync_repos", lambda: 4)
     response = admin_client.post("/github/sync")
     assert response.status_code == 200
     assert response.json() == {"ok": True, "synced": 4}
@@ -337,10 +369,13 @@ def test_sync_endpoint_maps_api_error_to_502(admin_client, monkeypatch):
 
 
 def test_curation_write_on_missing_repo_is_404(admin_client):
-    assert admin_client.put(
-        "/github/repos/999/curation",
-        json={"visible": True, "pinned": False, "sort_order": 0},
-    ).status_code == 404
+    assert (
+        admin_client.put(
+            "/github/repos/999/curation",
+            json={"visible": True, "pinned": False, "sort_order": 0},
+        ).status_code
+        == 404
+    )
 
 
 def test_lifespan_startup_does_not_block(app):

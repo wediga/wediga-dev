@@ -6,6 +6,7 @@ startup. Migrations never run in the request path, only via
 """
 
 import asyncio
+import logging
 import os
 import sqlite3
 from contextlib import asynccontextmanager, suppress
@@ -18,6 +19,8 @@ from app.auth.bootstrap import ensure_admin
 from app.auth.sessions import add_session_middleware
 from app.github.scheduler import start_scheduler
 
+logger = logging.getLogger("uvicorn.error")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,9 +28,10 @@ async def lifespan(app: FastAPI):
     try:
         ensure_admin()
     except Exception:
-        # A missing schema or unset password must not block startup; the login
-        # route fails cleanly instead.
-        pass
+        # A missing schema must not block startup. The login fails until the
+        # bootstrap succeeds on a later start, and the log says why.
+        logger.warning("admin bootstrap failed, login will not work", exc_info=True)
+
     sync_task = start_scheduler()
     try:
         yield

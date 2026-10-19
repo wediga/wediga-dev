@@ -204,8 +204,7 @@ def delete_project(project_id: int) -> bool:
 def list_skill_categories() -> list[dict]:
     with get_connection() as conn:
         categories = conn.execute(
-            "SELECT id, name, sort_order FROM skill_category "
-            "ORDER BY sort_order, id"
+            "SELECT id, name, sort_order FROM skill_category ORDER BY sort_order, id"
         ).fetchall()
         skills = conn.execute(
             "SELECT id, category_id, name, sort_order FROM skill "
@@ -214,7 +213,11 @@ def list_skill_categories() -> list[dict]:
     by_category: dict[int, list[dict]] = {}
     for skill in skills:
         by_category.setdefault(skill["category_id"], []).append(
-            {"id": skill["id"], "name": skill["name"], "sort_order": skill["sort_order"]}
+            {
+                "id": skill["id"],
+                "name": skill["name"],
+                "sort_order": skill["sort_order"],
+            }
         )
     return [
         {
@@ -268,9 +271,7 @@ def update_category(category_id: int, data: SkillCategoryWrite) -> dict | None:
 def delete_category(category_id: int) -> bool:
     with get_connection() as conn:
         conn.execute("DELETE FROM skill WHERE category_id = ?", (category_id,))
-        cursor = conn.execute(
-            "DELETE FROM skill_category WHERE id = ?", (category_id,)
-        )
+        cursor = conn.execute("DELETE FROM skill_category WHERE id = ?", (category_id,))
         conn.commit()
     return cursor.rowcount > 0
 

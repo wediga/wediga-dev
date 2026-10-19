@@ -11,8 +11,6 @@ from fastapi import APIRouter, Depends, status
 from app.auth.csrf import require_csrf
 from app.auth.dependencies import require_admin
 from app.content import repository as repo
-from app.errors import not_found
-from app.recruiter.dependencies import require_recruiter_view
 from app.content.schemas import (
     AboutContent,
     ContactContent,
@@ -24,6 +22,8 @@ from app.content.schemas import (
     SkillRead,
     SkillWrite,
 )
+from app.errors import not_found
+from app.recruiter.dependencies import require_recruiter_view
 
 router = APIRouter(prefix="/content", tags=["content"])
 
@@ -148,7 +148,9 @@ def create_project(body: ProjectWrite) -> dict:
     return repo.create_project(body)
 
 
-@router.put("/projects/{project_id}", response_model=ProjectRead, dependencies=WRITE_DEPS)
+@router.put(
+    "/projects/{project_id}", response_model=ProjectRead, dependencies=WRITE_DEPS
+)
 def update_project(project_id: int, body: ProjectWrite) -> dict:
     updated = repo.update_project(project_id, body)
     if updated is None:

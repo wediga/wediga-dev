@@ -50,6 +50,8 @@ uv sync
 cp ../.env.example ../.env   # then fill in the secrets
 uv run python -m app.db.migrate
 uv run uvicorn app.main:app --reload   # http://localhost:8000
+uv run ruff format .                   # format the code
+uv run ruff check .                    # lint
 ```
 
 Then the frontend, which reaches the backend over `BACKEND_URL` (default `http://localhost:8000`):

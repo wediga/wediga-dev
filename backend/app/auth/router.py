@@ -8,12 +8,12 @@ in its threadpool and the backend keeps one synchronous connection helper.
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from app.auth import totp
 from app.auth.csrf import issue_csrf_token, require_csrf
 from app.auth.dependencies import require_admin
 from app.auth.passwords import verify_password
 from app.auth.ratelimit import client_ip, login_limiter, totp_limiter
 from app.auth.sessions import ADMIN_SESSION_KEY, PENDING_2FA_SESSION_KEY
-from app.auth import totp
 from app.db.connection import get_connection
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -54,7 +54,7 @@ def _decrypt_secret_or_500(stored: str) -> str:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Second factor is unavailable",
-        )
+        ) from None
 
 
 @router.post("/login")
@@ -190,9 +190,7 @@ def totp_setup() -> dict[str, str]:
     the QR code and is never persisted in the clear.
     """
     with get_connection() as conn:
-        active = conn.execute(
-            "SELECT totp_enabled FROM admin WHERE id = 1"
-        ).fetchone()
+        active = conn.execute("SELECT totp_enabled FROM admin WHERE id = 1").fetchone()
     if active and active["totp_enabled"]:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -206,7 +204,7 @@ def totp_setup() -> dict[str, str]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Second factor is unavailable",
-        )
+        ) from None
 
     with get_connection() as conn:
         conn.execute(
@@ -241,9 +239,7 @@ def totp_confirm(request: Request, body: CodeRequest) -> dict[str, bool]:
         )
 
     with get_connection() as conn:
-        row = conn.execute(
-            "SELECT totp_secret FROM admin WHERE id = 1"
-        ).fetchone()
+        row = conn.execute("SELECT totp_secret FROM admin WHERE id = 1").fetchone()
 
     if row is None or not row["totp_secret"]:
         raise HTTPException(

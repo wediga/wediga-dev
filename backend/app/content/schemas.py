@@ -19,7 +19,7 @@ def _validate_web_link(value: str | None) -> str | None:
     if value is None or value == "":
         return value
     lowered = value.strip().lower()
-    if not (lowered.startswith("http://") or lowered.startswith("https://")):
+    if not lowered.startswith(("http://", "https://")):
         raise ValueError("link must start with http:// or https://")
     return value
 

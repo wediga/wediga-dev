@@ -49,9 +49,7 @@ class RateLimiter:
             # the table cannot grow without bound under a spread of addresses.
             if len(self._hits) > self._max_keys:
                 self._hits = {
-                    k: v
-                    for k, v in self._hits.items()
-                    if nowt - v[0] < self._window
+                    k: v for k, v in self._hits.items() if nowt - v[0] < self._window
                 }
             window_start, count = self._hits.get(key, (nowt, 0))
             if nowt - window_start >= self._window:

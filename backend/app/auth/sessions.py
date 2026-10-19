@@ -11,8 +11,8 @@ import logging
 import os
 import secrets
 
-from starlette.middleware.sessions import SessionMiddleware
 from fastapi import FastAPI
+from starlette.middleware.sessions import SessionMiddleware
 
 logger = logging.getLogger("uvicorn.error")
 

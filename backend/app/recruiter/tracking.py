@@ -18,6 +18,9 @@ import ipaddress
 import os
 import secrets
 
+IPV4_PREFIX_BITS = 24
+IPV6_PREFIX_BITS = 48
+
 # Prefer a dedicated salt, fall back to the session secret for a stable value,
 # and only mint a throwaway one when nothing is configured.
 _SALT = (
@@ -32,7 +35,12 @@ def _network_prefix(ip: str) -> str | None:
         address = ipaddress.ip_address(ip.strip())
     except ValueError:
         return None
-    bits = 24 if address.version == 4 else 48
+
+    if isinstance(address, ipaddress.IPv4Address):
+        bits = IPV4_PREFIX_BITS
+    else:
+        bits = IPV6_PREFIX_BITS
+
     return str(ipaddress.ip_network(f"{address}/{bits}", strict=False))
 
 
@@ -43,6 +51,6 @@ def coarse_origin(ip: str | None) -> str:
     prefix = _network_prefix(ip)
     if prefix is None:
         return "unknown"
-    digest = hashlib.sha256(f"{_SALT}:{prefix}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{_SALT}:{prefix}".encode()).hexdigest()
     # A short digest prefix tells origins apart and keeps the stored value compact.
     return digest[:16]
