@@ -108,6 +108,20 @@ def is_ready(base_url: str) -> bool:
     return response.is_success
 
 
+def token_accepted(api: httpx.Client) -> bool:
+    # The worker creates the bootstrap token from a blueprint, which can finish
+    # after the server reports ready. Until then, the API answers 403.
+    try:
+        api.get("/core/users/me/")
+    except httpx.HTTPStatusError as error:
+        if error.response.status_code == httpx.codes.FORBIDDEN:
+            return False
+
+        raise
+
+    return True
+
+
 def blueprints(api: httpx.Client) -> list[dict]:
     response = api.get(
         "/managed/blueprints/", params={"page_size": BLUEPRINT_PAGE_SIZE}
@@ -277,6 +291,11 @@ def main() -> None:
     with client(
         f"{base_url}/api/v3", {"Authorization": f"Bearer {bootstrap_token()}"}
     ) as api:
+        wait_for(
+            "authentik to accept the API token",
+            lambda: token_accepted(api),
+            READY_TIMEOUT_SECONDS,
+        )
         prepare_blueprints(api)
 
         for username, group in ACCOUNTS:
