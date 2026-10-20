@@ -52,7 +52,7 @@ Someone lost their authenticator: delete the old device on the user's page under
 Dependabot does not watch the Quadlet units, so the authentik and PostgreSQL versions are raised by hand.
 
 1. Read the release notes of the new authentik version for breaking changes.
-2. Raise the tag and the digest in `authentik-server.container` and `authentik-worker.container`. Both must name the same image.
+2. Raise the tag and the digest in `authentik-server.container` and `authentik-worker.container`, and in `authentik-test/compose.yaml`. All of them must name the same image, the CI fails otherwise.
 3. Merge. The deploy copies the new units to the server but leaves the running containers alone.
 4. Take a fresh dump (`systemctl --user start authentik-db-backup.service`).
 5. Restart right away, so the new version does not first come up on some later reboot:
@@ -63,6 +63,29 @@ systemctl --user restart authentik-server.service authentik-worker.service
 ```
 
 6. Check `podman logs --tail 30 authentik-server`, log in once and confirm that the second factor is still asked for.
+
+## Testing the identity provider
+
+`authentik-test/` holds a throwaway authentik with the same images and the same `wediga.yaml` as production. The CI starts it for the end-to-end tests, and it runs locally with Podman, so a change to the setup file or a new version can be tried before it reaches the server. Its secrets and the API key for the setup script are fixed test values in `compose.yaml` and exist nowhere else.
+
+Starting it locally, from the repository root:
+
+```
+podman machine start
+cd deploy/authentik-test && podman compose up -d && cd ../..
+AUTHENTIK_URL=http://localhost:9000 uv run --project backend python deploy/authentik-test/setup.py
+```
+
+The first start takes a few minutes. `setup.py` waits until authentik has applied all blueprints, applies the example recovery flow and `wediga.yaml` once more, like on a fresh install, and stops with an error if a blueprint fails. It then creates three accounts (`test-admin` in `wediga-admins`, `test-friend` in `friends`, `test-nogroup` without a group), sets up a TOTP device for each through the real login flow and prints password and TOTP secret. To log in at `http://localhost:9000`, add the secret to an authenticator app by hand. Every run of `setup.py` creates the accounts again with new secrets.
+
+With `AUTHENTIK_ACCOUNTS` set to a file, the script also writes the accounts there, and with `AUTHENTIK_URL` set as well, `npm run e2e` in `frontend/` runs the login smoke test against it:
+
+```
+AUTHENTIK_URL=http://localhost:9000 AUTHENTIK_ACCOUNTS=frontend/e2e/.tmp/authentik-accounts.json uv run --project backend python deploy/authentik-test/setup.py
+cd frontend && AUTHENTIK_URL=http://localhost:9000 AUTHENTIK_ACCOUNTS=e2e/.tmp/authentik-accounts.json npm run e2e
+```
+
+`podman compose down` in `deploy/authentik-test/` stops it, `podman compose down -v` also deletes its data for a fresh start.
 
 ## Backup and restore
 

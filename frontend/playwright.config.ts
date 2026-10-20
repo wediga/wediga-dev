@@ -21,6 +21,10 @@ const TMP_DIR = path.join(__dirname, "e2e", ".tmp");
 // The admin password comes from the environment; a fixed local default keeps
 // the suite zero-config while a real secret never lives in committed code.
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "e2e-admin-password";
+// The test authentik from deploy/authentik-test. Its tests only run when it is
+// up and AUTHENTIK_URL points at it, as in the CI. Locally the suite runs
+// without it as before.
+const AUTHENTIK_URL = process.env.AUTHENTIK_URL;
 
 export default defineConfig({
   testDir: "./e2e/specs",
@@ -37,6 +41,15 @@ export default defineConfig({
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    ...(AUTHENTIK_URL
+      ? [
+          {
+            name: "authentik",
+            testDir: "./e2e/authentik",
+            use: { ...devices["Desktop Chrome"], baseURL: AUTHENTIK_URL },
+          },
+        ]
+      : []),
   ],
   webServer: [
     {
