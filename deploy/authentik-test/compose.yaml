@@ -75,6 +75,10 @@ services:
     depends_on:
       authentik-db:
         condition: service_healthy
+      # The first container on the new authentik-data volume copies the
+      # image's /data into it. Two at once collide on its "media" symlink.
+      authentik-server:
+        condition: service_started
     volumes:
       - authentik-data:/data
       - ../authentik/blueprints:/blueprints/custom:ro
