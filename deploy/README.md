@@ -2,6 +2,8 @@
 
 Everything on the server runs as rootless Podman containers under one unprivileged user, started by systemd through Quadlet units. This file is the operating manual: where things live, how a deploy works and what has to be done by hand.
 
+The commands in this file run as that user. After switching to it with `sudo`, run `export XDG_RUNTIME_DIR=/run/user/$(id -u)` once, because `sudo` does not set it and `systemctl --user` cannot reach the user's systemd without it.
+
 ## Layout
 
 | What | Where on the server |
