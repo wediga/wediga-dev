@@ -84,6 +84,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Check CI and the image run the same Node version
+        run: bash ../deploy/check-node-version.sh
+
       - uses: actions/setup-node@v7
         with:
           node-version: 24.22.1
