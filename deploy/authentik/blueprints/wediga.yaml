@@ -146,8 +146,8 @@ entries:
   # The login of wediga.dev itself. The backend exchanges the code for tokens,
   # so only the authorization code grant is allowed. Tokens are signed with
   # authentik's own key instead of the client secret, and the secret comes
-  # from authentik.env. Redirect URIs are still empty, and authentik rejects
-  # every login until they are set.
+  # from authentik.env. authentik sends the browser back only to the route
+  # handler in Next.js that passes the code on to the backend.
   - model: authentik_providers_oauth2.oauth2provider
     id: wediga-dev-provider
     identifiers:
@@ -160,7 +160,9 @@ entries:
       client_secret: !Env WEDIGA_OIDC_CLIENT_SECRET
       grant_types:
         - authorization_code
-      redirect_uris: []
+      redirect_uris:
+        - matching_mode: strict
+          url: https://www.wediga.dev/auth/callback
       signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
       property_mappings:
         - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
