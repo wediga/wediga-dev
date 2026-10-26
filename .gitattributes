@@ -1,0 +1,3 @@
+# authentik compares a blueprint's raw bytes with the text it last applied,
+# so a copy with CRLF line endings counts as changed on every hourly scan.
+deploy/authentik/blueprints/*.yaml text eol=lf
