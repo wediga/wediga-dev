@@ -12,7 +12,7 @@ from authlib.oauth2.rfc7636 import create_s256_code_challenge
 from joserfc.jwk import OctKey, RSAKey
 
 from app.auth import oidc
-from tests.oidc_fake import (
+from tests.oidc.oidc_fake import (
     CLIENT_ID,
     ISSUER,
     KEY_ID,
@@ -25,11 +25,6 @@ from tests.oidc_fake import (
 )
 
 NONCE = "expected-nonce"
-
-
-@pytest.fixture()
-def fake(monkeypatch) -> FakeAuthentik:
-    return FakeAuthentik(monkeypatch)
 
 
 def _validate(id_token: str) -> dict:
