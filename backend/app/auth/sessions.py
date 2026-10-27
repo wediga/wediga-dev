@@ -28,6 +28,14 @@ RECRUITER_SESSION_KEY = "recruiter"
 # to a full admin session.
 PENDING_2FA_SESSION_KEY = "pending_2fa"
 
+# The login through authentik. Holds the roles taken from the groups and the
+# time of the login, never a token from authentik.
+OIDC_SESSION_KEY = "oidc"
+
+# State, nonce, PKCE verifier and target of a login that is under way. It is
+# removed by the callback whether the login succeeds or not.
+OIDC_FLOW_SESSION_KEY = "oidc_flow"
+
 
 def _session_secret() -> str:
     secret = os.environ.get("SESSION_SECRET")
