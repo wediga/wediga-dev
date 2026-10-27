@@ -8,9 +8,11 @@ Run it once the containers are up:
 It waits until authentik has applied every blueprint, applies the example
 recovery flow that production also uses and applies wediga.yaml again, so its
 second-factor step lands in that flow. Every blueprint has to end up
-successful, otherwise the script fails. Then it creates the test accounts, each
-with a password and a TOTP device set up through the real login flow, and
-prints their credentials. With AUTHENTIK_ACCOUNTS set, it also writes them to
+successful, otherwise the script fails. It lets the login of wediga.dev return
+to a frontend on this machine, an entry that a change to wediga.yaml removes
+again, so run the script once more after one. Then it creates the test
+accounts, each with a password and a TOTP device set up through the real login
+flow, and prints their credentials. With AUTHENTIK_ACCOUNTS set, it also writes them to
 that JSON file for Playwright.
 
 Accounts from an earlier run are deleted and created again, so the script can
@@ -23,6 +25,7 @@ import re
 import time
 from collections.abc import Callable, Iterable
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 import pyotp
@@ -33,6 +36,9 @@ RECOVERY_BLUEPRINT = "example/flows-recovery-email-verification.yaml"
 RECOVERY_INSTANCE_NAME = "Recovery flow"
 SITE_BLUEPRINT = "custom/wediga.yaml"
 LOGIN_FLOW = "default-authentication-flow"
+SITE_CLIENT_ID = "wediga-dev"
+# npm run dev and Playwright serve the frontend on different ports.
+LOCAL_ORIGIN_PATTERN = r"^http://localhost:\d+"
 
 STATUS_SUCCESSFUL = "successful"
 # Every task state except the final ones, "done" and "rejected".
@@ -211,6 +217,26 @@ def prepare_blueprints(api: httpx.Client) -> None:
         raise SystemExit("the brand has no recovery flow after applying wediga.yaml")
 
 
+def allow_local_redirect(api: httpx.Client) -> None:
+    """Add the path of the production redirect URI on any localhost port.
+
+    Must run after wediga.yaml is applied, which resets the list to the one
+    production address.
+    """
+    provider = api.get(
+        "/providers/oauth2/", params={"client_id": SITE_CLIENT_ID}
+    ).json()["results"][0]
+    production = provider["redirect_uris"][0]
+    local = {
+        "matching_mode": "regex",
+        "url": f"{LOCAL_ORIGIN_PATTERN}{re.escape(urlsplit(production['url']).path)}$",
+    }
+    api.patch(
+        f"/providers/oauth2/{provider['pk']}/",
+        json={"redirect_uris": [production, local]},
+    )
+
+
 def create_user(api: httpx.Client, username: str, group: str | None) -> None:
     """Create the account from scratch, deleting one left by an earlier run."""
     for old in api.get("/core/users/", params={"username": username}).json()["results"]:
@@ -297,6 +323,7 @@ def main() -> None:
             READY_TIMEOUT_SECONDS,
         )
         prepare_blueprints(api)
+        allow_local_redirect(api)
 
         for username, group in ACCOUNTS:
             create_user(api, username, group)

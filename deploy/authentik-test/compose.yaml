@@ -19,6 +19,7 @@ x-authentik-env: &authentik-env
   AUTHENTIK_POSTGRESQL__PASSWORD: *db-password
   AUTHENTIK_BOOTSTRAP_TOKEN: test-only-bootstrap-token
   AUTHENTIK_BOOTSTRAP_EMAIL: akadmin@example.com
+  WEDIGA_OIDC_CLIENT_SECRET: test-only-oidc-client-secret
 
 services:
   authentik-db:
