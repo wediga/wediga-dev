@@ -41,6 +41,7 @@ GROUP_ROLES = {
 }
 
 START_PAGE = "/"
+PASSWORD_LOGIN_PAGE = "/login"
 ADMIN_HOME = "/admin"
 HUB_HOME = "/hub"
 NO_ACCESS_PATH = "/no-access"
@@ -242,10 +243,16 @@ def callback(
 def logout(request: Request, settings: Settings) -> dict[str, str]:
     """End the login here and return the authentik URL that ends it there.
 
-    The local logout always happens. If authentik cannot be reached, the
-    browser goes to the start page instead.
+    The local logout always happens. A session without a login through
+    authentik (the password login) has nothing to end there and goes back to
+    the password login. If authentik cannot be reached, the browser goes to
+    the start page instead.
     """
+    had_authentik_login = OIDC_SESSION_KEY in request.session
     _drop_login_state(request)
+
+    if not had_authentik_login:
+        return {"redirect": PASSWORD_LOGIN_PAGE}
 
     try:
         url = oidc.end_session_url(settings, oidc.load_metadata(settings))

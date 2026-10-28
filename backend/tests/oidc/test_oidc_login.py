@@ -269,6 +269,17 @@ def test_logout_ends_the_login_and_points_to_authentik(client, fake) -> None:
     assert CSRF_SESSION_KEY not in session
 
 
+@pytest.mark.usefixtures("fake")
+def test_logout_of_a_password_login_skips_authentik(client) -> None:
+    assert client.post("/auth/login", json={"password": ADMIN_PASSWORD}).is_success
+    client.get("/auth/csrf")
+
+    response = log_out(client)
+
+    assert response.json() == {"redirect": "/login"}
+    assert ADMIN_SESSION_KEY not in read_session(client)
+
+
 def test_logout_keeps_the_recruiter_session(app, client, fake) -> None:
     redeem_recruiter_link(app, client)
     log_in(client, fake, ["friends"])
