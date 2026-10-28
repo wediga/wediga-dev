@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from app.auth import totp
 from app.auth.csrf import issue_csrf_token, require_csrf
-from app.auth.dependencies import require_admin
+from app.auth.dependencies import require_admin, require_login
 from app.auth.passwords import verify_password
 from app.auth.ratelimit import client_ip, login_limiter, totp_limiter
 from app.auth.sessions import ADMIN_SESSION_KEY, PENDING_2FA_SESSION_KEY
@@ -162,9 +162,10 @@ def me() -> dict[str, bool]:
     return {"admin": True}
 
 
-@router.get("/csrf", dependencies=[Depends(require_admin)])
+@router.get("/csrf", dependencies=[Depends(require_login)])
 def csrf(request: Request) -> dict[str, str]:
-    """Return the session CSRF token for the admin to send on writes."""
+    """Return the session CSRF token to send on writes. Every logged in
+    visitor gets it, since logging out is a write as well."""
     return {"csrf_token": issue_csrf_token(request)}
 
 
