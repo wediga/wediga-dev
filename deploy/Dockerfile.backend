@@ -32,6 +32,10 @@ RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
+# The app runs from the uv-built /app/.venv, so the base image's pip is never
+# used and would only carry its own vulnerabilities into the image.
+RUN pip uninstall -y pip
+
 # Run as a non-root user (uid/gid 999).
 RUN groupadd --gid 999 nonroot \
     && useradd --uid 999 --gid 999 --no-create-home nonroot
