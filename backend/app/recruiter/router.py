@@ -85,7 +85,7 @@ def redeem(token: str, request: Request) -> dict[str, bool]:
         )
 
     request.session[RECRUITER_SESSION_KEY] = link_id
-    repo.record_view(link_id, coarse_origin(client_ip(request)))  # type: ignore[arg-type]
+    repo.record_view(link_id, coarse_origin(client_ip(request)))
     return {"ok": True}
 
 

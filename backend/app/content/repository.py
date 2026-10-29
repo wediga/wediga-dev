@@ -173,7 +173,7 @@ def create_project(data: ProjectWrite) -> dict:
         )
         conn.commit()
         project_id = cursor.lastrowid
-    return get_project(project_id)  # type: ignore[return-value]
+    return get_project(project_id)
 
 
 def update_project(project_id: int, data: ProjectWrite) -> dict | None:
@@ -247,7 +247,7 @@ def create_category(data: SkillCategoryWrite) -> dict:
         conn.commit()
         category_id = cursor.lastrowid
         category = _get_category(conn, category_id)
-    return {**category, "skills": []}  # type: ignore[dict-item]
+    return {**category, "skills": []}
 
 
 def update_category(category_id: int, data: SkillCategoryWrite) -> dict | None:
@@ -265,7 +265,7 @@ def update_category(category_id: int, data: SkillCategoryWrite) -> dict | None:
             "ORDER BY sort_order, id",
             (category_id,),
         ).fetchall()
-    return {**category, "skills": [dict(s) for s in skills]}  # type: ignore[dict-item]
+    return {**category, "skills": [dict(s) for s in skills]}
 
 
 def delete_category(category_id: int) -> bool:

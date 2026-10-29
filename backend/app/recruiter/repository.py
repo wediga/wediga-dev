@@ -85,7 +85,7 @@ def create_link(label: str | None, expires_on: date | None) -> tuple[dict, str]:
         )
         conn.commit()
         link = _get_link(conn, cursor.lastrowid)
-    return link, token  # type: ignore[return-value]
+    return link, token
 
 
 def list_links() -> list[dict]:
