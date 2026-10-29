@@ -8,7 +8,7 @@ checks that the backend never talks to the public address itself.
 
 import time
 
-import httpx
+import httpx2
 from joserfc import jwt
 from joserfc.jwk import RSAKey
 
@@ -74,7 +74,7 @@ class FakeAuthentik:
         self.unreachable = False
         self.get_calls: list[tuple[str, dict]] = []
         self.token_calls: list[tuple[str, dict]] = []
-        monkeypatch.setattr(oidc.httpx, "get", self._get)
+        monkeypatch.setattr(oidc.httpx2, "get", self._get)
         monkeypatch.setattr(oidc.OAuth2Client, "fetch_token", self._fetch_token)
 
     def _expected_url(self, url: str) -> str:
@@ -87,23 +87,23 @@ class FakeAuthentik:
         else:
             assert "Host" not in headers
 
-    def _get(self, url: str, headers: dict, timeout) -> httpx.Response:
+    def _get(self, url: str, headers: dict, timeout) -> httpx2.Response:
         self.get_calls.append((url, headers))
         self._check_headers(headers)
-        request = httpx.Request("GET", url)
+        request = httpx2.Request("GET", url)
 
         if self.unreachable:
-            raise httpx.ConnectError("unreachable", request=request)
+            raise httpx2.ConnectError("unreachable", request=request)
 
         if url == self._expected_url(ISSUER + oidc.DISCOVERY_PATH):
-            return httpx.Response(200, json=self.metadata, request=request)
+            return httpx2.Response(200, json=self.metadata, request=request)
 
         if url == self._expected_url(METADATA["jwks_uri"]):
             keys = {"keys": [SIGNING_KEY.as_dict(private=False)]}
 
-            return httpx.Response(200, json=keys, request=request)
+            return httpx2.Response(200, json=keys, request=request)
 
-        return httpx.Response(404, request=request)
+        return httpx2.Response(404, request=request)
 
     def _fetch_token(self, url: str, **kwargs) -> dict:
         self.token_calls.append((url, kwargs))

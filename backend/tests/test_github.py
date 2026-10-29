@@ -12,7 +12,7 @@ Secure session cookie round-trips.
 
 import importlib
 
-import httpx
+import httpx2
 import pytest
 from fastapi.testclient import TestClient
 
@@ -105,18 +105,18 @@ def _mapped(
 
 
 def _mock_client(pages):
-    """Build an httpx.Client backed by a transport that serves fixed pages.
+    """Build an httpx2.Client backed by a transport that serves fixed pages.
 
     ``pages`` is a list of response bodies keyed by the 1-based page number.
     """
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         page = int(request.url.params.get("page", "1"))
         body = pages[page - 1] if page - 1 < len(pages) else []
-        return httpx.Response(200, json=body)
+        return httpx2.Response(200, json=body)
 
-    return httpx.Client(
-        transport=httpx.MockTransport(handler),
+    return httpx2.Client(
+        transport=httpx2.MockTransport(handler),
         base_url="https://api.github.com",
     )
 
@@ -154,10 +154,10 @@ def test_client_non_200_raises():
     from app.github import client as gh
 
     def handler(request):
-        return httpx.Response(403, json={"message": "rate limited"})
+        return httpx2.Response(403, json={"message": "rate limited"})
 
-    bad = httpx.Client(
-        transport=httpx.MockTransport(handler), base_url="https://api.github.com"
+    bad = httpx2.Client(
+        transport=httpx2.MockTransport(handler), base_url="https://api.github.com"
     )
     with pytest.raises(gh.GithubApiError):
         gh.fetch_repos(client=bad)

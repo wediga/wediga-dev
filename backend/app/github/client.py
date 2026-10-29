@@ -9,11 +9,11 @@ raises ``GithubApiError`` so the caller fails without touching the cache.
 
 import os
 
-import httpx
+import httpx2
 
 GITHUB_API_BASE = "https://api.github.com"
 PER_PAGE = 100
-TIMEOUT = httpx.Timeout(10.0)
+TIMEOUT = httpx2.Timeout(10.0)
 # A hard bound on the page loop so a misbehaving API can never spin forever.
 MAX_PAGES = 50
 
@@ -69,7 +69,7 @@ def _parse_batch(payload) -> list[dict]:
     return [_map_repo(item) for item in payload]
 
 
-def fetch_repos(*, client: httpx.Client | None = None) -> list[dict]:
+def fetch_repos(*, client: httpx2.Client | None = None) -> list[dict]:
     """Return the account's public repos mapped to the mirrored fields.
 
     All pages are fetched before anything returns, so the caller can write them
@@ -78,7 +78,7 @@ def fetch_repos(*, client: httpx.Client | None = None) -> list[dict]:
     """
     owns_client = client is None
     if client is None:
-        client = httpx.Client(
+        client = httpx2.Client(
             base_url=GITHUB_API_BASE, headers=_headers(), timeout=TIMEOUT
         )
     try:
@@ -90,13 +90,13 @@ def fetch_repos(*, client: httpx.Client | None = None) -> list[dict]:
                     f"/users/{username}/repos",
                     params={"per_page": PER_PAGE, "page": page},
                 )
-            except httpx.HTTPError as exc:
+            except httpx2.HTTPError as exc:
                 # Surface only the error class, not the request internals, so
                 # nothing sensitive leaks into a log or response.
                 raise GithubApiError(
                     f"request to GitHub failed: {exc.__class__.__name__}"
                 ) from exc
-            if response.status_code != httpx.codes.OK:
+            if response.status_code != httpx2.codes.OK:
                 raise GithubApiError(f"GitHub returned status {response.status_code}")
             batch = response.json()
             repos.extend(_parse_batch(batch))
