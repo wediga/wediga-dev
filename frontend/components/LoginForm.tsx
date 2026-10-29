@@ -6,10 +6,15 @@ import { useRouter } from "next/navigation";
 // Sign-in for the protected area. The password posts to /api/login; when the
 // second factor is active the backend asks for a code, so the form switches to
 // a code step that posts to /api/login/totp. On success it lands on /admin with
-// a refresh so the server gate re-reads the new session.
+// a refresh so the server gate re-reads the new session. While the login
+// through authentik is switched on, a link to it stands above the password.
 type Step = "password" | "code";
 
-export default function LoginPage() {
+export default function LoginForm({
+  authentikLoginHref,
+}: {
+  authentikLoginHref: string | null;
+}) {
   const [step, setStep] = useState<Step>("password");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -22,7 +27,7 @@ export default function LoginPage() {
     router.refresh();
   }
 
-  async function onPasswordSubmit(event: React.FormEvent) {
+  async function onPasswordSubmit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(false);
     setPending(true);
@@ -44,7 +49,7 @@ export default function LoginPage() {
     }
   }
 
-  async function onCodeSubmit(event: React.FormEvent) {
+  async function onCodeSubmit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(false);
     setPending(true);
@@ -76,6 +81,16 @@ export default function LoginPage() {
           ? "Der geschützte Bereich liegt hinter diesem Login."
           : "Geben Sie den Code aus Ihrer Authenticator-App ein."}
       </p>
+
+      {authentikLoginHref && step === "password" ? (
+        // A plain link, because a prefetch would already start a login.
+        <a
+          href={authentikLoginHref}
+          className="quiet-press mt-10 block w-full rounded-md border border-accent px-6 py-2.5 text-center text-sm uppercase tracking-[0.14em] text-accent transition-colors hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent/60"
+        >
+          Mit wediga.dev-Konto anmelden
+        </a>
+      ) : null}
 
       {step === "password" ? (
         <form onSubmit={onPasswordSubmit} className="mt-10 space-y-5" noValidate>

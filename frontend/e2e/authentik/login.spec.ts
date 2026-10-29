@@ -19,14 +19,18 @@ async function expectNoAdminAccess(page: Page) {
   await expect(page).toHaveURL(/\/login$/);
 }
 
-test("the admin gets into /admin, and logging out ends the authentik session as well", async ({
+test("the admin gets into /admin through the link on /login, and logging out ends the authentik session as well", async ({
   page,
 }) => {
   await page.route(`${LIVE_SITE}**`, (route) =>
     route.fulfill({ contentType: "text/html", body: "live site" }),
   );
 
-  await logInThroughAuthentik(page, "test-admin");
+  await page.goto("/login");
+  await page
+    .getByRole("link", { name: "Mit wediga.dev-Konto anmelden" })
+    .click();
+  await logInAtAuthentik(page, "test-admin");
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole("link", { name: "Overview" })).toBeVisible();
 
