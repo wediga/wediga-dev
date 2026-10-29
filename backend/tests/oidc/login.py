@@ -8,6 +8,7 @@ import base64
 import json
 from urllib.parse import parse_qs, urlsplit
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from itsdangerous import TimestampSigner
 from starlette.middleware.sessions import SessionMiddleware
@@ -27,10 +28,12 @@ def read_session(client: TestClient) -> dict:
 
     # The app may have been imported by another test before SESSION_SECRET was
     # set, so the secret is taken from the middleware actually in use.
-    middleware = next(
-        m for m in client.app.user_middleware if m.cls is SessionMiddleware
-    )
-    signer = TimestampSigner(middleware.kwargs["secret_key"])
+    app = client.app
+    assert isinstance(app, FastAPI)
+    middleware = next(m for m in app.user_middleware if m.cls is SessionMiddleware)
+    secret_key = middleware.kwargs["secret_key"]
+    assert isinstance(secret_key, str)
+    signer = TimestampSigner(secret_key)
 
     return json.loads(base64.b64decode(signer.unsign(cookie)))
 
