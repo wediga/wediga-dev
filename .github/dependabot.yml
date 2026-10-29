@@ -20,14 +20,6 @@ updates:
         patterns: ["*"]
         update-types: ["minor", "patch"]
 
-  # Temporary: the dependency graph still holds a snapshot of the root
-  # uv.lock that was deleted on 2026-06-10. A graph run for "/" finds no
-  # lockfile and replaces it. Remove this entry once that snapshot is gone.
-  - package-ecosystem: "uv"
-    directory: "/"
-    schedule:
-      interval: "monthly"
-
   # Next.js frontend (npm lockfile)
   - package-ecosystem: "npm"
     directory: "/frontend"
