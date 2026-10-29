@@ -1,14 +1,11 @@
-import { test, expect } from "@playwright/test";
+import { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { totpCode } from "../totp";
+import { totpCode } from "./totp";
 
-// The test authentik from deploy/authentik-test is up and set up: the admin
-// test account gets through authentik's own login with password and TOTP. This
-// only checks the test environment, wediga.dev is not involved yet.
+// The test accounts that deploy/authentik-test/setup.py creates, and the way
+// through authentik's own login forms with password and TOTP.
 
 type Account = { password: string; totp_secret: string };
-
-const ADMIN_ACCOUNT = "test-admin";
 
 function account(username: string): Account {
   const file = process.env.AUTHENTIK_ACCOUNTS;
@@ -28,21 +25,20 @@ function account(username: string): Account {
   return found;
 }
 
-test("the admin test account logs in with password and TOTP", async ({
-  page,
-}) => {
-  const admin = account(ADMIN_ACCOUNT);
+// Fill in authentik's login forms on the current page. authentik accepts each
+// TOTP code only once, so an account logs in at most once per 30 seconds.
+export async function logInAtAuthentik(
+  page: Page,
+  username: string,
+): Promise<void> {
+  const { password, totp_secret } = account(username);
 
-  await page.goto("/");
-  await page.getByRole("textbox", { name: /username/i }).fill(ADMIN_ACCOUNT);
+  await page.getByRole("textbox", { name: /username/i }).fill(username);
   await page.getByRole("button", { name: "Log in" }).click();
-  await page.getByRole("textbox", { name: "Password" }).fill(admin.password);
+  await page.getByRole("textbox", { name: "Password" }).fill(password);
   await page.getByRole("button", { name: "Continue" }).click();
   await page
     .getByRole("textbox", { name: /code/i })
-    .fill(totpCode(admin.totp_secret));
+    .fill(totpCode(totp_secret));
   await page.getByRole("button", { name: "Continue" }).click();
-
-  // A finished login lands on authentik's user interface.
-  await expect(page).toHaveURL(/\/if\/user\//);
-});
+}

@@ -1,0 +1,116 @@
+"""A stand-in for authentik in the login tests.
+
+Signs real RS256 ID tokens with a key generated for the test run and answers
+the backend's discovery, key and token requests. Requests must arrive on the
+internal URL with the public host in the ``Host`` header, so every test also
+checks that the backend never talks to the public address itself.
+"""
+
+import time
+
+import httpx
+from joserfc import jwt
+from joserfc.jwk import RSAKey
+
+from app.auth import oidc
+from app.auth.oidc_settings import OidcSettings
+
+ISSUER = "https://auth.example/application/o/wediga-dev/"
+PUBLIC_HOST = "auth.example"
+INTERNAL_URL = "http://authentik-server:9000"
+CLIENT_ID = "wediga-dev"
+KEY_ID = "test-key"
+TOKEN_LIFETIME_SECONDS = 300
+
+SETTINGS = OidcSettings(
+    issuer=ISSUER,
+    client_id=CLIENT_ID,
+    client_secret="test-client-secret",
+    redirect_uri="https://www.example/auth/callback",
+    internal_url=INTERNAL_URL,
+)
+
+METADATA = {
+    "issuer": ISSUER,
+    "authorization_endpoint": "https://auth.example/application/o/authorize/",
+    "token_endpoint": "https://auth.example/application/o/token/",
+    "jwks_uri": ISSUER + "jwks/",
+    "end_session_endpoint": ISSUER + "end-session/",
+}
+
+SIGNING_KEY = RSAKey.generate_key(2048, parameters={"kid": KEY_ID})
+
+
+def internal(url: str) -> str:
+    return url.replace("https://auth.example", INTERNAL_URL)
+
+
+def make_id_token(key=SIGNING_KEY, alg: str = "RS256", **claims) -> str:
+    """Return a signed ID token. ``claims`` (always with the ``nonce``) override
+    or, with ``None``, remove the defaults."""
+    now = int(time.time())
+    payload = {
+        "iss": ISSUER,
+        "sub": "user-1",
+        "aud": CLIENT_ID,
+        "exp": now + TOKEN_LIFETIME_SECONDS,
+        "iat": now,
+        "groups": [],
+    }
+    payload.update(claims)
+    payload = {name: value for name, value in payload.items() if value is not None}
+
+    return jwt.encode({"alg": alg, "kid": KEY_ID}, payload, key)
+
+
+class FakeAuthentik:
+    """Answers the backend's requests and records them."""
+
+    def __init__(self, monkeypatch, settings: OidcSettings = SETTINGS) -> None:
+        self.settings = settings
+        self.metadata = dict(METADATA)
+        self.id_token: str | None = None
+        self.token_error: Exception | None = None
+        self.unreachable = False
+        self.get_calls: list[tuple[str, dict]] = []
+        self.token_calls: list[tuple[str, dict]] = []
+        monkeypatch.setattr(oidc.httpx, "get", self._get)
+        monkeypatch.setattr(oidc.OAuth2Client, "fetch_token", self._fetch_token)
+
+    def _expected_url(self, url: str) -> str:
+        return internal(url) if self.settings.internal_url else url
+
+    def _check_headers(self, headers: dict) -> None:
+        if self.settings.internal_url:
+            assert headers["Host"] == PUBLIC_HOST
+            assert headers["X-Forwarded-Proto"] == "https"
+        else:
+            assert "Host" not in headers
+
+    def _get(self, url: str, headers: dict, timeout) -> httpx.Response:
+        self.get_calls.append((url, headers))
+        self._check_headers(headers)
+        request = httpx.Request("GET", url)
+
+        if self.unreachable:
+            raise httpx.ConnectError("unreachable", request=request)
+
+        if url == self._expected_url(ISSUER + oidc.DISCOVERY_PATH):
+            return httpx.Response(200, json=self.metadata, request=request)
+
+        if url == self._expected_url(METADATA["jwks_uri"]):
+            keys = {"keys": [SIGNING_KEY.as_dict(private=False)]}
+
+            return httpx.Response(200, json=keys, request=request)
+
+        return httpx.Response(404, request=request)
+
+    def _fetch_token(self, url: str, **kwargs) -> dict:
+        self.token_calls.append((url, kwargs))
+        assert url == self._expected_url(METADATA["token_endpoint"])
+        self._check_headers(kwargs["headers"])
+
+        if self.token_error is not None:
+            raise self.token_error
+
+        return {"access_token": "access", "id_token": self.id_token}

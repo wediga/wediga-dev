@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 // The end-to-end suite drives the real stack: a FastAPI backend and the Next.js
@@ -25,6 +26,41 @@ const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "e2e-admin-password";
 // up and AUTHENTIK_URL points at it, as in the CI. Locally the suite runs
 // without it as before.
 const AUTHENTIK_URL = process.env.AUTHENTIK_URL;
+const AUTHENTIK_COMPOSE = path.join(
+  __dirname,
+  "..",
+  "deploy",
+  "authentik-test",
+  "compose.yaml",
+);
+// The application slug and client ID of wediga.dev in the blueprint.
+const OIDC_CLIENT_ID = "wediga-dev";
+
+// The client secret is a fixed test value defined only in the test
+// authentik's compose file, so it is read from there.
+function testClientSecret(): string {
+  const match = readFileSync(AUTHENTIK_COMPOSE, "utf-8").match(
+    /WEDIGA_OIDC_CLIENT_SECRET: (\S+)/,
+  );
+
+  if (!match) {
+    throw new Error(`no WEDIGA_OIDC_CLIENT_SECRET in ${AUTHENTIK_COMPOSE}`);
+  }
+
+  return match[1];
+}
+
+// With the test authentik up, the backend gets the login through it switched
+// on. Without it the login stays off, as in production.
+const OIDC_ENV: Record<string, string> = AUTHENTIK_URL
+  ? {
+      OIDC_ENABLED: "true",
+      OIDC_ISSUER: `${AUTHENTIK_URL}/application/o/${OIDC_CLIENT_ID}/`,
+      OIDC_CLIENT_ID,
+      OIDC_CLIENT_SECRET: testClientSecret(),
+      OIDC_REDIRECT_URI: `${FRONTEND_URL}/auth/callback`,
+    }
+  : {};
 
 export default defineConfig({
   testDir: "./e2e/specs",
@@ -46,7 +82,7 @@ export default defineConfig({
           {
             name: "authentik",
             testDir: "./e2e/authentik",
-            use: { ...devices["Desktop Chrome"], baseURL: AUTHENTIK_URL },
+            use: { ...devices["Desktop Chrome"] },
           },
         ]
       : []),
@@ -64,6 +100,7 @@ export default defineConfig({
         ADMIN_PASSWORD,
         SESSION_SECRET: "e2e-session-secret-not-for-production",
         COOKIE_SECURE: "false",
+        ...OIDC_ENV,
       },
     },
     {

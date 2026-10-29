@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 
 from app.api import api_router
 from app.auth.bootstrap import ensure_admin
+from app.auth.oidc_settings import load_oidc_settings
 from app.auth.sessions import add_session_middleware
 from app.github.scheduler import start_scheduler
 
@@ -24,7 +25,12 @@ logger = logging.getLogger("uvicorn.error")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Bootstrap the admin and start the GitHub refresh, neither blocking start."""
+    """Check the login settings, bootstrap the admin and start the GitHub
+    refresh. Only broken login settings block the start."""
+    # Raises on a half configured login, so the backend does not start at all
+    # rather than serve with a login that fails or runs downgraded.
+    app.state.oidc = load_oidc_settings()
+
     try:
         ensure_admin()
     except Exception:

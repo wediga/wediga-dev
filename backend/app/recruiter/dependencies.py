@@ -10,15 +10,15 @@ the same pages.
 
 from fastapi import HTTPException, Request, status
 
-from app.auth.dependencies import require_recruiter_or_admin
-from app.auth.sessions import ADMIN_SESSION_KEY, RECRUITER_SESSION_KEY
+from app.auth.dependencies import is_admin, require_recruiter_or_admin
+from app.auth.sessions import RECRUITER_SESSION_KEY
 from app.recruiter import repository as repo
 
 
 def require_recruiter_view(request: Request) -> None:
     """Allow an admin, or a recruiter whose link is still active."""
     require_recruiter_or_admin(request)
-    if request.session.get(ADMIN_SESSION_KEY):
+    if is_admin(request):
         return
     link_id = request.session.get(RECRUITER_SESSION_KEY)
     if not repo.link_is_active(link_id):
