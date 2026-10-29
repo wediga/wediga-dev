@@ -78,13 +78,15 @@ def create_link(label: str | None, expires_on: date | None) -> tuple[dict, str]:
     """Create a link and return its read view together with the plaintext token."""
     token = secrets.token_urlsafe(_TOKEN_BYTES)
     with get_connection() as conn:
-        cursor = conn.execute(
+        link_id = conn.execute(
             "INSERT INTO recruiter_link (token, label, created_at, expires_at) "
-            "VALUES (?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?) RETURNING id",
             (_hash_token(token), label, now(), _expiry_iso(expires_on)),
-        )
+        ).fetchone()["id"]
         conn.commit()
-        link = _get_link(conn, cursor.lastrowid)
+        link = _get_link(conn, link_id)
+        assert link is not None
+
     return link, token
 
 
@@ -119,20 +121,22 @@ def revoke_link(link_id: int) -> dict | None:
         return _get_link(conn, link_id)
 
 
-def validate_token(token: str) -> tuple[str, int | None]:
+def validate_token(token: str) -> tuple[str, int] | None:
     """Look a token up by its hash and classify it.
 
-    Returns ``("ok", id)``, ``("revoked", id)``, ``("expired", id)`` or
-    ``("invalid", None)``. The lookup matches on the stored hash, never the
-    plaintext.
+    Returns ``("ok", id)``, ``("revoked", id)`` or ``("expired", id)``, and
+    ``None`` for an unknown token. The lookup matches on the stored hash, never
+    the plaintext.
     """
     with get_connection() as conn:
         row = conn.execute(
             "SELECT id, expires_at, revoked_at FROM recruiter_link WHERE token = ?",
             (_hash_token(token),),
         ).fetchone()
+
     if row is None:
-        return "invalid", None
+        return None
+
     if row["revoked_at"] is not None:
         return "revoked", row["id"]
     if _is_expired(row["expires_at"]):

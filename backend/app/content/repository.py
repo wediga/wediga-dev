@@ -164,16 +164,18 @@ def _project_params(data: ProjectWrite) -> tuple:
 
 def create_project(data: ProjectWrite) -> dict:
     with get_connection() as conn:
-        cursor = conn.execute(
+        project_id = conn.execute(
             "INSERT INTO project "
             "(name, tagline, problem, solution, learning, tech_stack, "
             "demo_link, github_link, status, sort_order, visible) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
             _project_params(data),
-        )
+        ).fetchone()["id"]
         conn.commit()
-        project_id = cursor.lastrowid
-    return get_project(project_id)
+    project = get_project(project_id)
+    assert project is not None
+
+    return project
 
 
 def update_project(project_id: int, data: ProjectWrite) -> dict | None:
@@ -240,26 +242,29 @@ def _get_category(conn, category_id: int) -> dict | None:
 
 def create_category(data: SkillCategoryWrite) -> dict:
     with get_connection() as conn:
-        cursor = conn.execute(
-            "INSERT INTO skill_category (name, sort_order) VALUES (?, ?)",
+        category_id = conn.execute(
+            "INSERT INTO skill_category (name, sort_order) VALUES (?, ?) RETURNING id",
             (data.name, data.sort_order),
-        )
+        ).fetchone()["id"]
         conn.commit()
-        category_id = cursor.lastrowid
         category = _get_category(conn, category_id)
+        assert category is not None
+
     return {**category, "skills": []}
 
 
 def update_category(category_id: int, data: SkillCategoryWrite) -> dict | None:
     with get_connection() as conn:
-        cursor = conn.execute(
+        conn.execute(
             "UPDATE skill_category SET name = ?, sort_order = ? WHERE id = ?",
             (data.name, data.sort_order, category_id),
         )
         conn.commit()
-        if cursor.rowcount == 0:
-            return None
         category = _get_category(conn, category_id)
+
+        if category is None:
+            return None
+
         skills = conn.execute(
             "SELECT id, name, sort_order FROM skill WHERE category_id = ? "
             "ORDER BY sort_order, id",
@@ -280,12 +285,12 @@ def create_skill(category_id: int, data: SkillWrite) -> dict | None:
     with get_connection() as conn:
         if _get_category(conn, category_id) is None:
             return None
-        cursor = conn.execute(
-            "INSERT INTO skill (category_id, name, sort_order) VALUES (?, ?, ?)",
+        skill_id = conn.execute(
+            "INSERT INTO skill (category_id, name, sort_order) VALUES (?, ?, ?) "
+            "RETURNING id",
             (category_id, data.name, data.sort_order),
-        )
+        ).fetchone()["id"]
         conn.commit()
-        skill_id = cursor.lastrowid
         row = conn.execute(
             "SELECT id, name, sort_order FROM skill WHERE id = ?", (skill_id,)
         ).fetchone()
