@@ -11,15 +11,17 @@ origin, so a tampered document can neither send the browser elsewhere nor make
 the backend post the client secret to a foreign host.
 """
 
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
 import httpx2
+
+# Typed through backend/typings, the module docstring there says why.
 from authlib.integrations.httpx_client import OAuth2Client, OAuthError
 from authlib.oauth2.client import DEFAULT_HEADERS
 from authlib.oidc.core import CodeIDToken
 from joserfc import jwt
 from joserfc.errors import JoseError
-from joserfc.jwk import KeySet
+from joserfc.jwk import KeySet, KeySetSerialization
 
 from app.auth.oidc_settings import OidcSettings
 
@@ -66,7 +68,7 @@ def _server_side(settings: OidcSettings, url: str) -> tuple[str, dict[str, str]]
     parts = urlsplit(url)._replace(scheme=internal.scheme, netloc=internal.netloc)
     headers = {"Host": netloc, "X-Forwarded-Proto": scheme}
 
-    return urlunsplit(parts), headers
+    return parts.geturl(), headers
 
 
 def _get_json(settings: OidcSettings, url: str) -> dict:
@@ -160,12 +162,12 @@ def validate_id_token(
 ) -> dict:
     """Check signature, issuer, audience, lifetime and nonce of the ID token
     and return its claims."""
-    keys = _get_json(settings, metadata["jwks_uri"])
+    jwks = _get_json(settings, metadata["jwks_uri"])
 
     try:
         decoded = jwt.decode(
             token["id_token"],
-            KeySet.import_key_set(keys),
+            KeySet.import_key_set(KeySetSerialization(keys=jwks["keys"])),
             algorithms=ID_TOKEN_ALGORITHMS,
         )
         # Without the audience listed here, Authlib would accept a token for
