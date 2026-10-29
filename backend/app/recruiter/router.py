@@ -76,16 +76,20 @@ def redeem(token: str, request: Request) -> dict[str, bool]:
             detail="Too many attempts, try again later",
         )
 
-    result, link_id = repo.validate_token(token)
-    if result == "invalid":
+    found = repo.validate_token(token)
+
+    if found is None:
         raise not_found("Link not found")
-    if result in ("revoked", "expired"):
+
+    link_status, link_id = found
+
+    if link_status in (repo.LinkStatus.REVOKED, repo.LinkStatus.EXPIRED):
         raise HTTPException(
             status_code=status.HTTP_410_GONE, detail="Link no longer valid"
         )
 
     request.session[RECRUITER_SESSION_KEY] = link_id
-    repo.record_view(link_id, coarse_origin(client_ip(request)))  # type: ignore[arg-type]
+    repo.record_view(link_id, coarse_origin(client_ip(request)))
     return {"ok": True}
 
 

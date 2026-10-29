@@ -24,6 +24,7 @@ import os
 import re
 import time
 from collections.abc import Callable, Iterable
+from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -120,7 +121,7 @@ def token_accepted(api: httpx2.Client) -> bool:
     try:
         api.get("/core/users/me/")
     except httpx2.HTTPStatusError as error:
-        if error.response.status_code == httpx2.codes.FORBIDDEN:
+        if error.response.status_code == HTTPStatus.FORBIDDEN:
             return False
 
         raise
@@ -198,7 +199,12 @@ def prepare_blueprints(api: httpx2.Client) -> None:
         READY_TIMEOUT_SECONDS,
     )
     apply_blueprint(api, recovery_instance(api))
-    apply_blueprint(api, blueprint_by_path(api, SITE_BLUEPRINT))
+    site = blueprint_by_path(api, SITE_BLUEPRINT)
+
+    if site is None:
+        raise SystemExit(f"authentik does not know the blueprint {SITE_BLUEPRINT}")
+
+    apply_blueprint(api, site)
 
     # On a fresh start the worker applies many blueprints at once, and two of
     # them can deadlock in the database. One more run clears that, a real
@@ -287,6 +293,10 @@ def enroll_totp(base_url: str, username: str) -> pyotp.TOTP:
             },
         ).json()
         totp = pyotp.parse_uri(challenge["config_url"])
+
+        if not isinstance(totp, pyotp.TOTP):
+            raise SystemExit(f"authentik set up no TOTP device for {username}")
+
         done = flow.post(
             "", json={"component": "ak-stage-authenticator-totp", "code": totp.now()}
         ).json()

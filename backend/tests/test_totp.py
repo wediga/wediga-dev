@@ -100,8 +100,8 @@ def test_verify_code_accepts_one_step_drift() -> None:
 
     secret = totp.generate_secret()
     generator = pyotp.TOTP(secret)
-    assert totp.verify_code(secret, generator.at(time.time() - 30)) is True
-    assert totp.verify_code(secret, generator.at(time.time() - 90)) is False
+    assert totp.verify_code(secret, generator.at(int(time.time()) - 30)) is True
+    assert totp.verify_code(secret, generator.at(int(time.time()) - 90)) is False
 
 
 def test_setup_requires_admin_session(client) -> None:

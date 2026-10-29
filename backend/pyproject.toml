@@ -14,20 +14,24 @@ dependencies = [
     "pyotp>=2.10.0",
     "python-multipart>=0.0.32",
     "qrcode>=8.2",
+    "starlette>=1.3.1",
     "uvicorn[standard]>=0.49.0",
 ]
 
 [dependency-groups]
 dev = [
+    "pyright>=1.1.414",
     "pytest>=9.0.3",
     "ruff>=0.17.1",
 ]
 
 # ruff's default rules, plus exception chaining and named constants instead of
 # bare numbers in comparisons. Tests compare against literal status codes on
-# purpose, so the second rule only applies to the application code.
+# purpose, so the second rule only applies to the application code. A
+# type-ignore comment has to name the rule it suppresses, and a noqa comment
+# that suppresses nothing is an error.
 [tool.ruff.lint]
-extend-select = ["B904", "PLR2004"]
+extend-select = ["B904", "PLR2004", "PGH003", "RUF100"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR2004"]

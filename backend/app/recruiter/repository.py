@@ -11,11 +11,20 @@ from input.
 import hashlib
 import secrets
 from datetime import UTC, date, datetime, time
+from enum import Enum, auto
 
 from app.db.connection import get_connection, now
 
 # 32 url-safe random bytes, a 256-bit token.
 _TOKEN_BYTES = 32
+
+
+class LinkStatus(Enum):
+    """State of a known link, as ``validate_token`` reports it."""
+
+    OK = auto()
+    REVOKED = auto()
+    EXPIRED = auto()
 
 
 def _hash_token(token: str) -> str:
@@ -78,14 +87,16 @@ def create_link(label: str | None, expires_on: date | None) -> tuple[dict, str]:
     """Create a link and return its read view together with the plaintext token."""
     token = secrets.token_urlsafe(_TOKEN_BYTES)
     with get_connection() as conn:
-        cursor = conn.execute(
+        link_id = conn.execute(
             "INSERT INTO recruiter_link (token, label, created_at, expires_at) "
-            "VALUES (?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?) RETURNING id",
             (_hash_token(token), label, now(), _expiry_iso(expires_on)),
-        )
+        ).fetchone()["id"]
         conn.commit()
-        link = _get_link(conn, cursor.lastrowid)
-    return link, token  # type: ignore[return-value]
+        link = _get_link(conn, link_id)
+        assert link is not None
+
+    return link, token
 
 
 def list_links() -> list[dict]:
@@ -119,25 +130,28 @@ def revoke_link(link_id: int) -> dict | None:
         return _get_link(conn, link_id)
 
 
-def validate_token(token: str) -> tuple[str, int | None]:
+def validate_token(token: str) -> tuple[LinkStatus, int] | None:
     """Look a token up by its hash and classify it.
 
-    Returns ``("ok", id)``, ``("revoked", id)``, ``("expired", id)`` or
-    ``("invalid", None)``. The lookup matches on the stored hash, never the
-    plaintext.
+    Returns the link's status together with its id, or ``None`` for an unknown
+    token. The lookup matches on the stored hash, never the plaintext.
     """
     with get_connection() as conn:
         row = conn.execute(
             "SELECT id, expires_at, revoked_at FROM recruiter_link WHERE token = ?",
             (_hash_token(token),),
         ).fetchone()
+
     if row is None:
-        return "invalid", None
+        return None
+
     if row["revoked_at"] is not None:
-        return "revoked", row["id"]
+        return LinkStatus.REVOKED, row["id"]
+
     if _is_expired(row["expires_at"]):
-        return "expired", row["id"]
-    return "ok", row["id"]
+        return LinkStatus.EXPIRED, row["id"]
+
+    return LinkStatus.OK, row["id"]
 
 
 def link_is_active(link_id: int | None) -> bool:

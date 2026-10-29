@@ -10,7 +10,7 @@ import time
 
 import httpx2
 from joserfc import jwt
-from joserfc.jwk import RSAKey
+from joserfc.jwk import Key, RSAKey
 
 from app.auth import oidc
 from app.auth.oidc_settings import OidcSettings
@@ -45,7 +45,7 @@ def internal(url: str) -> str:
     return url.replace("https://auth.example", INTERNAL_URL)
 
 
-def make_id_token(key=SIGNING_KEY, alg: str = "RS256", **claims) -> str:
+def make_id_token(key: Key = SIGNING_KEY, alg: str = "RS256", **claims) -> str:
     """Return a signed ID token. ``claims`` (always with the ``nonce``) override
     or, with ``None``, remove the defaults."""
     now = int(time.time())
