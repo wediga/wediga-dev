@@ -8,6 +8,7 @@ raises ``GithubApiError`` so the caller fails without touching the cache.
 """
 
 import os
+from http import HTTPStatus
 
 import httpx2
 
@@ -96,7 +97,7 @@ def fetch_repos(*, client: httpx2.Client | None = None) -> list[dict]:
                 raise GithubApiError(
                     f"request to GitHub failed: {exc.__class__.__name__}"
                 ) from exc
-            if response.status_code != httpx2.codes.OK:
+            if response.status_code != HTTPStatus.OK:
                 raise GithubApiError(f"GitHub returned status {response.status_code}")
             batch = response.json()
             repos.extend(_parse_batch(batch))

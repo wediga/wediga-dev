@@ -4,5 +4,9 @@
   "venvPath": "backend",
   "venv": ".venv",
   "stubPath": "backend/typings",
-  "executionEnvironments": [{ "root": "backend" }]
+  "executionEnvironments": [{ "root": "backend" }],
+  "reportUnnecessaryTypeIgnoreComment": "error",
+  "reportUnnecessaryIsInstance": "error",
+  "reportUnnecessaryComparison": "error",
+  "reportUnnecessaryCast": "error"
 }

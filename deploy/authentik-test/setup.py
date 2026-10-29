@@ -24,6 +24,7 @@ import os
 import re
 import time
 from collections.abc import Callable, Iterable
+from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -120,7 +121,7 @@ def token_accepted(api: httpx2.Client) -> bool:
     try:
         api.get("/core/users/me/")
     except httpx2.HTTPStatusError as error:
-        if error.response.status_code == httpx2.codes.FORBIDDEN:
+        if error.response.status_code == HTTPStatus.FORBIDDEN:
             return False
 
         raise
