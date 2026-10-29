@@ -1,0 +1,8 @@
+{
+  "include": ["backend", "deploy/authentik-test"],
+  "exclude": ["backend/.venv"],
+  "venvPath": "backend",
+  "venv": ".venv",
+  "stubPath": "backend/typings",
+  "executionEnvironments": [{ "root": "backend" }]
+}
