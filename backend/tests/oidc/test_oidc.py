@@ -126,7 +126,7 @@ def test_code_is_exchanged_internally_with_the_verifier(fake) -> None:
 
 
 @pytest.mark.parametrize(
-    "error", [OAuthError("invalid_grant"), oidc.httpx.ConnectError("down")]
+    "error", [OAuthError("invalid_grant"), oidc.httpx2.ConnectError("down")]
 )
 def test_failed_exchange_is_a_provider_error(fake, error) -> None:
     fake.token_error = error

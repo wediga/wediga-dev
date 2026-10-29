@@ -13,7 +13,7 @@ the backend post the client secret to a foreign host.
 
 from urllib.parse import urlsplit, urlunsplit
 
-import httpx
+import httpx2
 from authlib.integrations.httpx_client import OAuth2Client, OAuthError
 from authlib.oauth2.client import DEFAULT_HEADERS
 from authlib.oidc.core import CodeIDToken
@@ -30,7 +30,7 @@ SCOPE = "openid profile"
 ID_TOKEN_ALGORITHMS = ["RS256"]
 # Allowed clock difference between authentik and the backend.
 CLOCK_LEEWAY_SECONDS = 60
-TIMEOUT = httpx.Timeout(5.0)
+TIMEOUT = httpx2.Timeout(5.0)
 DISCOVERY_PATH = ".well-known/openid-configuration"
 
 
@@ -73,10 +73,10 @@ def _get_json(settings: OidcSettings, url: str) -> dict:
     target, headers = _server_side(settings, url)
 
     try:
-        response = httpx.get(target, headers=headers, timeout=TIMEOUT)
+        response = httpx2.get(target, headers=headers, timeout=TIMEOUT)
         response.raise_for_status()
         data = response.json()
-    except (httpx.HTTPError, ValueError) as exc:
+    except (httpx2.HTTPError, ValueError) as exc:
         raise OidcProviderError(f"request to authentik failed: {exc}") from exc
 
     if not isinstance(data, dict):
@@ -146,7 +146,7 @@ def exchange_code(
                 code_verifier=verifier,
                 headers={**DEFAULT_HEADERS, **headers},
             )
-    except (httpx.HTTPError, OAuthError, ValueError) as exc:
+    except (httpx2.HTTPError, OAuthError, ValueError) as exc:
         raise OidcProviderError(f"token exchange failed: {exc}") from exc
 
     if not isinstance(token.get("id_token"), str):

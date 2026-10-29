@@ -27,7 +27,7 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from urllib.parse import urlsplit
 
-import httpx
+import httpx2
 import pyotp
 
 COMPOSE_FILE = Path(__file__).with_name("compose.yaml")
@@ -78,15 +78,15 @@ def bootstrap_token() -> str:
     return match.group(1)
 
 
-def raise_on_error(response: httpx.Response) -> None:
+def raise_on_error(response: httpx2.Response) -> None:
     # The hook also sees each redirect on the way, which the client follows.
     if not response.is_redirect:
         response.raise_for_status()
 
 
-def client(base_url: str, headers: dict[str, str] | None = None) -> httpx.Client:
+def client(base_url: str, headers: dict[str, str] | None = None) -> httpx2.Client:
     """An HTTP client that fails on every error response."""
-    return httpx.Client(
+    return httpx2.Client(
         base_url=base_url,
         headers=headers,
         timeout=REQUEST_TIMEOUT_SECONDS,
@@ -107,20 +107,20 @@ def wait_for(description: str, check: Callable[[], bool], timeout: int) -> None:
 
 def is_ready(base_url: str) -> bool:
     try:
-        response = httpx.get(f"{base_url}/-/health/ready/")
-    except httpx.TransportError:
+        response = httpx2.get(f"{base_url}/-/health/ready/")
+    except httpx2.TransportError:
         return False
 
     return response.is_success
 
 
-def token_accepted(api: httpx.Client) -> bool:
+def token_accepted(api: httpx2.Client) -> bool:
     # The worker creates the bootstrap token from a blueprint, which can finish
     # after the server reports ready. Until then, the API answers 403.
     try:
         api.get("/core/users/me/")
-    except httpx.HTTPStatusError as error:
-        if error.response.status_code == httpx.codes.FORBIDDEN:
+    except httpx2.HTTPStatusError as error:
+        if error.response.status_code == httpx2.codes.FORBIDDEN:
             return False
 
         raise
@@ -128,7 +128,7 @@ def token_accepted(api: httpx.Client) -> bool:
     return True
 
 
-def blueprints(api: httpx.Client) -> list[dict]:
+def blueprints(api: httpx2.Client) -> list[dict]:
     response = api.get(
         "/managed/blueprints/", params={"page_size": BLUEPRINT_PAGE_SIZE}
     )
@@ -136,35 +136,35 @@ def blueprints(api: httpx.Client) -> list[dict]:
     return response.json()["results"]
 
 
-def blueprint_by_path(api: httpx.Client, path: str) -> dict | None:
+def blueprint_by_path(api: httpx2.Client, path: str) -> dict | None:
     return next((b for b in blueprints(api) if b["path"] == path), None)
 
 
-def not_successful(api: httpx.Client) -> list[dict]:
+def not_successful(api: httpx2.Client) -> list[dict]:
     return [b for b in blueprints(api) if b["status"] != STATUS_SUCCESSFUL]
 
 
-def task_count(api: httpx.Client, state: str) -> int:
+def task_count(api: httpx2.Client, state: str) -> int:
     response = api.get("/tasks/tasks/", params={"state": state})
 
     return response.json()["pagination"]["count"]
 
 
-def worker_idle(api: httpx.Client) -> bool:
+def worker_idle(api: httpx2.Client) -> bool:
     return not any(task_count(api, state) for state in PENDING_TASK_STATES)
 
 
-def wait_for_worker(api: httpx.Client) -> None:
+def wait_for_worker(api: httpx2.Client) -> None:
     wait_for("the worker", lambda: worker_idle(api), APPLY_TIMEOUT_SECONDS)
 
 
-def startup_blueprints_done(api: httpx.Client) -> bool:
+def startup_blueprints_done(api: httpx2.Client) -> bool:
     # The worker finds the blueprint files in a task that queues every apply,
     # so once the file below is known, an idle worker has applied them all.
     return blueprint_by_path(api, SITE_BLUEPRINT) is not None and worker_idle(api)
 
 
-def apply_blueprint(api: httpx.Client, instance: dict) -> None:
+def apply_blueprint(api: httpx2.Client, instance: dict) -> None:
     """Apply a blueprint and wait until the worker has finished it.
 
     Waiting for the whole worker instead of this blueprint keeps two runs from
@@ -174,7 +174,7 @@ def apply_blueprint(api: httpx.Client, instance: dict) -> None:
     wait_for_worker(api)
 
 
-def recovery_instance(api: httpx.Client) -> dict:
+def recovery_instance(api: httpx2.Client) -> dict:
     existing = blueprint_by_path(api, RECOVERY_BLUEPRINT)
 
     if existing is not None:
@@ -191,7 +191,7 @@ def recovery_instance(api: httpx.Client) -> dict:
     ).json()
 
 
-def prepare_blueprints(api: httpx.Client) -> None:
+def prepare_blueprints(api: httpx2.Client) -> None:
     wait_for(
         "the startup blueprints",
         lambda: startup_blueprints_done(api),
@@ -217,7 +217,7 @@ def prepare_blueprints(api: httpx.Client) -> None:
         raise SystemExit("the brand has no recovery flow after applying wediga.yaml")
 
 
-def allow_local_redirect(api: httpx.Client) -> None:
+def allow_local_redirect(api: httpx2.Client) -> None:
     """Add the path of the production redirect URI on any localhost port.
 
     Must run after wediga.yaml is applied, which resets the list to the one
@@ -237,7 +237,7 @@ def allow_local_redirect(api: httpx.Client) -> None:
     )
 
 
-def create_user(api: httpx.Client, username: str, group: str | None) -> None:
+def create_user(api: httpx2.Client, username: str, group: str | None) -> None:
     """Create the account from scratch, deleting one left by an earlier run."""
     for old in api.get("/core/users/", params={"username": username}).json()["results"]:
         api.delete(f"/core/users/{old['pk']}/")
