@@ -250,7 +250,7 @@ def test_login_drops_the_old_admin_marker_and_csrf_token(client, fake) -> None:
     session = read_session(client)
     assert ADMIN_SESSION_KEY not in session
     assert session[CSRF_SESSION_KEY] != old_csrf
-    assert client.get("/auth/me").status_code == 401
+    assert client.get("/auth/me").status_code == 403
 
 
 def test_failed_login_also_ends_an_earlier_one(client, fake) -> None:

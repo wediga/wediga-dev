@@ -1,15 +1,22 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 
+import { AUTHENTIK_ADMIN_LOGIN } from "@/lib/authRedirect";
 import { backendUrl } from "@/lib/backend";
 import { LogoutButton } from "@/components/LogoutButton";
 import { AdminNav } from "@/components/admin/AdminNav";
 
+// The backend's answer for a login without the admin role.
+const FORBIDDEN = 403;
+const NO_ACCESS_PAGE = "/no-access";
+
 // Server-side guard: ask the backend whether the forwarded session is an admin
-// session, redirect to login otherwise. The raw cookie header is forwarded
-// verbatim (the BFF route handlers do the same) because re-serializing via
-// cookies().toString() re-encodes the signed session value and the backend
-// then rejects it.
+// session. Without a login the visitor goes to authentik, and while that login
+// is switched off, /auth/login falls back to the password login. A login
+// without the admin role goes to the no-access page, because authentik would
+// return it at once. The raw cookie header is forwarded verbatim (the BFF
+// route handlers do the same) because re-serializing via cookies().toString()
+// re-encodes the signed session value and the backend then rejects it.
 export default async function AdminLayout({
   children,
 }: {
@@ -20,8 +27,13 @@ export default async function AdminLayout({
     headers: cookieHeader ? { cookie: cookieHeader } : {},
     cache: "no-store",
   });
+
+  if (response.status === FORBIDDEN) {
+    redirect(NO_ACCESS_PAGE);
+  }
+
   if (!response.ok) {
-    redirect("/login");
+    redirect(AUTHENTIK_ADMIN_LOGIN);
   }
 
   return (
