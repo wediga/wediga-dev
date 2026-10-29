@@ -36,6 +36,7 @@ jobs:
               - 'backend/**'
               - 'deploy/Dockerfile.backend'
               - 'deploy/authentik-test/*.py'
+              - 'pyrightconfig.json'
               - '.github/workflows/ci.yml'
             frontend:
               - 'frontend/**'
@@ -70,6 +71,12 @@ jobs:
 
       - name: Lint
         run: uv run ruff check --config pyproject.toml . ../deploy/authentik-test
+
+      # Pyright reads pyrightconfig.json in the repository root, so it runs
+      # from there. --warnings fails the job on warnings too.
+      - name: Type check
+        run: uv run --project backend pyright --warnings
+        working-directory: .
 
       - name: Run tests
         run: uv run pytest
