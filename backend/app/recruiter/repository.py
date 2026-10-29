@@ -11,11 +11,20 @@ from input.
 import hashlib
 import secrets
 from datetime import UTC, date, datetime, time
+from enum import Enum, auto
 
 from app.db.connection import get_connection, now
 
 # 32 url-safe random bytes, a 256-bit token.
 _TOKEN_BYTES = 32
+
+
+class LinkStatus(Enum):
+    """State of a known link, as ``validate_token`` reports it."""
+
+    OK = auto()
+    REVOKED = auto()
+    EXPIRED = auto()
 
 
 def _hash_token(token: str) -> str:
@@ -121,12 +130,11 @@ def revoke_link(link_id: int) -> dict | None:
         return _get_link(conn, link_id)
 
 
-def validate_token(token: str) -> tuple[str, int] | None:
+def validate_token(token: str) -> tuple[LinkStatus, int] | None:
     """Look a token up by its hash and classify it.
 
-    Returns ``("ok", id)``, ``("revoked", id)`` or ``("expired", id)``, and
-    ``None`` for an unknown token. The lookup matches on the stored hash, never
-    the plaintext.
+    Returns the link's status together with its id, or ``None`` for an unknown
+    token. The lookup matches on the stored hash, never the plaintext.
     """
     with get_connection() as conn:
         row = conn.execute(
@@ -138,10 +146,12 @@ def validate_token(token: str) -> tuple[str, int] | None:
         return None
 
     if row["revoked_at"] is not None:
-        return "revoked", row["id"]
+        return LinkStatus.REVOKED, row["id"]
+
     if _is_expired(row["expires_at"]):
-        return "expired", row["id"]
-    return "ok", row["id"]
+        return LinkStatus.EXPIRED, row["id"]
+
+    return LinkStatus.OK, row["id"]
 
 
 def link_is_active(link_id: int | None) -> bool:

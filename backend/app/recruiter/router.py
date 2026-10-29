@@ -81,9 +81,9 @@ def redeem(token: str, request: Request) -> dict[str, bool]:
     if found is None:
         raise not_found("Link not found")
 
-    result, link_id = found
+    link_status, link_id = found
 
-    if result in ("revoked", "expired"):
+    if link_status in (repo.LinkStatus.REVOKED, repo.LinkStatus.EXPIRED):
         raise HTTPException(
             status_code=status.HTTP_410_GONE, detail="Link no longer valid"
         )
