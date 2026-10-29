@@ -50,15 +50,17 @@ def test_admin_from_authentik_previews_the_recruiter_pages(client, fake) -> None
 def test_friend_reaches_no_admin_or_recruiter_route(client, fake) -> None:
     log_in(client, fake, ["friends"])
 
-    assert client.get("/auth/me").status_code == 401
-    assert client.get("/recruiter/links").status_code == 401
+    # 403 rather than 401, so the admin area does not send a logged in friend
+    # back to authentik, which would return them at once.
+    assert client.get("/auth/me").status_code == 403
+    assert client.get("/recruiter/links").status_code == 403
     assert client.get("/recruiter/session").status_code == 401
     refused = client.post(
         "/recruiter/links",
         json={"label": "x"},
         headers={CSRF_HEADER_NAME: _csrf(client)},
     )
-    assert refused.status_code == 401
+    assert refused.status_code == 403
 
 
 def test_friend_gets_the_csrf_token_and_can_log_out(client, fake) -> None:

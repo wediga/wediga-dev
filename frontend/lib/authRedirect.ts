@@ -11,6 +11,9 @@ import { sessionCookieHeader } from "./forwarding";
 const SEE_OTHER = 303;
 const FALLBACK = "/login";
 
+// Starts the login through authentik and comes back to the admin area.
+export const AUTHENTIK_ADMIN_LOGIN = "/auth/login?next=/admin";
+
 export async function relayLoginRedirect(
   request: NextRequest,
   backendPath: string,

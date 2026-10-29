@@ -74,12 +74,14 @@ class OidcLogin(TypedDict):
     login_at: int
 
 
-def require_oidc(request: Request) -> OidcSettings:
-    """Hide the routes behind a 404 while the login is switched off.
+def _oidc_settings(request: Request) -> OidcSettings | None:
+    """Before the startup has run there are no settings, which counts as off."""
+    return getattr(request.app.state, "oidc", None)
 
-    Before the startup has run there are no settings, which counts as off.
-    """
-    settings = getattr(request.app.state, "oidc", None)
+
+def require_oidc(request: Request) -> OidcSettings:
+    """Hide the routes behind a 404 while the login is switched off."""
+    settings = _oidc_settings(request)
 
     if settings is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
@@ -94,6 +96,15 @@ Settings = Annotated[OidcSettings, Depends(require_oidc)]
 router = APIRouter(
     prefix="/auth/oidc", tags=["auth"], dependencies=[Depends(require_oidc)]
 )
+# Without the switch check, so the login page can ask whether to offer the
+# login through authentik.
+status_router = APIRouter(prefix="/auth/oidc", tags=["auth"])
+
+
+@status_router.get("/status")
+def login_status(request: Request) -> dict[str, bool]:
+    """Tell whether the login through authentik is switched on."""
+    return {"enabled": _oidc_settings(request) is not None}
 
 
 def safe_target(value: str | None) -> str | None:

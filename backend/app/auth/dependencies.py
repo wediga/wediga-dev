@@ -52,12 +52,25 @@ def is_admin(request: Request) -> bool:
 
 
 def require_admin(request: Request) -> None:
-    """Reject the request with 401 unless an admin session is present."""
-    if not is_admin(request):
+    """Reject the request unless an admin session is present.
+
+    A login through authentik without the admin role gets 403, so the admin
+    area can tell it apart from no login (401) and does not send it back to
+    authentik, which would return it at once.
+    """
+    if is_admin(request):
+        return
+
+    if oidc_roles(request):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Admin authentication required",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required",
         )
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Admin authentication required",
+    )
 
 
 def require_login(request: Request) -> None:

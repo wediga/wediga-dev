@@ -55,6 +55,19 @@ def test_routes_do_not_answer_while_switched_off(
     assert client.request(method, path).status_code == 404
 
 
+def test_status_tells_whether_the_login_is_switched_on(client) -> None:
+    response = client.get("/auth/oidc/status")
+
+    assert response.status_code == 200
+    assert response.json() == {"enabled": True}
+
+
+def test_status_answers_while_switched_off(app, client, monkeypatch) -> None:
+    monkeypatch.setattr(app.state, "oidc", None)
+
+    assert client.get("/auth/oidc/status").json() == {"enabled": False}
+
+
 # --- start -------------------------------------------------------------------
 
 
@@ -237,7 +250,7 @@ def test_login_drops_the_old_admin_marker_and_csrf_token(client, fake) -> None:
     session = read_session(client)
     assert ADMIN_SESSION_KEY not in session
     assert session[CSRF_SESSION_KEY] != old_csrf
-    assert client.get("/auth/me").status_code == 401
+    assert client.get("/auth/me").status_code == 403
 
 
 def test_failed_login_also_ends_an_earlier_one(client, fake) -> None:

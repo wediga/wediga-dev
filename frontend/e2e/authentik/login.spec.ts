@@ -14,28 +14,27 @@ async function logInThroughAuthentik(page: Page, username: string) {
   await logInAtAuthentik(page, username);
 }
 
-async function expectNoAdminAccess(page: Page) {
-  await page.goto("/admin");
-  await expect(page).toHaveURL(/\/login$/);
-}
-
-test("the admin gets into /admin, and logging out ends the authentik session as well", async ({
+test("the admin gets into /admin through the link on /login, and logging out ends the authentik session as well", async ({
   page,
 }) => {
   await page.route(`${LIVE_SITE}**`, (route) =>
     route.fulfill({ contentType: "text/html", body: "live site" }),
   );
 
-  await logInThroughAuthentik(page, "test-admin");
+  await page.goto("/login");
+  await page
+    .getByRole("link", { name: "Mit wediga.dev-Konto anmelden" })
+    .click();
+  await logInAtAuthentik(page, "test-admin");
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole("link", { name: "Overview" })).toBeVisible();
 
   await page.getByRole("button", { name: "Logout" }).click();
   await expect(page).toHaveURL(LIVE_SITE);
-  await expectNoAdminAccess(page);
 
-  // A new login asks for the account again instead of returning at once.
-  await page.goto("/auth/login");
+  // /admin sends to authentik, and authentik asks for the account again
+  // instead of returning at once.
+  await page.goto("/admin");
   await expect(page.getByRole("textbox", { name: /username/i })).toBeVisible();
 });
 
@@ -43,7 +42,8 @@ test("a friend logs in but gets no admin access", async ({ page }) => {
   await logInThroughAuthentik(page, "test-friend");
   await expect(page).toHaveURL(/\/hub$/);
 
-  await expectNoAdminAccess(page);
+  await page.goto("/admin");
+  await expect(page).toHaveURL(/\/no-access$/);
 });
 
 test("an account without a group is turned away by authentik", async ({
@@ -52,5 +52,7 @@ test("an account without a group is turned away by authentik", async ({
   await logInThroughAuthentik(page, "test-nogroup");
   await expect(page.getByText("Permission denied")).toBeVisible();
 
-  await expectNoAdminAccess(page);
+  // Without a session at wediga.dev, /admin sends to authentik again.
+  await page.goto("/admin");
+  await expect(page.getByText("Permission denied")).toBeVisible();
 });
