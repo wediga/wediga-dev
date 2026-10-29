@@ -42,6 +42,8 @@ That file owns what it lists. A change made by hand in the admin interface to on
 
 The recovery flow itself comes from the example blueprint that ships with authentik (`example/flows-recovery-email-verification.yaml`). On a fresh install it has to be created once under Customization, Blueprints and applied there.
 
+The login of wediga.dev signs its tokens with authentik's built-in "authentik Self-signed Certificate". authentik creates that certificate once and never renews it, so it expires on 2027-10-06, but the login keeps working afterwards because neither authentik nor the backend looks at the certificate's dates, only at the key inside it.
+
 Adding someone:
 
 1. Create the user in the admin interface as an internal user, set Locale to `en` and add the group.
