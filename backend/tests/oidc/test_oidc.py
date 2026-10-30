@@ -13,6 +13,7 @@ from joserfc.jwk import OctKey, RSAKey
 
 from app.auth import oidc
 from tests.oidc.oidc_fake import (
+    ACCOUNT_ID,
     CLIENT_ID,
     ISSUER,
     KEY_ID,
@@ -147,7 +148,7 @@ def test_response_without_id_token_is_a_provider_error(fake) -> None:
 def test_valid_id_token_returns_its_claims() -> None:
     claims = _validate(make_id_token(nonce=NONCE, groups=["friends"]))
 
-    assert claims["sub"] == "user-1"
+    assert claims["sub"] == ACCOUNT_ID
     assert claims["groups"] == ["friends"]
 
 
@@ -207,7 +208,7 @@ def test_token_with_symmetric_algorithm_is_refused() -> None:
 def test_unsigned_token_is_refused() -> None:
     claims = {
         "iss": ISSUER,
-        "sub": "user-1",
+        "sub": ACCOUNT_ID,
         "aud": CLIENT_ID,
         "exp": int(time.time()) + TOKEN_LIFETIME_SECONDS,
         "iat": int(time.time()),

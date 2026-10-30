@@ -19,6 +19,8 @@ ISSUER = "https://auth.example/application/o/wediga-dev/"
 PUBLIC_HOST = "auth.example"
 INTERNAL_URL = "http://authentik-server:9000"
 CLIENT_ID = "wediga-dev"
+# authentik sends the account's numeric ID as "sub".
+ACCOUNT_ID = "21"
 KEY_ID = "test-key"
 TOKEN_LIFETIME_SECONDS = 300
 
@@ -51,7 +53,7 @@ def make_id_token(key: Key = SIGNING_KEY, alg: str = "RS256", **claims) -> str:
     now = int(time.time())
     payload = {
         "iss": ISSUER,
-        "sub": "user-1",
+        "sub": ACCOUNT_ID,
         "aud": CLIENT_ID,
         "exp": now + TOKEN_LIFETIME_SECONDS,
         "iat": now,

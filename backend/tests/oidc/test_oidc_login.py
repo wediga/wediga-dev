@@ -29,7 +29,7 @@ from tests.oidc.login import (
     redeem_recruiter_link,
     start_login,
 )
-from tests.oidc.oidc_fake import METADATA, make_id_token
+from tests.oidc.oidc_fake import ACCOUNT_ID, METADATA, make_id_token
 
 BLUEPRINT = (
     Path(__file__).resolve().parents[3] / "deploy/authentik/blueprints/wediga.yaml"
@@ -110,6 +110,7 @@ def test_admin_lands_in_admin_with_both_roles(client, fake) -> None:
     assert response.status_code == 303
     assert response.headers["location"] == "/admin"
     session = read_session(client)
+    assert session[OIDC_SESSION_KEY]["user_id"] == int(ACCOUNT_ID)
     assert session[OIDC_SESSION_KEY]["roles"] == ["admin", "hub"]
     assert abs(session[OIDC_SESSION_KEY]["login_at"] - time.time()) < 5
     assert OIDC_FLOW_SESSION_KEY not in session
@@ -224,6 +225,16 @@ def test_invalid_id_token_is_refused(client, fake, claims) -> None:
     assert OIDC_SESSION_KEY not in read_session(client)
 
 
+# A hashed sub, as authentik sends it without sub_mode user_id, and values
+# that only look like a number.
+@pytest.mark.parametrize("sub", ["a1b2c3", "", " 21", "21 ", "-21", "2.1", "٢١"])
+def test_login_without_numeric_account_id_is_refused(client, fake, sub) -> None:
+    response = log_in(client, fake, ["wediga-admins"], sub=sub)
+
+    assert response.status_code == 400
+    assert OIDC_SESSION_KEY not in read_session(client)
+
+
 def test_nonce_of_another_login_is_refused(client, fake) -> None:
     """A token captured from one login cannot finish another one."""
     first = start_login(client)
@@ -328,3 +339,8 @@ def test_logout_still_works_when_authentik_is_down(client, fake) -> None:
 def test_mapped_groups_exist_in_the_blueprint(group) -> None:
     """The group names live in the blueprint and here, so they must match."""
     assert f"name: {group}\n" in BLUEPRINT.read_text(encoding="utf-8")
+
+
+def test_blueprint_sends_the_numeric_account_id() -> None:
+    """The callback only accepts a numeric sub, which needs this setting."""
+    assert "sub_mode: user_id\n" in BLUEPRINT.read_text(encoding="utf-8")
