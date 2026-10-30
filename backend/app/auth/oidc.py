@@ -57,7 +57,7 @@ def _require_issuer_origin(settings: OidcSettings, url: object) -> str:
     return url
 
 
-def _server_side(settings: OidcSettings, url: str) -> tuple[str, dict[str, str]]:
+def server_side(settings: OidcSettings, url: str) -> tuple[str, dict[str, str]]:
     """Return the URL and headers the backend itself uses for ``url``."""
 
     if settings.internal_url is None:
@@ -72,7 +72,7 @@ def _server_side(settings: OidcSettings, url: str) -> tuple[str, dict[str, str]]
 
 
 def _get_json(settings: OidcSettings, url: str) -> dict:
-    target, headers = _server_side(settings, url)
+    target, headers = server_side(settings, url)
 
     try:
         response = httpx2.get(target, headers=headers, timeout=TIMEOUT)
@@ -137,7 +137,7 @@ def exchange_code(
     settings: OidcSettings, metadata: dict, code: str, verifier: str
 ) -> dict:
     """Trade the authorization code for tokens at authentik's token endpoint."""
-    target, headers = _server_side(settings, metadata["token_endpoint"])
+    target, headers = server_side(settings, metadata["token_endpoint"])
 
     try:
         with _client(settings) as client:
