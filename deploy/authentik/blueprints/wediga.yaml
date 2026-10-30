@@ -6,16 +6,19 @@
 #
 # Everything listed here is owned by this file: a change made by hand in the
 # admin interface is reverted the next time the file is applied. Accounts,
-# passwords and second factors are not part of it and only live in the database.
+# passwords and second factors are not part of it and only live in the database,
+# except for the service account of the hub below.
 #
 # The recovery flow itself comes from the example blueprint that ships with
 # authentik (example/flows-recovery-email-verification.yaml). On a fresh install
 # that one has to be applied once in the admin interface before this file can
 # attach the second-factor step to it.
 #
-# The login of wediga.dev (provider, application and its logout flow) lives
-# here as well. Its client secret is read from the environment, so authentik
-# needs WEDIGA_OIDC_CLIENT_SECRET set before it applies this file.
+# The login of wediga.dev (provider, application and its logout flow) and the
+# service account its hub asks with live here as well. The client secret and
+# the account's token are read from the environment, so authentik needs
+# WEDIGA_OIDC_CLIENT_SECRET and WEDIGA_HUB_API_TOKEN set before it applies this
+# file.
 version: 1
 metadata:
   name: wediga.dev - groups, second factor, recovery and login
@@ -164,6 +167,9 @@ entries:
         - matching_mode: strict
           url: https://www.wediga.dev/auth/callback
       signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+      # The account's numeric ID as "sub", which the hub needs to ask for the
+      # applications of the account that is logged in.
+      sub_mode: user_id
       property_mappings:
         - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
         - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
@@ -189,3 +195,35 @@ entries:
       target: !KeyOf wediga-dev-application
       group: !Find [authentik_core.group, [name, friends]]
       order: 20
+
+  # The hub of wediga.dev asks with this account which applications the
+  # visitor may use, and authentik answers from its own bindings. The role
+  # grants nothing but that question, so the account can neither read users,
+  # groups or bindings nor change anything except its own tokens, which
+  # authentik lets every account manage. The token is read from the
+  # environment like the client secret above.
+  - model: authentik_rbac.role
+    id: wediga-dev-hub-role
+    identifiers:
+      name: wediga-dev-hub
+    attrs:
+      permissions:
+        - authentik_core.view_user_applications
+  - model: authentik_core.user
+    id: wediga-dev-hub-account
+    identifiers:
+      username: wediga-dev-hub
+    attrs:
+      name: wediga.dev hub
+      type: service_account
+      path: goauthentik.io/service-accounts
+      roles:
+        - !KeyOf wediga-dev-hub-role
+  - model: authentik_core.token
+    identifiers:
+      identifier: wediga-dev-hub
+    attrs:
+      user: !KeyOf wediga-dev-hub-account
+      intent: api
+      expiring: false
+      key: !Env WEDIGA_HUB_API_TOKEN
