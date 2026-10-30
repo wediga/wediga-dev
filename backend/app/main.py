@@ -8,11 +8,11 @@ startup. Migrations never run in the request path, only via
 import asyncio
 import logging
 import os
-import sqlite3
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
 from app.api import api_router
 from app.auth.bootstrap import ensure_admin
@@ -66,9 +66,9 @@ add_session_middleware(app)
 app.include_router(api_router)
 
 
-@app.exception_handler(sqlite3.IntegrityError)
+@app.exception_handler(IntegrityError)
 async def integrity_error_handler(
-    request: Request, exc: sqlite3.IntegrityError
+    request: Request, exc: IntegrityError
 ) -> JSONResponse:
     """Turn a constraint violation (e.g. a duplicate name) into a 409 instead
     of an unhandled 500. The exception detail is not echoed back."""
