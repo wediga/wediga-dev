@@ -2,19 +2,21 @@
 current-session check.
 
 The handlers are plain ``def`` functions, so FastAPI runs their SQLite queries
-in its threadpool and the backend keeps one synchronous connection helper.
+in its threadpool and the backend keeps one synchronous session helper.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
+from sqlalchemy import update
 
 from app.auth import totp
 from app.auth.csrf import issue_csrf_token, require_csrf
 from app.auth.dependencies import require_admin, require_login
+from app.auth.models import ADMIN_ID, Admin
 from app.auth.passwords import verify_password
 from app.auth.ratelimit import client_ip, login_limiter, totp_limiter
 from app.auth.sessions import ADMIN_SESSION_KEY, PENDING_2FA_SESSION_KEY
-from app.db.connection import get_connection
+from app.db.connection import get_session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -73,12 +75,10 @@ def login(request: Request, body: LoginRequest) -> dict[str, bool]:
             detail="Too many login attempts, try again later",
         )
 
-    with get_connection() as conn:
-        row = conn.execute(
-            "SELECT password_hash, totp_enabled FROM admin WHERE id = 1"
-        ).fetchone()
+    with get_session() as session:
+        admin = session.get(Admin, ADMIN_ID)
 
-    if row is None or not verify_password(row["password_hash"], body.password):
+    if admin is None or not verify_password(admin.password_hash, body.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid password",
@@ -88,7 +88,7 @@ def login(request: Request, body: LoginRequest) -> dict[str, bool]:
     # never lock out a legitimate admin.
     login_limiter.reset(ip)
 
-    if row["totp_enabled"]:
+    if admin.totp_enabled:
         # The password alone grants no admin rights; only the second factor
         # below promotes this to an admin session.
         request.session.clear()
@@ -120,18 +120,16 @@ def login_totp(request: Request, body: CodeRequest) -> dict[str, bool]:
             detail="Too many code attempts, try again later",
         )
 
-    with get_connection() as conn:
-        row = conn.execute(
-            "SELECT totp_secret, totp_enabled FROM admin WHERE id = 1"
-        ).fetchone()
+    with get_session() as session:
+        admin = session.get(Admin, ADMIN_ID)
 
-    if row is None or not row["totp_enabled"] or not row["totp_secret"]:
+    if admin is None or not admin.totp_enabled or not admin.totp_secret:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Second factor is not active",
         )
 
-    secret = _decrypt_secret_or_500(row["totp_secret"])
+    secret = _decrypt_secret_or_500(admin.totp_secret)
 
     # A TOTP code stays valid for its whole time window, so it could in principle
     # be replayed within that window. No used-code tracking is kept: one admin
@@ -172,9 +170,10 @@ def csrf(request: Request) -> dict[str, str]:
 @router.get("/totp/status", dependencies=[Depends(require_admin)])
 def totp_status() -> dict[str, bool]:
     """Report whether the second factor is active for the admin."""
-    with get_connection() as conn:
-        row = conn.execute("SELECT totp_enabled FROM admin WHERE id = 1").fetchone()
-    return {"enabled": bool(row and row["totp_enabled"])}
+    with get_session() as session:
+        admin = session.get(Admin, ADMIN_ID)
+
+    return {"enabled": admin is not None and admin.totp_enabled}
 
 
 @router.post(
@@ -190,9 +189,10 @@ def totp_setup() -> dict[str, str]:
     decision. The plaintext secret is returned once for manual entry alongside
     the QR code and is never persisted in the clear.
     """
-    with get_connection() as conn:
-        active = conn.execute("SELECT totp_enabled FROM admin WHERE id = 1").fetchone()
-    if active and active["totp_enabled"]:
+    with get_session() as session:
+        admin = session.get(Admin, ADMIN_ID)
+
+    if admin is not None and admin.totp_enabled:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Second factor is already active",
@@ -207,12 +207,13 @@ def totp_setup() -> dict[str, str]:
             detail="Second factor is unavailable",
         ) from None
 
-    with get_connection() as conn:
-        conn.execute(
-            "UPDATE admin SET totp_secret = ?, totp_enabled = 0 WHERE id = 1",
-            (encrypted,),
+    with get_session() as session:
+        session.execute(
+            update(Admin)
+            .where(Admin.id == ADMIN_ID)
+            .values(totp_secret=encrypted, totp_enabled=False)
         )
-        conn.commit()
+        session.commit()
 
     uri = totp.provisioning_uri(secret)
     return {
@@ -239,16 +240,16 @@ def totp_confirm(request: Request, body: CodeRequest) -> dict[str, bool]:
             detail="Too many code attempts, try again later",
         )
 
-    with get_connection() as conn:
-        row = conn.execute("SELECT totp_secret FROM admin WHERE id = 1").fetchone()
+    with get_session() as session:
+        admin = session.get(Admin, ADMIN_ID)
 
-    if row is None or not row["totp_secret"]:
+    if admin is None or not admin.totp_secret:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Run setup before confirming",
         )
 
-    secret = _decrypt_secret_or_500(row["totp_secret"])
+    secret = _decrypt_secret_or_500(admin.totp_secret)
 
     if not totp.verify_code(secret, body.code):
         raise HTTPException(
@@ -257,7 +258,11 @@ def totp_confirm(request: Request, body: CodeRequest) -> dict[str, bool]:
         )
 
     totp_limiter.reset(ip)
-    with get_connection() as conn:
-        conn.execute("UPDATE admin SET totp_enabled = 1 WHERE id = 1")
-        conn.commit()
+
+    with get_session() as session:
+        session.execute(
+            update(Admin).where(Admin.id == ADMIN_ID).values(totp_enabled=True)
+        )
+        session.commit()
+
     return {"ok": True, "enabled": True}

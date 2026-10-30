@@ -8,8 +8,11 @@ stored in plaintext.
 
 import os
 
+from sqlalchemy import insert
+
+from app.auth.models import ADMIN_ID, Admin
 from app.auth.passwords import hash_password
-from app.db.connection import get_connection, now
+from app.db.connection import get_session, now
 
 
 def ensure_admin() -> bool:
@@ -22,15 +25,19 @@ def ensure_admin() -> bool:
     if not password:
         return False
 
-    with get_connection() as conn:
-        existing = conn.execute("SELECT 1 FROM admin WHERE id = 1").fetchone()
-        if existing is not None:
+    with get_session() as session:
+        if session.get(Admin, ADMIN_ID) is not None:
             return False
+
         timestamp = now()
-        conn.execute(
-            "INSERT INTO admin (id, password_hash, created_at, updated_at) "
-            "VALUES (1, ?, ?, ?)",
-            (hash_password(password), timestamp, timestamp),
+        session.execute(
+            insert(Admin).values(
+                id=ADMIN_ID,
+                password_hash=hash_password(password),
+                created_at=timestamp,
+                updated_at=timestamp,
+            )
         )
-        conn.commit()
+        session.commit()
+
     return True
