@@ -36,15 +36,15 @@ const AUTHENTIK_COMPOSE = path.join(
 // The application slug and client ID of wediga.dev in the blueprint.
 const OIDC_CLIENT_ID = "wediga-dev";
 
-// The client secret is a fixed test value defined only in the test
-// authentik's compose file, so it is read from there.
-function testClientSecret(): string {
+// The client secret and the hub's API token are fixed test values defined
+// only in the test authentik's compose file, so they are read from there.
+function testSecret(name: string): string {
   const match = readFileSync(AUTHENTIK_COMPOSE, "utf-8").match(
-    /WEDIGA_OIDC_CLIENT_SECRET: (\S+)/,
+    new RegExp(`${name}: (\\S+)`),
   );
 
   if (!match) {
-    throw new Error(`no WEDIGA_OIDC_CLIENT_SECRET in ${AUTHENTIK_COMPOSE}`);
+    throw new Error(`no ${name} in ${AUTHENTIK_COMPOSE}`);
   }
 
   return match[1];
@@ -57,7 +57,8 @@ const OIDC_ENV: Record<string, string> = AUTHENTIK_URL
       OIDC_ENABLED: "true",
       OIDC_ISSUER: `${AUTHENTIK_URL}/application/o/${OIDC_CLIENT_ID}/`,
       OIDC_CLIENT_ID,
-      OIDC_CLIENT_SECRET: testClientSecret(),
+      OIDC_CLIENT_SECRET: testSecret("WEDIGA_OIDC_CLIENT_SECRET"),
+      AUTHENTIK_API_TOKEN: testSecret("WEDIGA_HUB_API_TOKEN"),
       OIDC_REDIRECT_URI: `${FRONTEND_URL}/auth/callback`,
     }
   : {};

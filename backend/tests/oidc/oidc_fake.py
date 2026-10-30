@@ -22,6 +22,7 @@ CLIENT_ID = "wediga-dev"
 # authentik sends the account's numeric ID as "sub".
 ACCOUNT_ID = "21"
 KEY_ID = "test-key"
+API_TOKEN = "test-api-token"
 TOKEN_LIFETIME_SECONDS = 300
 
 SETTINGS = OidcSettings(
@@ -30,6 +31,7 @@ SETTINGS = OidcSettings(
     client_secret="test-client-secret",
     redirect_uri="https://www.example/auth/callback",
     internal_url=INTERNAL_URL,
+    api_token=API_TOKEN,
 )
 
 METADATA = {
