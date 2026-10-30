@@ -5,6 +5,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 
+# The schema allows exactly one admin row, and it has this id.
+ADMIN_ID = 1
+
 
 class Admin(Base):
     __tablename__ = "admin"
