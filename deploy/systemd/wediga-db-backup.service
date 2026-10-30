@@ -1,0 +1,8 @@
+[Unit]
+Description=Dump the wediga.dev database
+After=wediga-db.service
+Requires=wediga-db.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/wediga-dev/backup.sh

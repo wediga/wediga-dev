@@ -1,0 +1,40 @@
+[Unit]
+Description=PostgreSQL for the wediga.dev backend
+
+[Container]
+# Version and digest are pinned. Dependabot does not watch this file, so the
+# image is raised by hand. Version 18 is the first that creates UUIDv7 values
+# itself, which the schema relies on.
+Image=docker.io/library/postgres:18.6-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+ContainerName=wediga-db
+Network=wediga.network
+
+# The password comes from a file that only exists on the server. It holds
+# nothing else, so this container never sees the app's other secrets.
+EnvironmentFile=/home/web/wediga-dev/wediga-db.env
+Environment=POSTGRES_USER=wediga
+Environment=POSTGRES_DB=wediga
+
+# From version 18 on, the image keeps its data in a subdirectory per major
+# version below /var/lib/postgresql, so the volume is mounted there.
+Volume=wediga-db.volume:/var/lib/postgresql
+
+HealthCmd=pg_isready -d wediga -U wediga
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=5
+HealthStartPeriod=20s
+
+# The entrypoint starts as root, fixes the ownership of the data directory and
+# then drops to the postgres user. Only the capabilities that step needs are
+# kept. Under rootless Podman, root in the container is the unprivileged host
+# user anyway.
+NoNewPrivileges=true
+DropCapability=ALL
+AddCapability=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETGID CAP_SETUID
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

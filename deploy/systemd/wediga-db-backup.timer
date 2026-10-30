@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily dump of the wediga.dev database
+
+[Timer]
+# A quarter of an hour after the dump of authentik, so the two never overlap.
+OnCalendar=*-*-* 03:45:00
+# Catch up after a reboot if the server was down at the scheduled time.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

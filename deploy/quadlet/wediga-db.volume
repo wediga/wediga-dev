@@ -1,0 +1,6 @@
+[Unit]
+Description=PostgreSQL data for the wediga.dev backend
+
+# Quadlet creates a Podman named volume "systemd-wediga-db". It holds the
+# backend's database.
+[Volume]
