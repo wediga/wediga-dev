@@ -10,10 +10,11 @@ The commands in this file run as that user. After switching to it with `sudo`, r
 |---|---|
 | Quadlet units (`quadlet/*.container`, `*.volume`, `*.network`) | `~/.config/containers/systemd/` |
 | Caddyfile, the app's `.env` and the database password `wediga-db.env` | `~/wediga-dev/` |
+| Database dumps of the app | `~/wediga-dev/backups/` |
 | Secrets for the identity provider | `~/authentik/authentik.env`, `~/authentik/authentik-db.env` |
 | Setup of the identity provider (`authentik/blueprints/`) | `~/authentik/blueprints/` |
 | Database dumps of the identity provider | `~/authentik/backups/` |
-| Backup script, service and timer (`systemd/`) | `~/authentik/backup.sh`, `~/.config/systemd/user/` |
+| Backup scripts, services and timers (`systemd/`) | `~/authentik/backup.sh`, `~/wediga-dev/backup.sh`, `~/.config/systemd/user/` |
 
 Caddy is the only container that publishes host ports. Every other container is reached by name over an internal Podman network.
 
@@ -70,6 +71,18 @@ systemctl --user restart authentik-server.service authentik-worker.service
 
 6. Check `podman logs --tail 30 authentik-server`, log in once and confirm that the second factor is still asked for.
 
+## Updating the app's database
+
+The app has its own PostgreSQL in `wediga-db.container`, separate from the one of the identity provider and only reachable over the internal network. Its version is raised by hand as well. A new minor version (18.6 to 18.7) only needs the tag and the digest raised, a fresh dump and a restart after the merge:
+
+```
+systemctl --user start wediga-db-backup.service
+systemctl --user daemon-reload
+systemctl --user restart wediga-db.service
+```
+
+A new major version cannot read the old data directory, so it needs a dump, a new volume and a restore, and gets its own plan.
+
 ## Testing the identity provider
 
 `authentik-test/` holds a throwaway authentik with the same images and the same `wediga.yaml` as production. The CI starts it for the end-to-end tests, and it runs locally with Podman, so a change to the setup file or a new version can be tried before it reaches the server. Its secrets and the API key for the setup script are fixed test values in `compose.yaml` and exist nowhere else.
@@ -95,9 +108,9 @@ cd frontend && AUTHENTIK_URL=http://localhost:9000 AUTHENTIK_ACCOUNTS=e2e/.tmp/a
 
 ## Backup and restore
 
-`authentik-db-backup.timer` writes a dump of the database to `~/authentik/backups/` every night and deletes dumps older than 14 days. The dumps stay on the same machine, so they protect against a broken update or a mistake, not against losing the server.
+`authentik-db-backup.timer` writes a dump of the identity provider's database to `~/authentik/backups/` every night, and `wediga-db-backup.timer` does the same for the app's database in `~/wediga-dev/backups/` a quarter of an hour later. Both delete dumps older than 14 days. The dumps stay on the same machine, so they protect against a broken update or a mistake, not against losing the server.
 
-Accounts, groups and settings only exist in the database, so the dump is the only copy.
+Accounts, groups and settings only exist in the identity provider's database, so its dump is the only copy.
 
 Install once:
 
@@ -114,4 +127,21 @@ Restore a dump into the running database, with the server and the worker stopped
 systemctl --user stop authentik-server.service authentik-worker.service
 podman exec -i authentik-db pg_restore -U authentik -d authentik --clean --if-exists < ~/authentik/backups/authentik-YYYY-MM-DD.dump
 systemctl --user start authentik-server.service authentik-worker.service
+```
+
+The app's database works the same way, with its own script and units:
+
+```
+install -m 700 wediga-db-backup.sh ~/wediga-dev/backup.sh
+cp wediga-db-backup.service wediga-db-backup.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now wediga-db-backup.timer
+```
+
+Restore a dump with the backend stopped:
+
+```
+systemctl --user stop backend.service
+podman exec -i wediga-db pg_restore -U wediga -d wediga --clean --if-exists < ~/wediga-dev/backups/wediga-YYYY-MM-DD.dump
+systemctl --user start backend.service
 ```
