@@ -85,9 +85,17 @@ def test_expired_login_does_not_open_the_hub(client, fake, monkeypatch) -> None:
     assert applications(client).status_code == 401
 
 
-def test_login_without_account_id_does_not_open_the_hub() -> None:
-    """A login from before the account ID was kept in the session."""
-    login = {"roles": ["hub"], "login_at": int(dependencies.time.time())}
+@pytest.mark.parametrize(
+    "login",
+    [
+        # A login from before the account ID was kept in the session.
+        {"roles": ["hub"]},
+        # No group gives such a login yet, but a later one may.
+        {"user_id": int(ACCOUNT_ID), "roles": ["admin"]},
+    ],
+)
+def test_login_that_does_not_open_the_hub(login) -> None:
+    login = {**login, "login_at": int(dependencies.time.time())}
     request = Request({"type": "http", "session": {OIDC_SESSION_KEY: login}})
 
     with pytest.raises(HTTPException) as excinfo:
@@ -197,8 +205,9 @@ def test_unreachable_authentik_answers_502_and_is_not_kept(client, fake) -> None
     assert response.json() == {"detail": "Hub unavailable"}
 
     fake.unreachable = False
+    fake.applications = {"results": [GAME]}
 
-    assert applications(client).status_code == 200
+    assert applications(client).json() == [GAME_SHOWN]
 
 
 @pytest.mark.parametrize(
