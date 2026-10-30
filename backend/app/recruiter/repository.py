@@ -4,8 +4,8 @@ The token comes from ``secrets`` and only its SHA-256 hash reaches the
 database, so a leak exposes no usable link. A fast hash is enough because a
 256-bit random token is infeasible to guess, so a slow password hash would add
 cost without buying security. The plaintext is returned once from
-``create_link`` and never again. Every query is parameterised, no SQL is built
-from input.
+``create_link`` and never again. Every query goes through SQLAlchemy with bound
+parameters, no SQL is built from input.
 """
 
 import hashlib
@@ -13,7 +13,11 @@ import secrets
 from datetime import UTC, date, datetime, time
 from enum import Enum, auto
 
-from app.db.connection import get_connection, now
+from sqlalchemy import RowMapping, func, select
+from sqlalchemy.orm import Session
+
+from app.db.connection import get_session, now
+from app.recruiter.models import LinkView, RecruiterLink
 
 # 32 url-safe random bytes, a 256-bit token.
 _TOKEN_BYTES = 32
@@ -55,58 +59,64 @@ def _is_active(expires_at: str | None, revoked_at: str | None) -> bool:
     return revoked_at is None and not _is_expired(expires_at)
 
 
-def _row_to_read(row) -> dict:
+def _row_to_read(row: RowMapping) -> dict:
     return {
-        "id": row["id"],
-        "label": row["label"],
-        "created_at": row["created_at"],
-        "expires_at": row["expires_at"],
-        "revoked_at": row["revoked_at"],
-        "view_count": row["view_count"],
-        "last_viewed_at": row["last_viewed_at"],
+        **row,
         "active": _is_active(row["expires_at"], row["revoked_at"]),
     }
 
 
 _SELECT_WITH_STATS = (
-    "SELECT rl.id, rl.label, rl.created_at, rl.expires_at, rl.revoked_at, "
-    "COUNT(lv.id) AS view_count, MAX(lv.viewed_at) AS last_viewed_at "
-    "FROM recruiter_link rl "
-    "LEFT JOIN link_view lv ON lv.link_id = rl.id "
+    select(
+        RecruiterLink.id,
+        RecruiterLink.label,
+        RecruiterLink.created_at,
+        RecruiterLink.expires_at,
+        RecruiterLink.revoked_at,
+        func.count(LinkView.id).label("view_count"),
+        func.max(LinkView.viewed_at).label("last_viewed_at"),
+    )
+    .outerjoin(LinkView, LinkView.link_id == RecruiterLink.id)
+    .group_by(RecruiterLink.id)
 )
 
 
-def _get_link(conn, link_id: int) -> dict | None:
-    row = conn.execute(
-        _SELECT_WITH_STATS + "WHERE rl.id = ? GROUP BY rl.id", (link_id,)
-    ).fetchone()
+def _get_link(session: Session, link_id: int) -> dict | None:
+    row = (
+        session.execute(_SELECT_WITH_STATS.where(RecruiterLink.id == link_id))
+        .mappings()
+        .one_or_none()
+    )
     return _row_to_read(row) if row is not None else None
 
 
 def create_link(label: str | None, expires_on: date | None) -> tuple[dict, str]:
     """Create a link and return its read view together with the plaintext token."""
     token = secrets.token_urlsafe(_TOKEN_BYTES)
-    with get_connection() as conn:
-        link_id = conn.execute(
-            "INSERT INTO recruiter_link (token, label, created_at, expires_at) "
-            "VALUES (?, ?, ?, ?) RETURNING id",
-            (_hash_token(token), label, now(), _expiry_iso(expires_on)),
-        ).fetchone()["id"]
-        conn.commit()
-        link = _get_link(conn, link_id)
-        assert link is not None
 
-    return link, token
+    with get_session() as session:
+        link = RecruiterLink(
+            token=_hash_token(token),
+            created_at=now(),
+            label=label,
+            expires_at=_expiry_iso(expires_on),
+        )
+        session.add(link)
+        session.commit()
+        read = _get_link(session, link.id)
+        assert read is not None
+
+    return read, token
 
 
 def list_links() -> list[dict]:
     """Return every link with its view count and last view, newest first."""
-    with get_connection() as conn:
-        rows = conn.execute(
-            _SELECT_WITH_STATS
-            + "GROUP BY rl.id ORDER BY rl.created_at DESC, rl.id DESC"
-        ).fetchall()
-    return [_row_to_read(row) for row in rows]
+    query = _SELECT_WITH_STATS.order_by(
+        RecruiterLink.created_at.desc(), RecruiterLink.id.desc()
+    )
+
+    with get_session() as session:
+        return [_row_to_read(row) for row in session.execute(query).mappings()]
 
 
 def revoke_link(link_id: int) -> dict | None:
@@ -115,19 +125,17 @@ def revoke_link(link_id: int) -> dict | None:
     Idempotent: an already revoked link keeps its first revoke time, a missing
     link returns None so the router can answer 404.
     """
-    with get_connection() as conn:
-        exists = conn.execute(
-            "SELECT 1 FROM recruiter_link WHERE id = ?", (link_id,)
-        ).fetchone()
-        if exists is None:
+    with get_session() as session:
+        link = session.get(RecruiterLink, link_id)
+
+        if link is None:
             return None
-        conn.execute(
-            "UPDATE recruiter_link SET revoked_at = ? "
-            "WHERE id = ? AND revoked_at IS NULL",
-            (now(), link_id),
-        )
-        conn.commit()
-        return _get_link(conn, link_id)
+
+        if link.revoked_at is None:
+            link.revoked_at = now()
+            session.commit()
+
+        return _get_link(session, link_id)
 
 
 def validate_token(token: str) -> tuple[LinkStatus, int] | None:
@@ -136,22 +144,21 @@ def validate_token(token: str) -> tuple[LinkStatus, int] | None:
     Returns the link's status together with its id, or ``None`` for an unknown
     token. The lookup matches on the stored hash, never the plaintext.
     """
-    with get_connection() as conn:
-        row = conn.execute(
-            "SELECT id, expires_at, revoked_at FROM recruiter_link WHERE token = ?",
-            (_hash_token(token),),
-        ).fetchone()
+    with get_session() as session:
+        link: RecruiterLink | None = session.scalar(
+            select(RecruiterLink).where(RecruiterLink.token == _hash_token(token))
+        )
 
-    if row is None:
-        return None
+        if link is None:
+            return None
 
-    if row["revoked_at"] is not None:
-        return LinkStatus.REVOKED, row["id"]
+        if link.revoked_at is not None:
+            return LinkStatus.REVOKED, link.id
 
-    if _is_expired(row["expires_at"]):
-        return LinkStatus.EXPIRED, row["id"]
+        if _is_expired(link.expires_at):
+            return LinkStatus.EXPIRED, link.id
 
-    return LinkStatus.OK, row["id"]
+        return LinkStatus.OK, link.id
 
 
 def link_is_active(link_id: int | None) -> bool:
@@ -162,21 +169,18 @@ def link_is_active(link_id: int | None) -> bool:
     """
     if not link_id:
         return False
-    with get_connection() as conn:
-        row = conn.execute(
-            "SELECT expires_at, revoked_at FROM recruiter_link WHERE id = ?",
-            (link_id,),
-        ).fetchone()
-    if row is None:
-        return False
-    return _is_active(row["expires_at"], row["revoked_at"])
+
+    with get_session() as session:
+        link = session.get(RecruiterLink, link_id)
+
+        if link is None:
+            return False
+
+        return _is_active(link.expires_at, link.revoked_at)
 
 
 def record_view(link_id: int, origin: str) -> None:
     """Write one row to ``link_view`` for a valid redeem."""
-    with get_connection() as conn:
-        conn.execute(
-            "INSERT INTO link_view (link_id, viewed_at, origin) VALUES (?, ?, ?)",
-            (link_id, now(), origin),
-        )
-        conn.commit()
+    with get_session() as session:
+        session.add(LinkView(link_id=link_id, viewed_at=now(), origin=origin))
+        session.commit()
