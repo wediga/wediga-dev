@@ -36,7 +36,7 @@ def _get_setting(session: Session, key: str) -> str | None:
     return setting.value if setting is not None else None
 
 
-def _set_setting(session: Session, key: str, value: str) -> None:
+def set_setting(session: Session, key: str, value: str) -> None:
     statement = insert(SiteSetting).values(key=key, value=value, updated_at=now())
     session.execute(
         statement.on_conflict_do_update(
@@ -70,7 +70,7 @@ def get_about() -> str | None:
 
 def set_about(text: str) -> None:
     with get_session() as session:
-        _set_setting(session, ABOUT_KEY, text)
+        set_setting(session, ABOUT_KEY, text)
         session.commit()
 
 
@@ -94,7 +94,7 @@ def get_contact() -> dict | None:
 
 def set_contact(data: ContactContent) -> None:
     with get_session() as session:
-        _set_setting(
+        set_setting(
             session, CONTACT_KEY, json.dumps(data.model_dump(), ensure_ascii=False)
         )
         session.commit()
@@ -117,7 +117,7 @@ def get_impressum() -> dict | None:
 
 def set_impressum(data: ImpressumContent) -> None:
     with get_session() as session:
-        _set_setting(
+        set_setting(
             session, IMPRESSUM_KEY, json.dumps(data.model_dump(), ensure_ascii=False)
         )
         session.commit()

@@ -43,14 +43,14 @@ def _require(path: Path) -> Path:
 def _seed_about(session: Session, base: Path) -> int:
     path = _require(base / "about.md")
     text = path.read_text(encoding="utf-8")
-    repository._set_setting(session, "about_text", text)
+    repository.set_setting(session, "about_text", text)
     return 1
 
 
 def _seed_setting_json(session: Session, base: Path, filename: str, key: str) -> int:
     path = _require(base / filename)
     data = json.loads(path.read_text(encoding="utf-8"))
-    repository._set_setting(session, key, json.dumps(data, ensure_ascii=False))
+    repository.set_setting(session, key, json.dumps(data, ensure_ascii=False))
     return 1
 
 
