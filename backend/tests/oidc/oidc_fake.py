@@ -1,7 +1,8 @@
-"""A stand-in for authentik in the login tests.
+"""A stand-in for authentik in the login and hub tests.
 
 Signs real RS256 ID tokens with a key generated for the test run and answers
-the backend's discovery, key and token requests. Requests must arrive on the
+the backend's discovery, key and token requests, and the hub's question for
+applications. Requests must arrive on the
 internal URL with the public host in the ``Host`` header, so every test also
 checks that the backend never talks to the public address itself.
 """
@@ -23,6 +24,7 @@ CLIENT_ID = "wediga-dev"
 ACCOUNT_ID = "21"
 KEY_ID = "test-key"
 API_TOKEN = "test-api-token"
+APPLICATIONS_URL = "https://auth.example/api/v3/core/applications/"
 TOKEN_LIFETIME_SECONDS = 300
 
 SETTINGS = OidcSettings(
@@ -76,6 +78,10 @@ class FakeAuthentik:
         self.id_token: str | None = None
         self.token_error: Exception | None = None
         self.unreachable = False
+        # The body and status of the hub's question for applications.
+        self.applications: object = {"results": []}
+        self.applications_status = 200
+        self.application_calls: list[dict] = []
         self.get_calls: list[tuple[str, dict]] = []
         self.token_calls: list[tuple[str, dict]] = []
         monkeypatch.setattr(oidc.httpx2, "get", self._get)
@@ -91,13 +97,23 @@ class FakeAuthentik:
         else:
             assert "Host" not in headers
 
-    def _get(self, url: str, headers: dict, timeout) -> httpx2.Response:
+    def _get(
+        self, url: str, headers: dict, timeout, params: dict | None = None
+    ) -> httpx2.Response:
         self.get_calls.append((url, headers))
         self._check_headers(headers)
         request = httpx2.Request("GET", url)
 
         if self.unreachable:
             raise httpx2.ConnectError("unreachable", request=request)
+
+        if url == self._expected_url(APPLICATIONS_URL):
+            assert headers["Authorization"] == f"Bearer {API_TOKEN}"
+            self.application_calls.append(params or {})
+
+            return httpx2.Response(
+                self.applications_status, json=self.applications, request=request
+            )
 
         if url == self._expected_url(ISSUER + oidc.DISCOVERY_PATH):
             return httpx2.Response(200, json=self.metadata, request=request)
