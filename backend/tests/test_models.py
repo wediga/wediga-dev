@@ -1,8 +1,11 @@
-"""The models must describe exactly the schema the SQL migrations create."""
+"""The models of each area must describe exactly the tables the SQL migrations
+create for it, down to which columns may be NULL and their defaults."""
 
 from importlib import import_module
 
-from sqlalchemy import inspect
+import pytest
+from sqlalchemy import Column, inspect
+from sqlalchemy.sql.schema import ScalarElementColumnDefault
 
 from app.db.base import Base
 from app.db.connection import get_session
@@ -16,21 +19,47 @@ MODEL_MODULES = (
     "app.recruiter.models",
 )
 
+# A column as both sides describe it: may it hold NULL, and its default as the
+# SQL text of the schema.
+ColumnShape = tuple[bool | None, str | None]
 
-def _columns_of_models() -> dict[str, dict[str, bool | None]]:
-    for module in MODEL_MODULES:
-        import_module(module)
+
+def _tables_of_area(module: str) -> set[str]:
+    import_module(module)
 
     return {
-        table.name: {column.name: column.nullable for column in table.columns}
-        for table in Base.metadata.tables.values()
+        mapper.class_.__tablename__
+        for mapper in Base.registry.mappers
+        if mapper.class_.__module__ == module
     }
 
 
-def _columns_of_database() -> dict[str, dict[str, bool | None]]:
+def _model_default(column: Column) -> str | None:
+    if not isinstance(column.default, ScalarElementColumnDefault):
+        return None
+
+    value = column.default.arg
+
+    if value is None:
+        return None
+
+    # The schema writes a boolean default as 0 or 1.
+    return str(int(value)) if isinstance(value, bool) else str(value)
+
+
+def _columns_of_models(tables: set[str]) -> dict[str, dict[str, ColumnShape]]:
+    return {
+        name: {
+            column.name: (column.nullable, _model_default(column))
+            for column in Base.metadata.tables[name].columns
+        }
+        for name in tables
+    }
+
+
+def _columns_of_database(tables: set[str]) -> dict[str, dict[str, ColumnShape]]:
     with get_session() as session:
         inspector = inspect(session.connection())
-        tables = set(inspector.get_table_names()) - {"schema_migrations"}
         result = {}
 
         for name in tables:
@@ -38,12 +67,30 @@ def _columns_of_database() -> dict[str, dict[str, bool | None]]:
             # SQLite reports a primary key column as nullable unless it is
             # declared NOT NULL, while it never holds NULL.
             result[name] = {
-                column["name"]: column["nullable"] and column["name"] not in primary_key
+                column["name"]: (
+                    column["nullable"] and column["name"] not in primary_key,
+                    column["default"],
+                )
                 for column in inspector.get_columns(name)
             }
 
     return result
 
 
-def test_models_match_migrated_schema(migrated_db) -> None:
-    assert _columns_of_models() == _columns_of_database()
+@pytest.mark.parametrize(
+    "module", MODEL_MODULES, ids=[module.split(".")[1] for module in MODEL_MODULES]
+)
+def test_models_of_area_match_migrated_schema(migrated_db, module: str) -> None:
+    tables = _tables_of_area(module)
+
+    assert tables
+    assert _columns_of_models(tables) == _columns_of_database(tables)
+
+
+def test_every_table_belongs_to_an_area(migrated_db) -> None:
+    with get_session() as session:
+        tables = set(inspect(session.connection()).get_table_names())
+
+    areas = set().union(*(_tables_of_area(module) for module in MODEL_MODULES))
+
+    assert areas == tables - {"schema_migrations"}

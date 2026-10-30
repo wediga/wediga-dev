@@ -9,9 +9,9 @@ from app.db.base import Base
 class Admin(Base):
     __tablename__ = "admin"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
     password_hash: Mapped[str]
     created_at: Mapped[str]
     updated_at: Mapped[str]
-    totp_secret: Mapped[str | None]
-    totp_enabled: Mapped[bool] = mapped_column(Boolean)
+    totp_secret: Mapped[str | None] = mapped_column(default=None)
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
