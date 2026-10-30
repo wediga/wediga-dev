@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.auth.oidc_settings import (
+    API_TOKEN_VAR,
     CLIENT_ID_VAR,
     CLIENT_SECRET_VAR,
     ENABLED_VAR,
@@ -17,6 +18,7 @@ from app.auth.oidc_settings import (
 from app.main import app
 
 SECRET = "a-secret-that-must-never-be-printed"
+API_TOKEN = "an-api-token-that-must-never-be-printed"
 
 VALID_ENV = {
     ENABLED_VAR: "true",
@@ -24,6 +26,7 @@ VALID_ENV = {
     CLIENT_ID_VAR: "wediga-dev",
     CLIENT_SECRET_VAR: SECRET,
     REDIRECT_URI_VAR: "https://www.wediga.dev/auth/callback",
+    API_TOKEN_VAR: API_TOKEN,
 }
 
 
@@ -63,6 +66,7 @@ def test_complete_settings_are_loaded() -> None:
     assert settings.client_secret == SECRET
     assert settings.redirect_uri == VALID_ENV[REDIRECT_URI_VAR]
     assert settings.internal_url is None
+    assert settings.api_token == API_TOKEN
 
 
 @pytest.mark.usefixtures("valid_env")
@@ -72,8 +76,11 @@ def test_switch_is_case_insensitive(monkeypatch) -> None:
 
 
 @pytest.mark.usefixtures("valid_env")
-def test_secret_is_not_in_repr() -> None:
-    assert SECRET not in repr(load_oidc_settings())
+def test_secrets_are_not_in_repr() -> None:
+    settings = repr(load_oidc_settings())
+
+    assert SECRET not in settings
+    assert API_TOKEN not in settings
 
 
 @pytest.mark.usefixtures("valid_env")

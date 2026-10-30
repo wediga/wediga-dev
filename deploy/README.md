@@ -38,7 +38,9 @@ podman exec caddy caddy reload --config /etc/caddy/Caddyfile
 
 `authentik/blueprints/wediga.yaml` describes the groups, the mandatory second factor, the recovery flow's second-factor step and the default language. authentik reads the file from `/blueprints/custom` and applies it on startup and whenever it changes.
 
-That file owns what it lists. A change made by hand in the admin interface to one of those settings is reverted the next time the file is applied, so such changes go through the file and a pull request. Accounts, passwords and second factors are not part of it.
+That file owns what it lists. A change made by hand in the admin interface to one of those settings is reverted the next time the file is applied, so such changes go through the file and a pull request. Accounts, passwords and second factors are not part of it, except for the service account `wediga-dev-hub`.
+
+The hub of wediga.dev uses that account to ask authentik which applications the visitor may use. Its only right is that question, and its token comes from `WEDIGA_HUB_API_TOKEN` in `authentik.env`, which must equal `AUTHENTIK_API_TOKEN` in the app's `.env`. authentik reads both files only when the containers start, so a new value needs a restart of `authentik-server` and `authentik-worker` and of the backend. Like every account in authentik, the service account can create further tokens for itself, each valid for at most a day. If its token may have leaked, a new value alone is therefore not enough: delete the account `wediga-dev-hub` in the admin interface, which removes all of its tokens, set the new value in both files and restart. authentik then creates the account again with the new token.
 
 The recovery flow itself comes from the example blueprint that ships with authentik (`example/flows-recovery-email-verification.yaml`). On a fresh install it has to be created once under Customization, Blueprints and applied there.
 

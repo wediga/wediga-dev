@@ -14,7 +14,7 @@ import time
 
 from fastapi import HTTPException, Request, status
 
-from app.auth.oidc_router import ADMIN_ROLE
+from app.auth.oidc_router import ADMIN_ROLE, HUB_ROLE
 from app.auth.sessions import (
     ADMIN_SESSION_KEY,
     OIDC_SESSION_KEY,
@@ -81,6 +81,25 @@ def require_login(request: Request) -> None:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         )
+
+
+def require_hub(request: Request) -> int:
+    """Pass a login through authentik with the hub role and return the
+    account's ID in authentik.
+
+    A login from before the ID was kept in the session counts as none, so the
+    visitor goes back to authentik and comes back with it.
+    """
+    roles = oidc_roles(request)
+    user_id = request.session.get(OIDC_SESSION_KEY, {}).get("user_id")
+
+    if HUB_ROLE not in roles or user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Hub authentication required",
+        )
+
+    return user_id
 
 
 def require_recruiter_or_admin(request: Request) -> None:

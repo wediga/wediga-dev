@@ -55,6 +55,10 @@ RANDOM_BYTES = 32
 # fragment, so no browser can read it as another host.
 SAFE_TARGET = re.compile(r"/(?!/)[A-Za-z0-9\-._~/?=&%]*")
 MAX_TARGET_LENGTH = 512
+# authentik sends the account's numeric ID as "sub" (sub_mode user_id in the
+# blueprint). The hub asks authentik with it which applications the account
+# may use.
+ACCOUNT_ID = re.compile(r"[0-9]+")
 
 
 class LoginFlow(TypedDict):
@@ -70,6 +74,7 @@ class LoginFlow(TypedDict):
 class OidcLogin(TypedDict):
     """A finished login. Holds no token from authentik."""
 
+    user_id: int
     roles: list[str]
     login_at: int
 
@@ -200,8 +205,8 @@ def callback(
     code: str | None = None,
     state: str | None = None,
 ) -> RedirectResponse:
-    """Finish the login: check state, trade the code, validate the ID token and
-    turn the groups into roles.
+    """Finish the login: check state, trade the code, validate the ID token,
+    take the account ID and turn the groups into roles.
 
     The flow is removed before any check, so a state is good for one attempt
     only. Without a matching group the visitor gets no session and lands on
@@ -232,6 +237,13 @@ def callback(
 
         raise _invalid_login() from None
 
+    sub = claims.get("sub")
+
+    if not isinstance(sub, str) or not ACCOUNT_ID.fullmatch(sub):
+        logger.warning("authentik sent no numeric account ID as sub")
+
+        raise _invalid_login()
+
     roles = roles_for(claims.get("groups"))
     _drop_login_state(request)
 
@@ -239,7 +251,7 @@ def callback(
         return RedirectResponse(NO_ACCESS_PATH, status_code=status.HTTP_303_SEE_OTHER)
 
     request.session[OIDC_SESSION_KEY] = OidcLogin(
-        roles=roles, login_at=int(time.time())
+        user_id=int(sub), roles=roles, login_at=int(time.time())
     )
     # A fresh token, so none from before the login stays valid.
     issue_csrf_token(request)
