@@ -1,13 +1,15 @@
-"""The models of each area must describe exactly the tables the SQL migrations
-create for it, down to which columns may be NULL and their defaults."""
+"""The models must describe exactly the schema the migrations create: the same
+tables, columns, types, NULL rules, keys and defaults."""
 
 from importlib import import_module
 
 import pytest
-from sqlalchemy import Column, inspect
+from alembic.autogenerate import compare_metadata
+from alembic.runtime.migration import MigrationContext
+from sqlalchemy import Column, DefaultClause, inspect
 from sqlalchemy.sql.schema import ScalarElementColumnDefault
 
-from app.db.base import Base
+from app.db.base import ACCESS_SCHEMA, SITE_SCHEMA, Base
 from app.db.connection import get_session
 
 # Each area keeps its models in its own module, and a model only reaches
@@ -19,22 +21,36 @@ MODEL_MODULES = (
     "app.recruiter.models",
 )
 
-# A column as both sides describe it: may it hold NULL, and its default as the
-# SQL text of the schema.
-ColumnShape = tuple[bool | None, str | None]
+
+@pytest.fixture(scope="module", autouse=True)
+def _all_models() -> None:
+    for module in MODEL_MODULES:
+        import_module(module)
 
 
-def _tables_of_area(module: str) -> set[str]:
-    import_module(module)
-
-    return {
-        mapper.class_.__tablename__
-        for mapper in Base.registry.mappers
-        if mapper.class_.__module__ == module
-    }
+def _include_schema(name, type_, *_) -> bool:
+    # Alembic's own bookkeeping table lives outside the app's schemas.
+    return type_ != "table" or name != "alembic_version"
 
 
-def _model_default(column: Column) -> str | None:
+def test_models_match_migrated_schema(_schema) -> None:
+    with get_session() as session:
+        context = MigrationContext.configure(
+            session.connection(),
+            opts={
+                "include_schemas": True,
+                "include_name": lambda name, type_, parent: (
+                    type_ != "schema" or name in (ACCESS_SCHEMA, SITE_SCHEMA)
+                ),
+                "include_object": _include_schema,
+                "compare_type": True,
+            },
+        )
+
+        assert compare_metadata(context, Base.metadata) == []
+
+
+def _python_default(column: Column) -> str | None:
     if not isinstance(column.default, ScalarElementColumnDefault):
         return None
 
@@ -43,54 +59,25 @@ def _model_default(column: Column) -> str | None:
     if value is None:
         return None
 
-    # The schema writes a boolean default as 0 or 1.
-    return str(int(value)) if isinstance(value, bool) else str(value)
+    # PostgreSQL reports a boolean default as true or false.
+    return str(value).lower() if isinstance(value, bool) else str(value)
 
 
-def _columns_of_models(tables: set[str]) -> dict[str, dict[str, ColumnShape]]:
-    return {
-        name: {
-            column.name: (column.nullable, _model_default(column))
-            for column in Base.metadata.tables[name].columns
-        }
-        for name in tables
-    }
-
-
-def _columns_of_database(tables: set[str]) -> dict[str, dict[str, ColumnShape]]:
+def test_model_defaults_match_column_defaults(_schema) -> None:
     with get_session() as session:
         inspector = inspect(session.connection())
-        result = {}
 
-        for name in tables:
-            primary_key = inspector.get_pk_constraint(name)["constrained_columns"]
-            # SQLite reports a primary key column as nullable unless it is
-            # declared NOT NULL, while it never holds NULL.
-            result[name] = {
-                column["name"]: (
-                    column["nullable"] and column["name"] not in primary_key,
-                    column["default"],
-                )
-                for column in inspector.get_columns(name)
+        for table in Base.metadata.tables.values():
+            database = {
+                column["name"]: column["default"]
+                for column in inspector.get_columns(table.name, schema=table.schema)
             }
 
-    return result
+            for column in table.columns:
+                expected = (
+                    str(column.server_default.arg)
+                    if isinstance(column.server_default, DefaultClause)
+                    else _python_default(column)
+                )
 
-
-@pytest.mark.parametrize(
-    "module", MODEL_MODULES, ids=[module.split(".")[1] for module in MODEL_MODULES]
-)
-def test_models_of_area_match_migrated_schema(migrated_db, module: str) -> None:
-    tables = _tables_of_area(module)
-
-    assert tables
-    assert _columns_of_models(tables) == _columns_of_database(tables)
-
-
-def test_every_table_belongs_to_an_area(migrated_db) -> None:
-    with get_session() as session:
-        tables = set(inspect(session.connection()).get_table_names())
-
-    areas = set().union(*(_tables_of_area(module) for module in MODEL_MODULES))
-
-    assert areas == tables - {"schema_migrations"}
+                assert database[column.name] == expected, f"{table}.{column.name}"

@@ -1,16 +1,17 @@
 """Read and write functions for the content tables.
 
-About, contact and impressum live in the key-value ``site_setting`` table
-(contact and impressum as JSON blobs). Projects live in ``project`` with the
-tech stack as JSON text, skills in ``skill_category`` and ``skill``. Every
+About, contact and impressum live in the key-value ``site_setting`` table as
+``jsonb`` (the about text as a JSON string, contact and impressum as objects).
+Projects live in ``project`` with the tech stack as a ``jsonb`` list, skills in
+``skill_category`` and ``skill``. Every
 query goes through SQLAlchemy with bound parameters, no SQL is built from
 input.
 """
 
-import json
+import uuid
 
 from sqlalchemy import delete, select
-from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.content.models import Project, SiteSetting, Skill, SkillCategory
@@ -31,12 +32,16 @@ IMPRESSUM_KEY = "impressum"
 # --- site_setting helpers ------------------------------------------------
 
 
-def _get_setting(session: Session, key: str) -> str | None:
-    setting = session.get(SiteSetting, key)
+def _find_setting(session: Session, key: str) -> SiteSetting | None:
+    return session.scalar(select(SiteSetting).where(SiteSetting.key == key))
+
+
+def _get_setting(session: Session, key: str) -> str | dict | None:
+    setting = _find_setting(session, key)
     return setting.value if setting is not None else None
 
 
-def set_setting(session: Session, key: str, value: str) -> None:
+def set_setting(session: Session, key: str, value: str | dict) -> None:
     statement = insert(SiteSetting).values(key=key, value=value, updated_at=now())
     session.execute(
         statement.on_conflict_do_update(
@@ -50,7 +55,7 @@ def set_setting(session: Session, key: str, value: str) -> None:
 
 
 def _delete_setting(session: Session, key: str) -> bool:
-    setting = session.get(SiteSetting, key)
+    setting = _find_setting(session, key)
 
     if setting is None:
         return False
@@ -65,7 +70,11 @@ def _delete_setting(session: Session, key: str) -> bool:
 
 def get_about() -> str | None:
     with get_session() as session:
-        return _get_setting(session, ABOUT_KEY)
+        text = _get_setting(session, ABOUT_KEY)
+
+    assert text is None or isinstance(text, str)
+
+    return text
 
 
 def set_about(text: str) -> None:
@@ -82,21 +91,25 @@ def delete_about() -> bool:
     return deleted
 
 
-# --- contact and impressum (JSON blobs) ----------------------------------
+# --- contact and impressum (JSON objects) --------------------------------
+
+
+def _get_object(key: str) -> dict | None:
+    with get_session() as session:
+        data = _get_setting(session, key)
+
+    assert data is None or isinstance(data, dict)
+
+    return data
 
 
 def get_contact() -> dict | None:
-    with get_session() as session:
-        raw = _get_setting(session, CONTACT_KEY)
-
-    return json.loads(raw) if raw is not None else None
+    return _get_object(CONTACT_KEY)
 
 
 def set_contact(data: ContactContent) -> None:
     with get_session() as session:
-        set_setting(
-            session, CONTACT_KEY, json.dumps(data.model_dump(), ensure_ascii=False)
-        )
+        set_setting(session, CONTACT_KEY, data.model_dump())
         session.commit()
 
 
@@ -109,17 +122,12 @@ def delete_contact() -> bool:
 
 
 def get_impressum() -> dict | None:
-    with get_session() as session:
-        raw = _get_setting(session, IMPRESSUM_KEY)
-
-    return json.loads(raw) if raw is not None else None
+    return _get_object(IMPRESSUM_KEY)
 
 
 def set_impressum(data: ImpressumContent) -> None:
     with get_session() as session:
-        set_setting(
-            session, IMPRESSUM_KEY, json.dumps(data.model_dump(), ensure_ascii=False)
-        )
+        set_setting(session, IMPRESSUM_KEY, data.model_dump())
         session.commit()
 
 
@@ -135,16 +143,7 @@ def delete_impressum() -> bool:
 
 
 def _project_to_dict(project: Project) -> dict:
-    data = project.as_dict()
-    data["tech_stack"] = json.loads(data["tech_stack"]) if data["tech_stack"] else []
-    return data
-
-
-def _project_values(data: ProjectWrite) -> dict:
-    return {
-        **data.model_dump(),
-        "tech_stack": json.dumps(data.tech_stack, ensure_ascii=False),
-    }
+    return {**project.as_dict(), "tech_stack": project.tech_stack or []}
 
 
 def list_projects(include_hidden: bool = True) -> list[dict]:
@@ -158,7 +157,7 @@ def list_projects(include_hidden: bool = True) -> list[dict]:
         return [_project_to_dict(project) for project in session.scalars(query)]
 
 
-def get_project(project_id: int) -> dict | None:
+def get_project(project_id: uuid.UUID) -> dict | None:
     with get_session() as session:
         project = session.get(Project, project_id)
         return _project_to_dict(project) if project is not None else None
@@ -166,28 +165,28 @@ def get_project(project_id: int) -> dict | None:
 
 def create_project(data: ProjectWrite) -> dict:
     with get_session() as session:
-        project = Project(**_project_values(data))
+        project = Project(**data.model_dump())
         session.add(project)
         session.commit()
 
         return _project_to_dict(project)
 
 
-def update_project(project_id: int, data: ProjectWrite) -> dict | None:
+def update_project(project_id: uuid.UUID, data: ProjectWrite) -> dict | None:
     with get_session() as session:
         project = session.get(Project, project_id)
 
         if project is None:
             return None
 
-        for key, value in _project_values(data).items():
+        for key, value in data.model_dump().items():
             setattr(project, key, value)
         session.commit()
 
         return _project_to_dict(project)
 
 
-def delete_project(project_id: int) -> bool:
+def delete_project(project_id: uuid.UUID) -> bool:
     with get_session() as session:
         project = session.get(Project, project_id)
 
@@ -213,7 +212,7 @@ def list_skill_categories() -> list[dict]:
             select(SkillCategory).order_by(SkillCategory.sort_order, SkillCategory.id)
         ).all()
         skills = session.scalars(select(Skill).order_by(Skill.sort_order, Skill.id))
-        by_category: dict[int, list[dict]] = {}
+        by_category: dict[uuid.UUID, list[dict]] = {}
 
         for skill in skills:
             by_category.setdefault(skill.category_id, []).append(_skill_to_dict(skill))
@@ -233,7 +232,7 @@ def create_category(data: SkillCategoryWrite) -> dict:
         return {**category.as_dict(), "skills": []}
 
 
-def update_category(category_id: int, data: SkillCategoryWrite) -> dict | None:
+def update_category(category_id: uuid.UUID, data: SkillCategoryWrite) -> dict | None:
     with get_session() as session:
         category = session.get(SkillCategory, category_id)
 
@@ -255,7 +254,7 @@ def update_category(category_id: int, data: SkillCategoryWrite) -> dict | None:
         }
 
 
-def delete_category(category_id: int) -> bool:
+def delete_category(category_id: uuid.UUID) -> bool:
     with get_session() as session:
         category = session.get(SkillCategory, category_id)
 
@@ -269,7 +268,7 @@ def delete_category(category_id: int) -> bool:
     return True
 
 
-def create_skill(category_id: int, data: SkillWrite) -> dict | None:
+def create_skill(category_id: uuid.UUID, data: SkillWrite) -> dict | None:
     with get_session() as session:
         if session.get(SkillCategory, category_id) is None:
             return None
@@ -283,7 +282,7 @@ def create_skill(category_id: int, data: SkillWrite) -> dict | None:
         return _skill_to_dict(skill)
 
 
-def update_skill(skill_id: int, data: SkillWrite) -> dict | None:
+def update_skill(skill_id: uuid.UUID, data: SkillWrite) -> dict | None:
     with get_session() as session:
         skill = session.get(Skill, skill_id)
 
@@ -297,7 +296,7 @@ def update_skill(skill_id: int, data: SkillWrite) -> dict | None:
         return _skill_to_dict(skill)
 
 
-def delete_skill(skill_id: int) -> bool:
+def delete_skill(skill_id: uuid.UUID) -> bool:
     with get_session() as session:
         skill = session.get(Skill, skill_id)
 

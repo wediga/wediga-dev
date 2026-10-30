@@ -7,6 +7,9 @@ curated recruiter view, ``RepoCurationWrite`` the four curation fields a write
 may change.
 """
 
+import uuid
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 OVERRIDE_MAX = 500
@@ -15,14 +18,14 @@ OVERRIDE_MAX = 500
 class GithubRepoRead(BaseModel):
     """The full repo row for the admin, mirrored fields plus curation."""
 
-    id: int
+    id: uuid.UUID
     name: str
     description: str | None
     language: str | None
     stars: int | None
     url: str | None
-    last_push: str | None
-    last_sync: str | None
+    last_push: datetime | None
+    last_sync: datetime | None
     visible: bool
     pinned: bool
     description_override: str | None
@@ -41,7 +44,7 @@ class GithubRepoPublic(BaseModel):
     language: str | None
     stars: int | None
     url: str | None
-    last_push: str | None
+    last_push: datetime | None
     pinned: bool
 
 

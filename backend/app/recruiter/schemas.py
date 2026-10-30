@@ -5,7 +5,8 @@ backend once, in the create response, and never again; the database holds only
 its hash.
 """
 
-from datetime import date
+import uuid
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -23,13 +24,13 @@ class RecruiterLinkCreate(BaseModel):
 class RecruiterLinkRead(BaseModel):
     """A link with its call statistics for the admin list."""
 
-    id: int
+    id: uuid.UUID
     label: str | None
-    created_at: str
-    expires_at: str | None
-    revoked_at: str | None
+    created_at: datetime
+    expires_at: datetime | None
+    revoked_at: datetime | None
     view_count: int
-    last_viewed_at: str | None
+    last_viewed_at: datetime | None
     active: bool
 
 

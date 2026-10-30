@@ -142,6 +142,6 @@ Restore a dump with the backend stopped:
 
 ```
 systemctl --user stop backend.service
-podman exec -i wediga-db pg_restore -U wediga -d wediga --clean --if-exists < ~/wediga-dev/backups/wediga-YYYY-MM-DD.dump
+podman exec -i wediga-db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' < ~/wediga-dev/backups/wediga-YYYY-MM-DD.dump
 systemctl --user start backend.service
 ```

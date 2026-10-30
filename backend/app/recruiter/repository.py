@@ -10,6 +10,7 @@ parameters, no SQL is built from input.
 
 import hashlib
 import secrets
+import uuid
 from datetime import UTC, date, datetime, time
 from enum import Enum, auto
 
@@ -36,7 +37,7 @@ def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def _expiry_iso(expires_on: date | None) -> str | None:
+def _expiry(expires_on: date | None) -> datetime | None:
     """Turn a calendar day into an end-of-day UTC timestamp, or ``None``.
 
     A link stays valid through the whole chosen day, so the stored instant is
@@ -44,18 +45,17 @@ def _expiry_iso(expires_on: date | None) -> str | None:
     """
     if expires_on is None:
         return None
-    end_of_day = datetime.combine(expires_on, time(23, 59, 59), tzinfo=UTC)
-    return end_of_day.isoformat()
+    return datetime.combine(expires_on, time(23, 59, 59), tzinfo=UTC)
 
 
-def _is_expired(expires_at: str | None) -> bool:
+def _is_expired(expires_at: datetime | None) -> bool:
     """Return whether an expiry instant has passed. No expiry never expires."""
     if expires_at is None:
         return False
-    return datetime.fromisoformat(expires_at) <= datetime.now(UTC)
+    return expires_at <= now()
 
 
-def _is_active(expires_at: str | None, revoked_at: str | None) -> bool:
+def _is_active(expires_at: datetime | None, revoked_at: datetime | None) -> bool:
     return revoked_at is None and not _is_expired(expires_at)
 
 
@@ -76,12 +76,12 @@ _SELECT_WITH_STATS = (
         func.count(LinkView.id).label("view_count"),
         func.max(LinkView.viewed_at).label("last_viewed_at"),
     )
-    .outerjoin(LinkView, LinkView.link_id == RecruiterLink.id)
+    .outerjoin(LinkView, LinkView.recruiter_link_id == RecruiterLink.id)
     .group_by(RecruiterLink.id)
 )
 
 
-def _get_link(session: Session, link_id: int) -> dict | None:
+def _get_link(session: Session, link_id: uuid.UUID) -> dict | None:
     row = (
         session.execute(_SELECT_WITH_STATS.where(RecruiterLink.id == link_id))
         .mappings()
@@ -96,10 +96,10 @@ def create_link(label: str | None, expires_on: date | None) -> tuple[dict, str]:
 
     with get_session() as session:
         link = RecruiterLink(
-            token=_hash_token(token),
+            token_hash=_hash_token(token),
             created_at=now(),
             label=label,
-            expires_at=_expiry_iso(expires_on),
+            expires_at=_expiry(expires_on),
         )
         session.add(link)
         session.commit()
@@ -119,7 +119,7 @@ def list_links() -> list[dict]:
         return [_row_to_read(row) for row in session.execute(query).mappings()]
 
 
-def revoke_link(link_id: int) -> dict | None:
+def revoke_link(link_id: uuid.UUID) -> dict | None:
     """Revoke a link by stamping ``revoked_at``; return its read view or None.
 
     Idempotent: an already revoked link keeps its first revoke time, a missing
@@ -138,7 +138,7 @@ def revoke_link(link_id: int) -> dict | None:
         return _get_link(session, link_id)
 
 
-def validate_token(token: str) -> tuple[LinkStatus, int] | None:
+def validate_token(token: str) -> tuple[LinkStatus, uuid.UUID] | None:
     """Look a token up by its hash and classify it.
 
     Returns the link's status together with its id, or ``None`` for an unknown
@@ -146,7 +146,7 @@ def validate_token(token: str) -> tuple[LinkStatus, int] | None:
     """
     with get_session() as session:
         link: RecruiterLink | None = session.scalar(
-            select(RecruiterLink).where(RecruiterLink.token == _hash_token(token))
+            select(RecruiterLink).where(RecruiterLink.token_hash == _hash_token(token))
         )
 
         if link is None:
@@ -161,17 +161,24 @@ def validate_token(token: str) -> tuple[LinkStatus, int] | None:
         return LinkStatus.OK, link.id
 
 
-def link_is_active(link_id: int | None) -> bool:
+def link_is_active(link_id: object) -> bool:
     """Return whether the link behind a recruiter session is still usable.
 
     Called on every recruiter read, so revoking or expiring a link cuts an
-    already redeemed session, not just a new redeem.
+    already redeemed session, not just a new redeem. The id comes from the
+    cookie, and anything that is not a UUID, such as the number a cookie from
+    the time of SQLite still holds, finds no link.
     """
-    if not link_id:
+    if not isinstance(link_id, str):
+        return False
+
+    try:
+        parsed = uuid.UUID(link_id)
+    except ValueError:
         return False
 
     with get_session() as session:
-        link = session.get(RecruiterLink, link_id)
+        link = session.get(RecruiterLink, parsed)
 
         if link is None:
             return False
@@ -179,8 +186,8 @@ def link_is_active(link_id: int | None) -> bool:
         return _is_active(link.expires_at, link.revoked_at)
 
 
-def record_view(link_id: int, origin: str) -> None:
+def record_view(link_id: uuid.UUID, origin: str) -> None:
     """Write one row to ``link_view`` for a valid redeem."""
     with get_session() as session:
-        session.add(LinkView(link_id=link_id, viewed_at=now(), origin=origin))
+        session.add(LinkView(recruiter_link_id=link_id, viewed_at=now(), origin=origin))
         session.commit()

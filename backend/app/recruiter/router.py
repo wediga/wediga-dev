@@ -5,6 +5,8 @@ Its recruiter marker is separate from the admin one, so redeeming never grants
 admin. The admin endpoints use the standard write gate (see WRITE_DEPS).
 """
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.auth.csrf import require_csrf
@@ -53,7 +55,7 @@ def list_links() -> list[dict]:
     response_model=RecruiterLinkRead,
     dependencies=WRITE_DEPS,
 )
-def revoke_link(link_id: int) -> dict:
+def revoke_link(link_id: uuid.UUID) -> dict:
     """Revoke a link, which blocks any further redeem."""
     link = repo.revoke_link(link_id)
     if link is None:
@@ -88,7 +90,8 @@ def redeem(token: str, request: Request) -> dict[str, bool]:
             status_code=status.HTTP_410_GONE, detail="Link no longer valid"
         )
 
-    request.session[RECRUITER_SESSION_KEY] = link_id
+    # The cookie holds JSON, so the id goes in as text.
+    request.session[RECRUITER_SESSION_KEY] = str(link_id)
     repo.record_view(link_id, coarse_origin(client_ip(request)))
     return {"ok": True}
 

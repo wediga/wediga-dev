@@ -8,8 +8,11 @@ schema's curation defaults. Every query goes through SQLAlchemy with bound
 parameters, no SQL is built from input.
 """
 
+import uuid
+from datetime import datetime
+
 from sqlalchemy import func, select
-from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.dialects.postgresql import insert
 
 from app.db.connection import get_session
 from app.github.models import GithubRepo
@@ -20,7 +23,7 @@ from app.github.schemas import RepoCurationWrite
 _MIRRORED = ("description", "language", "stars", "url", "last_push", "last_sync")
 
 
-def upsert_repos(repos: list[dict], synced_at: str) -> int:
+def upsert_repos(repos: list[dict], synced_at: datetime) -> int:
     """Upsert the mirrored fields of each repo in one transaction.
 
     The batch commits once, so either all rows land or none do. Curation is
@@ -80,7 +83,7 @@ def list_curated() -> list[dict]:
         return [dict(row) for row in session.execute(query).mappings()]
 
 
-def update_curation(repo_id: int, data: RepoCurationWrite) -> dict | None:
+def update_curation(repo_id: uuid.UUID, data: RepoCurationWrite) -> dict | None:
     """Set the four curation fields of one repo; return it or ``None``.
 
     Only the curation columns are written, leaving the mirrored fields as the

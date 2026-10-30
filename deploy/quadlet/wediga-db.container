@@ -9,17 +9,18 @@ Image=docker.io/library/postgres:18.6-alpine@sha256:10a5c69a83035ab5239f5620d708
 ContainerName=wediga-db
 Network=wediga.network
 
-# The password comes from a file that only exists on the server. It holds
-# nothing else, so this container never sees the app's other secrets.
+# User, database and password come from a file that only exists on the
+# server. The backend reads the same file, and it holds nothing else, so this
+# container never sees the app's other secrets.
 EnvironmentFile=/home/web/wediga-dev/wediga-db.env
-Environment=POSTGRES_USER=wediga
-Environment=POSTGRES_DB=wediga
 
 # From version 18 on, the image keeps its data in a subdirectory per major
 # version below /var/lib/postgresql, so the volume is mounted there.
 Volume=wediga-db.volume:/var/lib/postgresql
 
-HealthCmd=pg_isready -d wediga -U wediga
+# Podman runs the check through the container's shell, so the two names
+# come from the environment file.
+HealthCmd=pg_isready -d "$POSTGRES_DB" -U "$POSTGRES_USER"
 HealthInterval=30s
 HealthTimeout=5s
 HealthRetries=5

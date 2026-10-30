@@ -6,6 +6,8 @@ Writes and recruiter reads use the standard gates (see WRITE_DEPS and
 ``require_recruiter_view``).
 """
 
+import uuid
+
 from fastapi import APIRouter, Depends, status
 
 from app.auth.csrf import require_csrf
@@ -151,7 +153,7 @@ def create_project(body: ProjectWrite) -> dict:
 @router.put(
     "/projects/{project_id}", response_model=ProjectRead, dependencies=WRITE_DEPS
 )
-def update_project(project_id: int, body: ProjectWrite) -> dict:
+def update_project(project_id: uuid.UUID, body: ProjectWrite) -> dict:
     updated = repo.update_project(project_id, body)
     if updated is None:
         raise NOT_FOUND
@@ -159,7 +161,7 @@ def update_project(project_id: int, body: ProjectWrite) -> dict:
 
 
 @router.delete("/projects/{project_id}", dependencies=WRITE_DEPS)
-def delete_project(project_id: int) -> dict[str, bool]:
+def delete_project(project_id: uuid.UUID) -> dict[str, bool]:
     if not repo.delete_project(project_id):
         raise NOT_FOUND
     return {"ok": True}
@@ -188,7 +190,7 @@ def create_category(body: SkillCategoryWrite) -> dict:
     response_model=SkillCategoryRead,
     dependencies=WRITE_DEPS,
 )
-def update_category(category_id: int, body: SkillCategoryWrite) -> dict:
+def update_category(category_id: uuid.UUID, body: SkillCategoryWrite) -> dict:
     updated = repo.update_category(category_id, body)
     if updated is None:
         raise NOT_FOUND
@@ -196,7 +198,7 @@ def update_category(category_id: int, body: SkillCategoryWrite) -> dict:
 
 
 @router.delete("/skills/categories/{category_id}", dependencies=WRITE_DEPS)
-def delete_category(category_id: int) -> dict[str, bool]:
+def delete_category(category_id: uuid.UUID) -> dict[str, bool]:
     if not repo.delete_category(category_id):
         raise NOT_FOUND
     return {"ok": True}
@@ -208,7 +210,7 @@ def delete_category(category_id: int) -> dict[str, bool]:
     status_code=status.HTTP_201_CREATED,
     dependencies=WRITE_DEPS,
 )
-def create_skill(category_id: int, body: SkillWrite) -> dict:
+def create_skill(category_id: uuid.UUID, body: SkillWrite) -> dict:
     created = repo.create_skill(category_id, body)
     if created is None:
         raise NOT_FOUND
@@ -216,7 +218,7 @@ def create_skill(category_id: int, body: SkillWrite) -> dict:
 
 
 @router.put("/skills/{skill_id}", response_model=SkillRead, dependencies=WRITE_DEPS)
-def update_skill(skill_id: int, body: SkillWrite) -> dict:
+def update_skill(skill_id: uuid.UUID, body: SkillWrite) -> dict:
     updated = repo.update_skill(skill_id, body)
     if updated is None:
         raise NOT_FOUND
@@ -224,7 +226,7 @@ def update_skill(skill_id: int, body: SkillWrite) -> dict:
 
 
 @router.delete("/skills/{skill_id}", dependencies=WRITE_DEPS)
-def delete_skill(skill_id: int) -> dict[str, bool]:
+def delete_skill(skill_id: uuid.UUID) -> dict[str, bool]:
     if not repo.delete_skill(skill_id):
         raise NOT_FOUND
     return {"ok": True}

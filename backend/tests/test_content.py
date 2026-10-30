@@ -7,6 +7,7 @@ https base URL so the Secure session cookie round-trips.
 """
 
 import importlib
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -123,7 +124,7 @@ def test_project_crud_and_visibility(admin_client) -> None:
     )
     assert create.status_code == 201
     project = create.json()
-    assert project["id"] > 0
+    assert uuid.UUID(project["id"])
     assert project["tech_stack"] == ["Python"]
     project_id = project["id"]
 
@@ -186,7 +187,7 @@ def test_skills_crud(admin_client) -> None:
 def test_create_skill_in_missing_category_is_404(admin_client) -> None:
     assert (
         admin_client.post(
-            "/content/skills/categories/999/skills", json={"name": "X"}
+            f"/content/skills/categories/{uuid.uuid4()}/skills", json={"name": "X"}
         ).status_code
         == 404
     )

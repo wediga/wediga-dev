@@ -5,6 +5,8 @@ curation fields are. Writes and recruiter reads use the standard gates (see
 WRITE_DEPS and ``require_recruiter_view``).
 """
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.csrf import require_csrf
@@ -53,7 +55,7 @@ def list_curated_repos() -> list[dict]:
     response_model=GithubRepoRead,
     dependencies=WRITE_DEPS,
 )
-def update_curation(repo_id: int, body: RepoCurationWrite) -> dict:
+def update_curation(repo_id: uuid.UUID, body: RepoCurationWrite) -> dict:
     """Set the curation of one repo (visible, pinned, override, sort order)."""
     updated = repo.update_curation(repo_id, body)
     if updated is None:

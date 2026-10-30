@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Start the backend for the end-to-end tests against a throwaway database and a
-# synthetic content directory. The real data/ and content/ are never touched;
-# both are overridden by WEDIGA_DB_PATH and WEDIGA_CONTENT_DIR, which the
-# Playwright config points at a temporary path. Migrate and seed run first, so
-# the backend only starts answering once the data is in place.
+# Start the backend for the end-to-end tests against the test PostgreSQL and a
+# synthetic content directory. The schema is dropped and migrated again on every
+# run. The real data/ and content/ are never touched, WEDIGA_DB_PATH (where the
+# CV file goes) and WEDIGA_CONTENT_DIR point at a temporary path from the
+# Playwright config. Migrate and seed run first, so the backend only starts
+# answering once the data is in place.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,6 +28,7 @@ cp "$REPO_ROOT"/content.example/*.md "$WEDIGA_CONTENT_DIR"/
 cp "$REPO_ROOT"/content.example/*.json "$WEDIGA_CONTENT_DIR"/
 
 cd "$BACKEND_DIR"
-uv run python -m app.db.migrate
+uv run alembic downgrade base
+uv run alembic upgrade head
 uv run python -m app.db.seed
 exec uv run uvicorn app.main:app --host 127.0.0.1 --port "$BACKEND_PORT"

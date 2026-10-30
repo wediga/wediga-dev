@@ -1,16 +1,16 @@
 """Admin bootstrap from the environment.
 
 On startup, with no ``admin`` row and ``ADMIN_PASSWORD`` set, one admin row
-(id=1) is created from an argon2 hash. An existing row is left alone, so a
+is created from an argon2 hash. An existing row is left alone, so a
 restart never overwrites the password. The raw password is never logged or
 stored in plaintext.
 """
 
 import os
 
-from sqlalchemy import insert
+from sqlalchemy import select
 
-from app.auth.models import ADMIN_ID, Admin
+from app.auth.models import Admin
 from app.auth.passwords import hash_password
 from app.db.connection import get_session, now
 
@@ -26,13 +26,12 @@ def ensure_admin() -> bool:
         return False
 
     with get_session() as session:
-        if session.get(Admin, ADMIN_ID) is not None:
+        if session.scalar(select(Admin.id)) is not None:
             return False
 
         timestamp = now()
-        session.execute(
-            insert(Admin).values(
-                id=ADMIN_ID,
+        session.add(
+            Admin(
                 password_hash=hash_password(password),
                 created_at=timestamp,
                 updated_at=timestamp,

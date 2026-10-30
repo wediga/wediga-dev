@@ -57,7 +57,7 @@ def test_me_after_login_then_logout(client) -> None:
     assert me_again.status_code == 401
 
 
-def test_failed_admin_bootstrap_is_logged(temp_db, monkeypatch, caplog) -> None:
+def test_failed_admin_bootstrap_is_logged(unmigrated_db, monkeypatch, caplog) -> None:
     # Without migrations the admin table is missing, so the bootstrap fails.
     # Startup must still go through, with a warning that says why the login
     # will not work.
