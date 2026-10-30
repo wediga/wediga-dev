@@ -9,7 +9,7 @@ The commands in this file run as that user. After switching to it with `sudo`, r
 | What | Where on the server |
 |---|---|
 | Quadlet units (`quadlet/*.container`, `*.volume`, `*.network`) | `~/.config/containers/systemd/` |
-| Caddyfile and the app's `.env` | `~/wediga-dev/` |
+| Caddyfile, the app's `.env` and the database password `wediga-db.env` | `~/wediga-dev/` |
 | Secrets for the identity provider | `~/authentik/authentik.env`, `~/authentik/authentik-db.env` |
 | Setup of the identity provider (`authentik/blueprints/`) | `~/authentik/blueprints/` |
 | Database dumps of the identity provider | `~/authentik/backups/` |
@@ -25,7 +25,7 @@ A push to `main` builds both app images, scans them and, if the scan passes, tri
 2. pins the app units to the images of that commit,
 3. restarts the backend and the frontend.
 
-It does not reload Caddy and it does not restart the identity provider. Both are deliberate, so a routine deploy of the app cannot take the login or the proxy down.
+It does not reload Caddy and it restarts neither the identity provider nor the app's database (`wediga-db`). All of this is deliberate, so a routine deploy of the app cannot take the login, the proxy or the data down.
 
 After a change to the Caddyfile:
 
