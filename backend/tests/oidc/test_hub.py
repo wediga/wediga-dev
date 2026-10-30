@@ -166,7 +166,9 @@ def test_own_application_is_the_one_in_the_blueprint() -> None:
 
 def test_answer_is_kept_for_a_minute(client, fake, monkeypatch) -> None:
     log_in(client, fake, ["friends"])
-    now = hub_router.time.monotonic()
+    # The route only compares two points in time, so the clock may start at
+    # zero, where adding the minute gives exactly a minute later.
+    now = 0.0
     monkeypatch.setattr(hub_router.time, "monotonic", lambda: now)
     applications(client)
     fake.applications = {"results": [GAME]}
