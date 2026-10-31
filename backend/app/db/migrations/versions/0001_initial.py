@@ -1,9 +1,9 @@
 """The first schema on PostgreSQL.
 
-The recruiter links, their views and the admin row get their final form from
-the data model in the plan. Projects, skills, the GitHub repos and
-the key-value settings move over in the shape they had in SQLite, only with
-UUIDs, timestamptz, boolean and jsonb.
+The recruiter links, their views, the admin row and the CV get their final form
+from the data model in the plan. Projects, skills, the GitHub repos and the
+key-value settings move over in the shape they had in SQLite, only with UUIDs,
+timestamptz, boolean and jsonb.
 
 Revision ID: 0001_initial
 """
@@ -145,6 +145,21 @@ def upgrade() -> None:
         sa.Column("key", sa.Text, nullable=False, unique=True),
         sa.Column("value", JSONB, nullable=False),
         _timestamp("updated_at"),
+        schema=SITE_SCHEMA,
+    )
+
+    op.create_table(
+        "cv_document",
+        _id(),
+        sa.Column("content", sa.LargeBinary, nullable=False),
+        _timestamp("uploaded_at"),
+        schema=SITE_SCHEMA,
+    )
+    op.create_index(
+        "cv_document_single_row",
+        "cv_document",
+        [sa.text("(true)")],
+        unique=True,
         schema=SITE_SCHEMA,
     )
 

@@ -7,7 +7,14 @@ from app.db.connection import get_session
 
 EXPECTED_TABLES = {
     ACCESS_SCHEMA: {"admin", "link_view", "recruiter_link"},
-    SITE_SCHEMA: {"github_repo", "project", "site_setting", "skill", "skill_category"},
+    SITE_SCHEMA: {
+        "cv_document",
+        "github_repo",
+        "project",
+        "site_setting",
+        "skill",
+        "skill_category",
+    },
 }
 
 

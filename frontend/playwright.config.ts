@@ -104,7 +104,6 @@ export default defineConfig({
         POSTGRES_PASSWORD: "not-checked",
         POSTGRES_HOST: "127.0.0.1",
         POSTGRES_PORT: "5432",
-        WEDIGA_DB_PATH: path.join(TMP_DIR, "data", "e2e.db"),
         WEDIGA_CONTENT_DIR: path.join(TMP_DIR, "content"),
         BACKEND_PORT: String(BACKEND_PORT),
         ADMIN_PASSWORD,

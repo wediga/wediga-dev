@@ -65,15 +65,12 @@ def unmigrated_db(_schema):
 
 
 @pytest.fixture()
-def migrated_db(_schema, tmp_path, monkeypatch) -> None:
+def migrated_db(_schema, monkeypatch) -> None:
     """Empty every table of the migrated schema for this test."""
     from app.db.base import ACCESS_SCHEMA, SITE_SCHEMA
     from app.db.connection import get_session
 
     monkeypatch.setenv("WEDIGA_CONTENT_DIR", str(REPO_ROOT / "content.example"))
-    # The CV is still a file next to this path, so the tests keep it out of
-    # the real data/ directory.
-    monkeypatch.setenv("WEDIGA_DB_PATH", str(tmp_path / "data" / "wediga.db"))
 
     with get_session() as session:
         tables = session.scalars(

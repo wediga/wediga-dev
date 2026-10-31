@@ -17,6 +17,7 @@ from app.db.connection import get_session
 MODEL_MODULES = (
     "app.auth.models",
     "app.content.models",
+    "app.cv.models",
     "app.github.models",
     "app.recruiter.models",
 )
