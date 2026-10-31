@@ -23,6 +23,3 @@ next-env.d.ts
 # Private inputs used by later phases, kept out of the public repo
 /static/
 /Lebenslauf*.pdf
-
-# Runtime data (SQLite file and generated PDF, mounted as a volume)
-/data/
