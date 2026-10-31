@@ -6,12 +6,11 @@ gates (see WRITE_DEPS and ``require_recruiter_view``).
 The upload is the real attack surface, so a file is accepted only when its
 multipart part declares ``application/pdf`` and its bytes start with the
 ``%PDF-`` signature, and the size is capped while reading so an oversized body
-never buffers whole. Stored under a fixed name, a client filename never reaches
-the path.
+never buffers whole. The client filename is never stored, the download always
+carries a fixed name.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, status
 
 from app.auth.csrf import require_csrf
 from app.auth.dependencies import require_admin
@@ -42,22 +41,25 @@ def cv_status() -> dict[str, bool]:
 
 
 @router.get("/download", dependencies=RECRUITER_READ_DEPS)
-def download_cv(inline: bool = False) -> FileResponse:
+def download_cv(inline: bool = False) -> Response:
     """Return the stored CV PDF.
 
     By default it is sent as an attachment for the download link. With
     ``inline=true`` it is sent inline so the CV page can embed it in a preview
     pane instead of forcing a download.
     """
-    path = storage.cv_path()
-    if not path.is_file():
+    content = storage.load_cv()
+
+    if content is None:
         raise not_found("No CV uploaded yet")
-    return FileResponse(
-        path,
+
+    disposition = "inline" if inline else "attachment"
+
+    return Response(
+        content,
         media_type="application/pdf",
-        filename=DOWNLOAD_FILENAME,
-        content_disposition_type="inline" if inline else "attachment",
         headers={
+            "Content-Disposition": f'{disposition}; filename="{DOWNLOAD_FILENAME}"',
             # Gated personal content must not sit in a shared cache.
             "Cache-Control": "private, no-store",
             # nosniff plus the %PDF signature check stops a polyglot upload

@@ -2,9 +2,9 @@
 
 Starlette's ``SessionMiddleware`` signs one cookie with itsdangerous and keeps
 no server-side state. The admin marker is ``session["admin"]`` and the
-recruiter marker is ``session["recruiter"]`` (the id of the redeemed link).
-They are independent keys in the one cookie, so a recruiter session never
-carries the admin marker and cannot reach an admin route.
+recruiter marker is ``session["recruiter"]`` (the id of the redeemed link, as
+text). They are independent keys in the one cookie, so a recruiter session
+never carries the admin marker and cannot reach an admin route.
 """
 
 import logging

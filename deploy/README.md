@@ -9,7 +9,7 @@ The commands in this file run as that user. After switching to it with `sudo`, r
 | What | Where on the server |
 |---|---|
 | Quadlet units (`quadlet/*.container`, `*.volume`, `*.network`) | `~/.config/containers/systemd/` |
-| Caddyfile, the app's `.env` and the database password `wediga-db.env` | `~/wediga-dev/` |
+| Caddyfile, the app's `.env` and the database connection `wediga-db.env` | `~/wediga-dev/` |
 | Database dumps of the app | `~/wediga-dev/backups/` |
 | Secrets for the identity provider | `~/authentik/authentik.env`, `~/authentik/authentik-db.env` |
 | Setup of the identity provider (`authentik/blueprints/`) | `~/authentik/blueprints/` |
@@ -24,7 +24,7 @@ A push to `main` builds both app images, scans them and, if the scan passes, tri
 
 1. downloads the Quadlet units, the Caddyfile and the identity provider's setup file from `main`,
 2. pins the app units to the images of that commit,
-3. restarts the backend and the frontend.
+3. restarts `backend-migrate`, which applies new database migrations with `alembic upgrade head`, and then the backend and the frontend.
 
 It does not reload Caddy and it restarts neither the identity provider nor the app's database (`wediga-db`). All of this is deliberate, so a routine deploy of the app cannot take the login, the proxy or the data down.
 
@@ -73,7 +73,7 @@ systemctl --user restart authentik-server.service authentik-worker.service
 
 ## Updating the app's database
 
-The app has its own PostgreSQL in `wediga-db.container`, separate from the one of the identity provider and only reachable over the internal network. Its version is raised by hand as well. A new minor version (18.6 to 18.7) only needs the tag and the digest raised, a fresh dump and a restart after the merge:
+The app has its own PostgreSQL in `wediga-db.container`, separate from the one of the identity provider and only reachable over the internal network. User, database, password, host and port all come from `wediga-db.env`, which the database, the backend and `backend-migrate` read, so they are written down only there. Its version is raised by hand as well. A new minor version (18.6 to 18.7) only needs the tag and the digest raised, a fresh dump and a restart after the merge:
 
 ```
 systemctl --user start wediga-db-backup.service
@@ -110,7 +110,7 @@ cd frontend && AUTHENTIK_URL=http://localhost:9000 AUTHENTIK_ACCOUNTS=e2e/.tmp/a
 
 `authentik-db-backup.timer` writes a dump of the identity provider's database to `~/authentik/backups/` every night, and `wediga-db-backup.timer` does the same for the app's database in `~/wediga-dev/backups/` a quarter of an hour later. Both delete dumps older than 14 days. The dumps stay on the same machine, so they protect against a broken update or a mistake, not against losing the server.
 
-Accounts, groups and settings only exist in the identity provider's database, so its dump is the only copy.
+Accounts, groups and settings only exist in the identity provider's database, so its dump is the only copy. The same goes for the app, whose dump holds all of its content and the CV, because the CV lives in the table `cv_document` and not as a file.
 
 Install once:
 
@@ -142,6 +142,6 @@ Restore a dump with the backend stopped:
 
 ```
 systemctl --user stop backend.service
-podman exec -i wediga-db pg_restore -U wediga -d wediga --clean --if-exists < ~/wediga-dev/backups/wediga-YYYY-MM-DD.dump
+podman exec -i wediga-db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' < ~/wediga-dev/backups/wediga-YYYY-MM-DD.dump
 systemctl --user start backend.service
 ```

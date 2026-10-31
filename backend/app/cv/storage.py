@@ -1,35 +1,31 @@
 """Storage for the single uploaded CV PDF.
 
-The PDF is kept under a fixed name in the data volume, its presence is the
-whole state (no database row). The fixed name keeps the client filename off the
-path, so an upload can neither traverse out of the directory nor collide. The
-write goes through a temporary file and an atomic ``replace``, so an
-interrupted upload never leaves a half-written PDF at the served path.
+The PDF lives in the one row of ``cv_document``, so the nightly ``pg_dump``
+covers it together with the rest of the data. A new upload replaces the row in
+one transaction, so an interrupted upload never leaves the old CV missing.
 """
 
-from pathlib import Path
+from sqlalchemy import delete, exists, select
 
-from app.paths import cv_dir
-
-# Fixed on-disk name; the client filename is never used.
-CV_FILENAME = "cv.pdf"
-
-
-def cv_path() -> Path:
-    """Return the path of the stored CV PDF."""
-    return cv_dir() / CV_FILENAME
+from app.cv.models import CvDocument
+from app.db.connection import get_session, now
 
 
 def has_cv() -> bool:
     """Return whether a CV PDF is currently stored."""
-    return cv_path().is_file()
+    with get_session() as session:
+        return bool(session.scalar(select(exists().select_from(CvDocument))))
+
+
+def load_cv() -> bytes | None:
+    """Return the stored PDF bytes, or None when no CV was uploaded yet."""
+    with get_session() as session:
+        return session.scalar(select(CvDocument.content))
 
 
 def save_cv(data: bytes) -> None:
-    """Write the PDF bytes to the fixed path, replacing any existing file."""
-    directory = cv_dir()
-    directory.mkdir(parents=True, exist_ok=True)
-    tmp = directory / f".{CV_FILENAME}.tmp"
-    tmp.write_bytes(data)
-    # Atomic within the same filesystem.
-    tmp.replace(cv_path())
+    """Store the PDF bytes, replacing any existing CV."""
+    with get_session() as session:
+        session.execute(delete(CvDocument))
+        session.add(CvDocument(content=data, uploaded_at=now()))
+        session.commit()

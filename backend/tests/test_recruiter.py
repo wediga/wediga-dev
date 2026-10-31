@@ -4,6 +4,7 @@ The client uses an https base URL so the Secure session cookie round-trips.
 """
 
 import importlib
+import uuid
 from datetime import date, timedelta
 
 import pytest
@@ -84,7 +85,9 @@ def test_create_and_revoke_require_admin_and_csrf(client, session_client) -> Non
 
 
 def test_revoke_missing_link_is_404(admin_client) -> None:
-    assert admin_client.post("/recruiter/links/999/revoke").status_code == 404
+    assert (
+        admin_client.post(f"/recruiter/links/{uuid.uuid4()}/revoke").status_code == 404
+    )
 
 
 # --- redemption ----------------------------------------------------------
@@ -180,6 +183,25 @@ def test_revocation_cuts_an_active_recruiter_session(app, admin_client) -> None:
     assert visitor.get("/recruiter/session").status_code == 401
     assert visitor.get("/content/projects").status_code == 401
     assert visitor.get("/content/contact").status_code == 401
+
+
+def test_redeem_keeps_the_link_id_as_text_in_the_cookie(app, admin_client) -> None:
+    from app.auth.sessions import RECRUITER_SESSION_KEY
+    from tests.oidc.login import read_session
+
+    created = _create_link(admin_client, label="Cookie")
+    visitor = TestClient(app, base_url="https://testserver")
+    visitor.post(f"/recruiter/redeem/{created['token']}")
+
+    assert read_session(visitor)[RECRUITER_SESSION_KEY] == created["id"]
+
+
+@pytest.mark.parametrize("stale_id", [1, "1", "not-a-uuid", None])
+def test_a_link_id_that_is_no_uuid_finds_no_link(migrated_db, stale_id) -> None:
+    # A cookie from the time of SQLite still holds the number of the link.
+    from app.recruiter import repository as repo
+
+    assert repo.link_is_active(stale_id) is False
 
 
 # --- login rate limit ----------------------------------------------------

@@ -100,6 +100,26 @@ def test_upload_replaces_existing(admin_client) -> None:
     assert admin_client.get("/cv/download").content == replacement
 
 
+def _stored_documents() -> list[bytes]:
+    from sqlalchemy import select
+
+    from app.cv.models import CvDocument
+    from app.db.connection import get_session
+
+    with get_session() as session:
+        return list(session.scalars(select(CvDocument.content)))
+
+
+def test_upload_is_stored_as_single_database_row(admin_client) -> None:
+    # The CV lives in the database, so the nightly dump covers it.
+    _upload(admin_client, PDF_BYTES)
+    assert _stored_documents() == [PDF_BYTES]
+
+    replacement = b"%PDF-1.7\nreplaced\n%%EOF\n"
+    _upload(admin_client, replacement)
+    assert _stored_documents() == [replacement]
+
+
 def test_upload_rejects_non_pdf_content_type(admin_client) -> None:
     # A PDF body but a wrong declared type is refused on the type allowlist.
     response = _upload(admin_client, PDF_BYTES, content_type="image/png")

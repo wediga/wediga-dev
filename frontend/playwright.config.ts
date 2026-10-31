@@ -95,7 +95,15 @@ export default defineConfig({
       timeout: 120_000,
       reuseExistingServer: false,
       env: {
-        WEDIGA_DB_PATH: path.join(TMP_DIR, "data", "e2e.db"),
+        // The test PostgreSQL is the image with its own default user and
+        // database, and it trusts every connection, so the password is never
+        // checked. 127.0.0.1 rather than localhost, which hangs on Windows on
+        // the IPv6 address.
+        POSTGRES_USER: "postgres",
+        POSTGRES_DB: "postgres",
+        POSTGRES_PASSWORD: "not-checked",
+        POSTGRES_HOST: "127.0.0.1",
+        POSTGRES_PORT: "5432",
         WEDIGA_CONTENT_DIR: path.join(TMP_DIR, "content"),
         BACKEND_PORT: String(BACKEND_PORT),
         ADMIN_PASSWORD,

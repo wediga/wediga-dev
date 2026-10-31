@@ -17,7 +17,7 @@ day="$(date +%F)"
 tmp="$dir/.wediga-$day.dump.tmp"
 out="$dir/wediga-$day.dump"
 
-podman exec wediga-db pg_dump -U wediga -Fc wediga > "$tmp"
+podman exec wediga-db sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' > "$tmp"
 mv "$tmp" "$out"
 
 find "$dir" -name 'wediga-*.dump' -mtime "+$keep_days" -delete

@@ -4,6 +4,8 @@ The write models carry length limits so oversized input is rejected before it
 touches the database.
 """
 
+import uuid
+
 from pydantic import BaseModel, Field, field_validator
 
 # Bounded limits so a write can never store an unbounded blob.
@@ -31,7 +33,7 @@ class AboutContent(BaseModel):
 
 
 class ContactContent(BaseModel):
-    """Contact details held as a JSON blob under the ``contact`` setting."""
+    """Contact details held as a JSON object under the ``contact`` setting."""
 
     name: str = Field(max_length=SHORT)
     email: str = Field(max_length=SHORT)
@@ -47,7 +49,7 @@ class ImpressumAddress(BaseModel):
 
 
 class ImpressumContent(BaseModel):
-    """Legal notice held as a JSON blob under the ``impressum`` setting."""
+    """Legal notice held as a JSON object under the ``impressum`` setting."""
 
     name: str = Field(max_length=SHORT)
     email: str = Field(max_length=SHORT)
@@ -77,11 +79,11 @@ class ProjectWrite(BaseModel):
 
 
 class ProjectRead(ProjectWrite):
-    id: int
+    id: uuid.UUID
 
 
 class SkillRead(BaseModel):
-    id: int
+    id: uuid.UUID
     name: str
     sort_order: int
 
@@ -92,7 +94,7 @@ class SkillCategoryWrite(BaseModel):
 
 
 class SkillCategoryRead(BaseModel):
-    id: int
+    id: uuid.UUID
     name: str
     sort_order: int
     skills: list[SkillRead] = Field(default_factory=list)

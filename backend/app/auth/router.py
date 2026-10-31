@@ -1,18 +1,18 @@
 """Authentication routes: login, the TOTP second factor, logout and the
 current-session check.
 
-The handlers are plain ``def`` functions, so FastAPI runs their SQLite queries
+The handlers are plain ``def`` functions, so FastAPI runs their database queries
 in its threadpool and the backend keeps one synchronous session helper.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from app.auth import totp
 from app.auth.csrf import issue_csrf_token, require_csrf
 from app.auth.dependencies import require_admin, require_login
-from app.auth.models import ADMIN_ID, Admin
+from app.auth.models import Admin
 from app.auth.passwords import verify_password
 from app.auth.ratelimit import client_ip, login_limiter, totp_limiter
 from app.auth.sessions import ADMIN_SESSION_KEY, PENDING_2FA_SESSION_KEY
@@ -76,7 +76,7 @@ def login(request: Request, body: LoginRequest) -> dict[str, bool]:
         )
 
     with get_session() as session:
-        admin = session.get(Admin, ADMIN_ID)
+        admin: Admin | None = session.scalar(select(Admin))
 
     if admin is None or not verify_password(admin.password_hash, body.password):
         raise HTTPException(
@@ -121,7 +121,7 @@ def login_totp(request: Request, body: CodeRequest) -> dict[str, bool]:
         )
 
     with get_session() as session:
-        admin = session.get(Admin, ADMIN_ID)
+        admin: Admin | None = session.scalar(select(Admin))
 
     if admin is None or not admin.totp_enabled or not admin.totp_secret:
         raise HTTPException(
@@ -171,7 +171,7 @@ def csrf(request: Request) -> dict[str, str]:
 def totp_status() -> dict[str, bool]:
     """Report whether the second factor is active for the admin."""
     with get_session() as session:
-        admin = session.get(Admin, ADMIN_ID)
+        admin: Admin | None = session.scalar(select(Admin))
 
     return {"enabled": admin is not None and admin.totp_enabled}
 
@@ -190,7 +190,7 @@ def totp_setup() -> dict[str, str]:
     the QR code and is never persisted in the clear.
     """
     with get_session() as session:
-        admin = session.get(Admin, ADMIN_ID)
+        admin: Admin | None = session.scalar(select(Admin))
 
     if admin is not None and admin.totp_enabled:
         raise HTTPException(
@@ -208,11 +208,7 @@ def totp_setup() -> dict[str, str]:
         ) from None
 
     with get_session() as session:
-        session.execute(
-            update(Admin)
-            .where(Admin.id == ADMIN_ID)
-            .values(totp_secret=encrypted, totp_enabled=False)
-        )
+        session.execute(update(Admin).values(totp_secret=encrypted, totp_enabled=False))
         session.commit()
 
     uri = totp.provisioning_uri(secret)
@@ -241,7 +237,7 @@ def totp_confirm(request: Request, body: CodeRequest) -> dict[str, bool]:
         )
 
     with get_session() as session:
-        admin = session.get(Admin, ADMIN_ID)
+        admin: Admin | None = session.scalar(select(Admin))
 
     if admin is None or not admin.totp_secret:
         raise HTTPException(
@@ -260,9 +256,7 @@ def totp_confirm(request: Request, body: CodeRequest) -> dict[str, bool]:
     totp_limiter.reset(ip)
 
     with get_session() as session:
-        session.execute(
-            update(Admin).where(Admin.id == ADMIN_ID).values(totp_enabled=True)
-        )
+        session.execute(update(Admin).values(totp_enabled=True))
         session.commit()
 
     return {"ok": True, "enabled": True}

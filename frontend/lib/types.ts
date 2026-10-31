@@ -25,7 +25,7 @@ export interface Impressum {
 }
 
 export interface Project {
-  id: number;
+  id: string;
   name: string;
   tagline: string | null;
   problem: string | null;
@@ -40,7 +40,7 @@ export interface Project {
 }
 
 export interface RecruiterLink {
-  id: number;
+  id: string;
   label: string | null;
   created_at: string;
   expires_at: string | null;
@@ -60,7 +60,7 @@ export interface RecruiterLinkCreated extends RecruiterLink {
 // mirrored fields are read-only in the UI, only the curation fields are sent
 // back on a write.
 export interface GithubRepo {
-  id: number;
+  id: string;
   name: string;
   description: string | null;
   language: string | null;
@@ -74,31 +74,19 @@ export interface GithubRepo {
   sort_order: number;
 }
 
-// The curated repo as the recruiter view receives it. description is already the
-// effective text (the override when set, otherwise the GitHub one).
-export interface CuratedRepo {
-  name: string;
-  description: string | null;
-  language: string | null;
-  stars: number | null;
-  url: string | null;
-  last_push: string | null;
-  pinned: boolean;
-}
-
 // The CV is a single uploaded PDF, its only state is whether one is present.
 export interface CvStatus {
   present: boolean;
 }
 
 export interface Skill {
-  id: number;
+  id: string;
   name: string;
   sort_order: number;
 }
 
 export interface SkillCategory {
-  id: number;
+  id: string;
   name: string;
   sort_order: number;
   skills: Skill[];

@@ -11,6 +11,7 @@ Secure session cookie round-trips.
 """
 
 import importlib
+import uuid
 
 import httpx2
 import pytest
@@ -371,7 +372,7 @@ def test_sync_endpoint_maps_api_error_to_502(admin_client, monkeypatch):
 def test_curation_write_on_missing_repo_is_404(admin_client):
     assert (
         admin_client.put(
-            "/github/repos/999/curation",
+            f"/github/repos/{uuid.uuid4()}/curation",
             json={"visible": True, "pinned": False, "sort_order": 0},
         ).status_code
         == 404

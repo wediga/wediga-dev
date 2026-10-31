@@ -1,23 +1,25 @@
 """Tests for the idempotent content seed."""
 
-from app.db.connection import get_connection
+from sqlalchemy import func, select
+
+from app.content.models import Project, SiteSetting, Skill, SkillCategory
+from app.db.connection import get_session
 from app.db.seed import run_seed
 
 
 def _counts() -> dict[str, int]:
-    with get_connection() as conn:
-        projects = conn.execute("SELECT COUNT(*) FROM project").fetchone()[0]
-        categories = conn.execute("SELECT COUNT(*) FROM skill_category").fetchone()[0]
-        skills = conn.execute("SELECT COUNT(*) FROM skill").fetchone()[0]
-        about = conn.execute(
-            "SELECT COUNT(*) FROM site_setting WHERE key = 'about_text'"
-        ).fetchone()[0]
-    return {
-        "projects": projects,
-        "categories": categories,
-        "skills": skills,
-        "about": about,
+    statements = {
+        "projects": select(func.count()).select_from(Project),
+        "categories": select(func.count()).select_from(SkillCategory),
+        "skills": select(func.count()).select_from(Skill),
+        "about": select(func.count()).where(SiteSetting.key == "about_text"),
     }
+
+    with get_session() as session:
+        return {
+            name: session.execute(statement).scalar_one()
+            for name, statement in statements.items()
+        }
 
 
 def test_seed_loads_content(migrated_db) -> None:

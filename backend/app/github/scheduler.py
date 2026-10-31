@@ -2,7 +2,7 @@
 
 A plain ``asyncio`` loop keeps the project free of a scheduler dependency. It
 syncs on start and then every interval, each run offloaded to a thread so the
-blocking httpx2 and sqlite calls never stall the event loop. A failed sync only
+blocking httpx2 and database calls never stall the event loop. A failed sync only
 logs and keeps the existing cache, the loop survives. The interval is
 ``GITHUB_SYNC_INTERVAL_SECONDS`` (default six hours), and zero or less disables
 the scheduled run, which keeps tests and local runs quiet.

@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 from sqlalchemy import select
-from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.content import repository
@@ -50,7 +50,7 @@ def _seed_about(session: Session, base: Path) -> int:
 def _seed_setting_json(session: Session, base: Path, filename: str, key: str) -> int:
     path = _require(base / filename)
     data = json.loads(path.read_text(encoding="utf-8"))
-    repository.set_setting(session, key, json.dumps(data, ensure_ascii=False))
+    repository.set_setting(session, key, data)
     return 1
 
 
@@ -66,7 +66,7 @@ def _seed_projects(session: Session, base: Path) -> int:
             problem=item.get("problem"),
             solution=item.get("solution"),
             learning=item.get("learning"),
-            tech_stack=json.dumps(item.get("tech_stack", []), ensure_ascii=False),
+            tech_stack=item.get("tech_stack", []),
             demo_link=links.get("demo"),
             github_link=links.get("github"),
             status=item.get("status"),

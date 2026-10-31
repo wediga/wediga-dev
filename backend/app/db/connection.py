@@ -1,54 +1,66 @@
-"""Database access helpers: a SQLAlchemy session for the repositories, seed,
-bootstrap and routes, and a raw ``sqlite3`` connection for the migration
-runner, which applies the SQL files with ``executescript``."""
+"""Database access helpers: one SQLAlchemy engine on the app's PostgreSQL and a
+session for the repositories, seed, bootstrap and routes.
 
-import sqlite3
-from collections.abc import Iterator
-from contextlib import contextmanager
+Every part of the connection comes from the environment. In production it is
+``wediga-db.env``, the one file the database container reads as well, so user,
+database and password are written down only there.
+"""
+
+import os
 from datetime import UTC, datetime
 from functools import cache
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import URL, Engine, create_engine
 from sqlalchemy.orm import Session
-from sqlalchemy.pool import NullPool
 
-from app.paths import db_path
-
-
-def now() -> str:
-    """Return the current UTC timestamp as an ISO 8601 string."""
-    return datetime.now(UTC).isoformat()
+USER_VARIABLE = "POSTGRES_USER"
+PASSWORD_VARIABLE = "POSTGRES_PASSWORD"
+HOST_VARIABLE = "POSTGRES_HOST"
+PORT_VARIABLE = "POSTGRES_PORT"
+DATABASE_VARIABLE = "POSTGRES_DB"
 
 
-@contextmanager
-def get_connection() -> Iterator[sqlite3.Connection]:
-    """Yield a SQLite connection with foreign keys enabled."""
-    conn = sqlite3.connect(str(db_path()))
+def now() -> datetime:
+    """Return the current time in UTC."""
+    return datetime.now(UTC)
+
+
+def _required(variable: str) -> str:
+    value = os.environ.get(variable)
+
+    if not value:
+        raise RuntimeError(f"{variable} must be set to reach the database")
+
+    return value
+
+
+def _port() -> int:
+    raw = _required(PORT_VARIABLE)
+
     try:
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.row_factory = sqlite3.Row
-        yield conn
-    finally:
-        conn.close()
+        return int(raw)
+    except ValueError:
+        raise RuntimeError(f"{PORT_VARIABLE} must be a number") from None
 
 
-def _enable_foreign_keys(dbapi_connection: sqlite3.Connection, _record) -> None:
-    dbapi_connection.execute("PRAGMA foreign_keys = ON")
+def database_url() -> URL:
+    """Return the URL of the app's database, built from the environment."""
+    return URL.create(
+        "postgresql+psycopg",
+        username=_required(USER_VARIABLE),
+        password=_required(PASSWORD_VARIABLE),
+        host=_required(HOST_VARIABLE),
+        port=_port(),
+        database=_required(DATABASE_VARIABLE),
+    )
 
 
 @cache
-def _engine(path: str) -> Engine:
-    """Return one engine per database file, since the tests switch the file.
-
-    ``NullPool`` opens and closes a connection per session like the stdlib
-    helper above, so no file handle outlives a request.
-    """
-    engine = create_engine(f"sqlite:///{path}", poolclass=NullPool)
-    event.listen(engine, "connect", _enable_foreign_keys)
-
-    return engine
+def engine() -> Engine:
+    """Return the one engine of the process, created on first use."""
+    return create_engine(database_url())
 
 
 def get_session() -> Session:
-    """Return a session on the configured database, used as ``with``."""
-    return Session(_engine(str(db_path())))
+    """Return a session on the app's database, used as ``with``."""
+    return Session(engine())
