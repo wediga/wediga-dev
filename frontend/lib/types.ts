@@ -74,18 +74,6 @@ export interface GithubRepo {
   sort_order: number;
 }
 
-// The curated repo as the recruiter view receives it. description is already the
-// effective text (the override when set, otherwise the GitHub one).
-export interface CuratedRepo {
-  name: string;
-  description: string | null;
-  language: string | null;
-  stars: number | null;
-  url: string | null;
-  last_push: string | null;
-  pinned: boolean;
-}
-
 // The CV is a single uploaded PDF, its only state is whether one is present.
 export interface CvStatus {
   present: boolean;
