@@ -19,8 +19,10 @@ EnvironmentFile=/home/web/wediga-dev/wediga-db.env
 Volume=wediga-db.volume:/var/lib/postgresql
 
 # Podman runs the check through the container's shell, so the two names
-# come from the environment file.
-HealthCmd=pg_isready -d "$POSTGRES_DB" -U "$POSTGRES_USER"
+# come from the environment file. They stay unquoted, because Quadlet 5.4 on
+# the server drops the last quote and breaks the check, and the names never
+# contain spaces.
+HealthCmd=pg_isready -d $POSTGRES_DB -U $POSTGRES_USER
 HealthInterval=30s
 HealthTimeout=5s
 HealthRetries=5

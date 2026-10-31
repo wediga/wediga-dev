@@ -33,3 +33,14 @@ def test_migration_runs_alembic_after_the_database() -> None:
 
 def test_database_counts_as_started_only_when_healthy() -> None:
     assert "Notify=healthy" in unit_lines("wediga-db.container")
+
+
+def test_health_check_has_no_quotes() -> None:
+    health_check = next(
+        line
+        for line in unit_lines("wediga-db.container")
+        if line.startswith("HealthCmd=")
+    )
+
+    assert '"' not in health_check
+    assert "'" not in health_check
