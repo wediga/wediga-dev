@@ -17,7 +17,7 @@ export default function AdminSkillsPage() {
   const token = useCsrf();
   const [categories, setCategories] = useState<SkillCategory[]>([]);
   const [newCategory, setNewCategory] = useState("");
-  const [newSkill, setNewSkill] = useState<Record<number, string>>({});
+  const [newSkill, setNewSkill] = useState<Record<string, string>>({});
   const { run, get, set } = useActionFeedback();
 
   const load = useCallback(() => {
@@ -36,7 +36,7 @@ export default function AdminSkillsPage() {
     load();
   }, [load]);
 
-  function setCategoryName(id: number, name: string) {
+  function setCategoryName(id: string, name: string) {
     setCategories((current) =>
       current.map((category) =>
         category.id === id ? { ...category, name } : category,
@@ -44,7 +44,7 @@ export default function AdminSkillsPage() {
     );
   }
 
-  function setSkillName(categoryId: number, skillId: number, name: string) {
+  function setSkillName(categoryId: string, skillId: string, name: string) {
     setCategories((current) =>
       current.map((category) =>
         category.id === categoryId
@@ -91,7 +91,7 @@ export default function AdminSkillsPage() {
     if (ok) setNewCategory("");
   }
 
-  async function addSkill(categoryId: number) {
+  async function addSkill(categoryId: string) {
     const name = (newSkill[categoryId] ?? "").trim();
     if (!name) return;
     const ok = await write(

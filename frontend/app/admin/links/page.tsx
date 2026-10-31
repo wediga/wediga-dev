@@ -76,7 +76,7 @@ export default function AdminLinksPage() {
       { success: "Link created", error: "Couldn't create the link. Try again." },
     );
 
-  const revoke = (id: number) =>
+  const revoke = (id: string) =>
     run(
       `revoke-${id}`,
       async () => {

@@ -91,7 +91,7 @@ const AREA_FIELDS: { key: keyof FormState; label: string }[] = [
 export default function AdminProjectsPage() {
   const token = useCsrf();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
   const { run, get, set } = useActionFeedback();
 
@@ -148,7 +148,7 @@ export default function AdminProjectsPage() {
       { success: "Saved", error: "Couldn't save. Try again." },
     );
 
-  const remove = (id: number) =>
+  const remove = (id: string) =>
     run(
       `delete-${id}`,
       async () => {

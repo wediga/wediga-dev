@@ -25,7 +25,7 @@ export interface Impressum {
 }
 
 export interface Project {
-  id: number;
+  id: string;
   name: string;
   tagline: string | null;
   problem: string | null;
@@ -40,7 +40,7 @@ export interface Project {
 }
 
 export interface RecruiterLink {
-  id: number;
+  id: string;
   label: string | null;
   created_at: string;
   expires_at: string | null;
@@ -60,7 +60,7 @@ export interface RecruiterLinkCreated extends RecruiterLink {
 // mirrored fields are read-only in the UI, only the curation fields are sent
 // back on a write.
 export interface GithubRepo {
-  id: number;
+  id: string;
   name: string;
   description: string | null;
   language: string | null;
@@ -92,13 +92,13 @@ export interface CvStatus {
 }
 
 export interface Skill {
-  id: number;
+  id: string;
   name: string;
   sort_order: number;
 }
 
 export interface SkillCategory {
-  id: number;
+  id: string;
   name: string;
   sort_order: number;
   skills: Skill[];

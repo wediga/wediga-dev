@@ -34,7 +34,7 @@ function toCuration(repo: GithubRepo): Curation {
 export default function AdminReposPage() {
   const token = useCsrf();
   const [repos, setRepos] = useState<GithubRepo[]>([]);
-  const [edits, setEdits] = useState<Record<number, Curation>>({});
+  const [edits, setEdits] = useState<Record<string, Curation>>({});
   const { run, get, set } = useActionFeedback();
 
   const load = useCallback(() => {
@@ -59,7 +59,7 @@ export default function AdminReposPage() {
   }, [load]);
 
   function update<K extends keyof Curation>(
-    id: number,
+    id: string,
     field: K,
     value: Curation[K],
   ) {
@@ -69,7 +69,7 @@ export default function AdminReposPage() {
     }));
   }
 
-  const save = (id: number) =>
+  const save = (id: string) =>
     run(
       `repo-${id}`,
       async () => {
