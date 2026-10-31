@@ -33,7 +33,7 @@ The public landing is a single animated page with my skills and a legal imprint,
 wediga-dev/
   frontend/         # Next.js app (public, protected and admin views) + BFF route handlers
   backend/          # FastAPI app: auth, content, CV, recruiter links, GitHub sync, SQLite
-  deploy/           # Dockerfiles, Quadlet units, authentik blueprint, compose for local use
+  deploy/           # Dockerfiles, Quadlet units, authentik blueprint
   content.example/  # Sample content (in Git)
   content/          # Personal content (NOT in Git)
   data/             # SQLite database (NOT in Git)
@@ -62,16 +62,7 @@ npm install
 npm run dev                            # http://localhost:3000
 ```
 
-## Docker
-
-```bash
-cd deploy
-docker compose up --build
-```
-
-The database and content are mounted as volumes, so they change without rebuilding the images.
-
-The compose file is for local use only. Production runs the same two images from the Quadlet units in `deploy/quadlet/`, and `deploy/README.md` describes how the server is laid out and what a deploy does.
+Production runs both as container images from the Quadlet units in `deploy/quadlet/`, and `deploy/README.md` describes how the server is laid out and what a deploy does.
 
 ## License
 
