@@ -12,12 +12,10 @@ Image=ghcr.io/wediga/wediga-dev-backend:main
 ContainerName=backend
 Network=wediga.network
 EnvironmentFile=/home/web/wediga-dev/.env
-Environment=WEDIGA_DB_PATH=/app/data/wediga.db
-# :U chowns the named volume to the container's non-root user so it can write.
-Volume=wediga-data.volume:/app/data:U
-# Hardening, mirrors the old compose: non-root image user, no new privileges,
-# all capabilities dropped, read-only root filesystem, only /tmp and the data
-# volume are writable.
+# The database connection lives in its own file, shared with wediga-db.
+EnvironmentFile=/home/web/wediga-dev/wediga-db.env
+# Hardening: non-root image user, no new privileges, all capabilities dropped,
+# read-only root filesystem, only /tmp is writable.
 NoNewPrivileges=true
 DropCapability=ALL
 ReadOnly=true

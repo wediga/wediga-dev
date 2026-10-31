@@ -25,6 +25,9 @@ HealthInterval=30s
 HealthTimeout=5s
 HealthRetries=5
 HealthStartPeriod=20s
+# The unit only counts as started once the check passes, so backend-migrate
+# does not connect before PostgreSQL accepts connections.
+Notify=healthy
 
 # The entrypoint starts as root, fixes the ownership of the data directory and
 # then drops to the postgres user. Only the capabilities that step needs are
