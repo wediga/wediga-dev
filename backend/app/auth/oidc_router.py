@@ -1,31 +1,37 @@
 """Routes of the login through authentik: start, callback and logout.
 
-All three answer 404 while ``OIDC_ENABLED`` is off. The login keeps its own
-key in the session next to the recruiter key, so logging in or out through
-authentik never touches a recruiter session. The old admin marker and the
-CSRF token are dropped on both, so no right or token of an earlier login
-carries over.
+All three answer 404 while ``OIDC_ENABLED`` is off. The login is a part of
+the session next to the recruiter part, so logging in or out through
+authentik never touches a recruiter session. The old admin login is dropped on
+both, and the session gets a new token and CSRF token, so no right or token of
+an earlier login carries over.
 """
 
 import hmac
 import logging
 import re
 import secrets
-import time
-from typing import Annotated, TypedDict
+import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
+from sqlalchemy import delete, exists, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.engine import Row
 
-from app.auth import oidc
-from app.auth.csrf import CSRF_SESSION_KEY, issue_csrf_token, require_csrf
-from app.auth.oidc_settings import OidcSettings
-from app.auth.sessions import (
-    ADMIN_SESSION_KEY,
-    OIDC_FLOW_SESSION_KEY,
-    OIDC_SESSION_KEY,
-    PENDING_2FA_SESSION_KEY,
+from app.auth import oidc, sessions
+from app.auth.csrf import require_csrf
+from app.auth.models import (
+    Account,
+    AuthentikLogin,
+    AuthentikLoginRole,
+    LegacyAdminLogin,
+    LoginFlow,
+    Role,
 )
+from app.auth.oidc_settings import OidcSettings
+from app.db.connection import get_session, now
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -46,8 +52,6 @@ ADMIN_HOME = "/admin"
 HUB_HOME = "/hub"
 NO_ACCESS_PATH = "/no-access"
 
-# A login that is not finished within this time has to start over.
-FLOW_MAX_AGE_SECONDS = 600
 # Long enough for a URL-safe random value well above 128 bits.
 RANDOM_BYTES = 32
 # Only a plain path on this site is a valid target after the login: it starts
@@ -59,24 +63,6 @@ MAX_TARGET_LENGTH = 512
 # blueprint). The hub asks authentik with it which applications the account
 # may use.
 ACCOUNT_ID = re.compile(r"[0-9]+")
-
-
-class LoginFlow(TypedDict):
-    """A login under way, kept in the session until the callback."""
-
-    state: str
-    nonce: str
-    verifier: str
-    target: str | None
-    started: int
-
-
-class OidcLogin(TypedDict):
-    """A finished login. Holds no token from authentik."""
-
-    user_id: int
-    roles: list[str]
-    login_at: int
 
 
 def _oidc_settings(request: Request) -> OidcSettings | None:
@@ -135,16 +121,75 @@ def roles_for(groups: object) -> list[str]:
     return sorted(roles)
 
 
-def _drop_login_state(request: Request) -> None:
-    """Remove every login and its CSRF token, keep a recruiter session."""
-    for key in (
-        ADMIN_SESSION_KEY,
-        PENDING_2FA_SESSION_KEY,
-        CSRF_SESSION_KEY,
-        OIDC_SESSION_KEY,
-        OIDC_FLOW_SESSION_KEY,
-    ):
-        request.session.pop(key, None)
+def _drop_logins(request: Request) -> None:
+    """Remove every login from the session, keep a recruiter part."""
+    sessions.drop_parts(request, AuthentikLogin, LegacyAdminLogin, LoginFlow)
+
+
+def _take_flow(request: Request) -> Row | None:
+    """Remove the login under way from the session and return it, unless it
+    is missing or too old."""
+    state = sessions.current(request)
+
+    if state is None:
+        return None
+
+    with get_session() as db:
+        flow = db.execute(
+            delete(LoginFlow)
+            .where(LoginFlow.session_id == state.id)
+            .returning(
+                LoginFlow.state,
+                LoginFlow.nonce,
+                LoginFlow.verifier,
+                LoginFlow.target,
+                LoginFlow.started_at,
+            )
+        ).one_or_none()
+        db.commit()
+
+    if flow is None or flow.started_at <= now() - sessions.LOGIN_FLOW_LIFETIME:
+        return None
+
+    return flow
+
+
+def _record_login(
+    session_id: uuid.UUID, authentik_user_id: int, name: str, roles: list[str]
+) -> None:
+    """Store the account with its current name and the login with its roles."""
+    moment = now()
+
+    with get_session() as db:
+        account_id = db.execute(
+            insert(Account)
+            .values(
+                authentik_user_id=authentik_user_id,
+                name=name,
+                first_login_at=moment,
+                last_login_at=moment,
+            )
+            .on_conflict_do_update(
+                index_elements=[Account.authentik_user_id],
+                set_={"name": name, "last_login_at": moment},
+            )
+            .returning(Account.id)
+        ).scalar_one()
+        db.execute(
+            insert(Role)
+            .values([{"key": role} for role in roles])
+            .on_conflict_do_nothing()
+        )
+        login = AuthentikLogin(
+            session_id=session_id, account_id=account_id, logged_in_at=moment
+        )
+        db.add(login)
+        db.flush()
+        db.add_all(
+            AuthentikLoginRole(authentik_login_id=login.id, role_id=role_id)
+            for role_id in db.scalars(select(Role.id).where(Role.key.in_(roles)))
+        )
+        db.commit()
 
 
 def _provider_unavailable() -> HTTPException:
@@ -178,22 +223,29 @@ def login(
 ) -> RedirectResponse:
     """Start a login and send the browser to authentik.
 
-    State, nonce and PKCE verifier stay in the signed session until the
-    callback. A target outside this site is dropped, not refused, so a bad
-    link still leads to a login.
+    State, nonce and PKCE verifier stay in the session until the callback.
+    A target outside this site is dropped, not refused, so a bad link still
+    leads to a login.
     """
     metadata = _metadata_or_502(settings)
+    # No new token yet, the callback gives one once the login succeeds.
+    session_id = sessions.ensure(request)
+    sessions.drop_parts(request, LoginFlow)
     flow = LoginFlow(
+        session_id=session_id,
         state=secrets.token_urlsafe(RANDOM_BYTES),
         nonce=secrets.token_urlsafe(RANDOM_BYTES),
         verifier=secrets.token_urlsafe(RANDOM_BYTES),
+        started_at=now(),
         target=safe_target(target),
-        started=int(time.time()),
     )
-    request.session[OIDC_FLOW_SESSION_KEY] = flow
     url = oidc.authorization_url(
-        settings, metadata, flow["state"], flow["nonce"], flow["verifier"]
+        settings, metadata, flow.state, flow.nonce, flow.verifier
     )
+
+    with get_session() as db:
+        db.add(flow)
+        db.commit()
 
     return RedirectResponse(url, status_code=status.HTTP_303_SEE_OTHER)
 
@@ -206,28 +258,27 @@ def callback(
     state: str | None = None,
 ) -> RedirectResponse:
     """Finish the login: check state, trade the code, validate the ID token,
-    take the account ID and turn the groups into roles.
+    take the account ID and name and turn the groups into roles.
 
     The flow is removed before any check, so a state is good for one attempt
-    only. Without a matching group the visitor gets no session and lands on
-    the no-access page.
+    only. Without a matching group the visitor gets no login and lands on the
+    no-access page.
     """
-    flow: LoginFlow | None = request.session.pop(OIDC_FLOW_SESSION_KEY, None)
+    flow = _take_flow(request)
 
     if (
         flow is None
         or not code
         or not state
-        or int(time.time()) - flow["started"] > FLOW_MAX_AGE_SECONDS
-        or not hmac.compare_digest(flow["state"], state)
+        or not hmac.compare_digest(flow.state, state)
     ):
         raise _invalid_login()
 
     metadata = _metadata_or_502(settings)
 
     try:
-        token = oidc.exchange_code(settings, metadata, code, flow["verifier"])
-        claims = oidc.validate_id_token(settings, metadata, token, flow["nonce"])
+        token = oidc.exchange_code(settings, metadata, code, flow.verifier)
+        claims = oidc.validate_id_token(settings, metadata, token, flow.nonce)
     except oidc.OidcProviderError:
         logger.warning("authentik token exchange failed", exc_info=True)
 
@@ -244,22 +295,25 @@ def callback(
 
         raise _invalid_login()
 
+    name = claims.get("name")
+
+    if not isinstance(name, str):
+        logger.warning("authentik sent no name")
+
+        raise _invalid_login()
+
     roles = roles_for(claims.get("groups"))
-    _drop_login_state(request)
+    _drop_logins(request)
 
     if not roles:
         return RedirectResponse(NO_ACCESS_PATH, status_code=status.HTTP_303_SEE_OTHER)
 
-    request.session[OIDC_SESSION_KEY] = OidcLogin(
-        user_id=int(sub), roles=roles, login_at=int(time.time())
-    )
-    # A fresh token, so none from before the login stays valid.
-    issue_csrf_token(request)
+    # A new token, so none known from before the login stays valid.
+    session_id = sessions.renew(request)
+    _record_login(session_id, int(sub), name, roles)
     home = ADMIN_HOME if ADMIN_ROLE in roles else HUB_HOME
 
-    return RedirectResponse(
-        flow["target"] or home, status_code=status.HTTP_303_SEE_OTHER
-    )
+    return RedirectResponse(flow.target or home, status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/logout", dependencies=[Depends(require_csrf)])
@@ -271,8 +325,17 @@ def logout(request: Request, settings: Settings) -> dict[str, str]:
     the password login. If authentik cannot be reached, the browser goes to
     the start page instead.
     """
-    had_authentik_login = OIDC_SESSION_KEY in request.session
-    _drop_login_state(request)
+    state = sessions.current(request)
+
+    # Past its eight hours the login still counts here, since the session in
+    # authentik may well outlast it.
+    with get_session() as db:
+        had_authentik_login = state is not None and bool(
+            db.scalar(select(exists().where(AuthentikLogin.session_id == state.id)))
+        )
+
+    _drop_logins(request)
+    sessions.renew(request)
 
     if not had_authentik_login:
         return {"redirect": PASSWORD_LOGIN_PAGE}

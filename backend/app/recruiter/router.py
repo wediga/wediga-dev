@@ -1,8 +1,9 @@
 """Recruiter routes: admin link management and the public redeem endpoint.
 
 Redeem is public because a recruiter has no session yet, and it is rate-limited.
-Its recruiter marker is separate from the admin one, so redeeming never grants
-admin. The admin endpoints use the standard write gate (see WRITE_DEPS).
+It adds a recruiter part to the session, separate from the admin one, so
+redeeming never grants admin. The admin endpoints use the standard write gate
+(see WRITE_DEPS).
 """
 
 import uuid
@@ -12,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.auth.csrf import require_csrf
 from app.auth.dependencies import require_admin
 from app.auth.ratelimit import client_ip, redeem_limiter
-from app.auth.sessions import RECRUITER_SESSION_KEY
+from app.auth.sessions import renew
 from app.errors import not_found
 from app.recruiter import repository as repo
 from app.recruiter.dependencies import require_recruiter_view
@@ -67,10 +68,10 @@ def revoke_link(link_id: uuid.UUID) -> dict:
 def redeem(token: str, request: Request) -> dict[str, bool]:
     """Validate a token, start the recruiter session and record the view.
 
-    Unknown token is 404, revoked or expired is 410. On success the recruiter
-    marker is set fresh (no fixation carry-over) and one view row is written
-    with only the coarse origin. The per-IP rate limit caps request floods and
-    view-count inflation from one source.
+    Unknown token is 404, revoked or expired is 410. On success the session
+    gets a new token and the recruiter part (no fixation carry-over), and one
+    view row is written with only the coarse origin. The per-IP rate limit caps
+    request floods and view-count inflation from one source.
     """
     if not redeem_limiter.hit(client_ip(request)):
         raise HTTPException(
@@ -90,8 +91,7 @@ def redeem(token: str, request: Request) -> dict[str, bool]:
             status_code=status.HTTP_410_GONE, detail="Link no longer valid"
         )
 
-    # The cookie holds JSON, so the id goes in as text.
-    request.session[RECRUITER_SESSION_KEY] = str(link_id)
+    repo.grant_access(renew(request), link_id)
     repo.record_view(link_id, coarse_origin(client_ip(request)))
     return {"ok": True}
 

@@ -107,7 +107,6 @@ export default defineConfig({
         WEDIGA_CONTENT_DIR: path.join(TMP_DIR, "content"),
         BACKEND_PORT: String(BACKEND_PORT),
         ADMIN_PASSWORD,
-        SESSION_SECRET: "e2e-session-secret-not-for-production",
         COOKIE_SECURE: "false",
         ...OIDC_ENV,
       },

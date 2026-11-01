@@ -6,15 +6,16 @@ The hub sits on the login through authentik, so it uses the same fake.
 from pathlib import Path
 
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from starlette.requests import Request
+from sqlalchemy import delete, select
 
-from app.auth import dependencies
-from app.auth.sessions import OIDC_SESSION_KEY
+from app.auth.models import AuthentikLogin, AuthentikLoginRole, Role
+from app.auth.oidc_router import HUB_ROLE
+from app.auth.sessions import AUTHENTIK_LOGIN_LIFETIME
+from app.db.connection import get_session
 from app.hub import router as hub_router
 from app.hub.authentik import OWN_APPLICATION, PAGE_SIZE
-from tests.oidc.login import ADMIN_PASSWORD, log_in
+from tests.oidc.login import ADMIN_PASSWORD, age, log_in
 from tests.oidc.oidc_fake import ACCOUNT_ID, APPLICATIONS_URL, internal
 
 BLUEPRINT = (
@@ -77,31 +78,27 @@ def test_password_login_does_not_open_the_hub(client, fake) -> None:
     assert applications(client).status_code == 401
 
 
-def test_expired_login_does_not_open_the_hub(client, fake, monkeypatch) -> None:
+def test_expired_login_does_not_open_the_hub(client, fake) -> None:
     log_in(client, fake, ["friends"])
-    later = dependencies.time.time() + dependencies.OIDC_LOGIN_LIFETIME_SECONDS + 1
-    monkeypatch.setattr(dependencies.time, "time", lambda: later)
+    age(AuthentikLogin.logged_in_at, AUTHENTIK_LOGIN_LIFETIME)
 
     assert applications(client).status_code == 401
 
 
-@pytest.mark.parametrize(
-    "login",
-    [
-        # A login from before the account ID was kept in the session.
-        {"roles": ["hub"]},
-        # No group gives such a login yet, but a later one may.
-        {"user_id": int(ACCOUNT_ID), "roles": ["admin"]},
-    ],
-)
-def test_login_that_does_not_open_the_hub(login) -> None:
-    login = {**login, "login_at": int(dependencies.time.time())}
-    request = Request({"type": "http", "session": {OIDC_SESSION_KEY: login}})
+def test_login_without_the_hub_role_does_not_open_the_hub(client, fake) -> None:
+    # No group gives such a login yet, but a later one may.
+    log_in(client, fake, ["wediga-admins"])
 
-    with pytest.raises(HTTPException) as excinfo:
-        dependencies.require_hub(request)
+    with get_session() as db:
+        db.execute(
+            delete(AuthentikLoginRole).where(
+                AuthentikLoginRole.role_id
+                == select(Role.id).where(Role.key == HUB_ROLE).scalar_subquery()
+            )
+        )
+        db.commit()
 
-    assert excinfo.value.status_code == 401
+    assert applications(client).status_code == 401
 
 
 def test_hub_does_not_answer_while_switched_off(app, client, monkeypatch) -> None:

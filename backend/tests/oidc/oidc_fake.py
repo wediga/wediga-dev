@@ -22,6 +22,7 @@ INTERNAL_URL = "http://authentik-server:9000"
 CLIENT_ID = "wediga-dev"
 # authentik sends the account's numeric ID as "sub".
 ACCOUNT_ID = "21"
+NAME = "Test Friend"
 KEY_ID = "test-key"
 API_TOKEN = "test-api-token"
 APPLICATIONS_URL = "https://auth.example/api/v3/core/applications/"
@@ -61,6 +62,7 @@ def make_id_token(key: Key = SIGNING_KEY, alg: str = "RS256", **claims) -> str:
         "aud": CLIENT_ID,
         "exp": now + TOKEN_LIFETIME_SECONDS,
         "iat": now,
+        "name": NAME,
         "groups": [],
     }
     payload.update(claims)

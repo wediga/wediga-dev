@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from app.api import api_router
 from app.auth.bootstrap import ensure_admin
 from app.auth.oidc_settings import load_oidc_settings
-from app.auth.sessions import add_session_middleware
+from app.auth.sessions import add_session_middleware, start_cleanup
 from app.github.scheduler import start_scheduler
 
 logger = logging.getLogger("uvicorn.error")
@@ -26,7 +26,8 @@ logger = logging.getLogger("uvicorn.error")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Check the login settings, bootstrap the admin and start the GitHub
-    refresh. Only broken login settings block the start."""
+    refresh and the clean-up of sessions. Only broken login settings block the
+    start."""
     # Raises on a half configured login, so the backend does not start at all
     # rather than serve with a login that fails or runs downgraded.
     app.state.oidc = load_oidc_settings()
@@ -38,14 +39,14 @@ async def lifespan(app: FastAPI):
         # bootstrap succeeds on a later start, and the log says why.
         logger.warning("admin bootstrap failed, login will not work", exc_info=True)
 
-    sync_task = start_scheduler()
+    tasks = [task for task in (start_scheduler(), start_cleanup()) if task]
     try:
         yield
     finally:
-        if sync_task is not None:
-            sync_task.cancel()
+        for task in tasks:
+            task.cancel()
             with suppress(asyncio.CancelledError):
-                await sync_task
+                await task
 
 
 # The interactive API docs are off by default, so the schema and the auth

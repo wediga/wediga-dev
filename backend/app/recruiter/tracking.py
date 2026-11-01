@@ -7,10 +7,9 @@ reversed to an address. Both steps run together because under GDPR a bare
 truncated or unsalted-hashed IP can still identify a person. An unparseable
 address is recorded as ``unknown``.
 
-The salt is ``TRACKING_SALT``, else ``SESSION_SECRET`` so grouping stays stable
-across restarts without a second secret. With neither set (a bare local run) a
-random per-process salt is used, resetting on restart, since tracking is not
-security-critical and must never block startup.
+The salt is ``TRACKING_SALT``, so grouping stays stable across restarts. Without
+it (a bare local run) a random per-process salt is used, resetting on restart,
+since tracking is not security-critical and must never block startup.
 """
 
 import hashlib
@@ -21,13 +20,7 @@ import secrets
 IPV4_PREFIX_BITS = 24
 IPV6_PREFIX_BITS = 48
 
-# Prefer a dedicated salt, fall back to the session secret for a stable value,
-# and only mint a throwaway one when nothing is configured.
-_SALT = (
-    os.environ.get("TRACKING_SALT")
-    or os.environ.get("SESSION_SECRET")
-    or secrets.token_urlsafe(16)
-)
+_SALT = os.environ.get("TRACKING_SALT") or secrets.token_urlsafe(16)
 
 
 def _network_prefix(ip: str) -> str | None:

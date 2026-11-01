@@ -5,14 +5,17 @@ the friends role must open none of them, and a login through authentik must
 end eight hours after it happened.
 """
 
+from datetime import timedelta
+
 import pytest
 
-from app.auth import dependencies
+from app.auth import sessions
 from app.auth.csrf import CSRF_HEADER_NAME
-from app.auth.sessions import OIDC_SESSION_KEY
-from tests.oidc.login import log_in, read_session, redeem_recruiter_link
+from app.auth.models import AuthentikLogin
+from tests.oidc.login import age, log_in, read_session, redeem_recruiter_link
 
-LIFETIME = dependencies.OIDC_LOGIN_LIFETIME_SECONDS
+LIFETIME = sessions.AUTHENTIK_LOGIN_LIFETIME
+LOGIN = AuthentikLogin.__tablename__
 
 
 def _csrf(client) -> str:
@@ -20,12 +23,6 @@ def _csrf(client) -> str:
     assert response.status_code == 200
 
     return response.json()["csrf_token"]
-
-
-def _later(monkeypatch, client, seconds: float) -> None:
-    """Move the clock to ``seconds`` after the login through authentik."""
-    login_at = read_session(client)[OIDC_SESSION_KEY]["login_at"]
-    monkeypatch.setattr(dependencies.time, "time", lambda: login_at + seconds)
 
 
 def test_admin_from_authentik_reaches_the_admin_routes(client, fake) -> None:
@@ -71,7 +68,7 @@ def test_friend_gets_the_csrf_token_and_can_log_out(client, fake) -> None:
     )
 
     assert response.status_code == 200
-    assert OIDC_SESSION_KEY not in read_session(client)
+    assert LOGIN not in read_session(client)
 
 
 @pytest.mark.usefixtures("fake")
@@ -87,37 +84,31 @@ def test_recruiter_gets_no_csrf_token(app, client) -> None:
 
 
 @pytest.mark.parametrize("groups", [["wediga-admins"], ["friends"]])
-def test_login_still_counts_at_the_end_of_its_lifetime(
-    client, fake, monkeypatch, groups
-) -> None:
+def test_login_still_counts_shortly_before_its_end(client, fake, groups) -> None:
     log_in(client, fake, groups)
-    _later(monkeypatch, client, LIFETIME)
+    age(AuthentikLogin.logged_in_at, LIFETIME - timedelta(minutes=1))
 
     assert client.get("/auth/csrf").status_code == 200
 
 
-def test_admin_login_ends_after_its_lifetime(client, fake, monkeypatch) -> None:
+def test_admin_login_ends_after_its_lifetime(client, fake) -> None:
     log_in(client, fake, ["wediga-admins"])
-    _later(monkeypatch, client, LIFETIME + 1)
+    age(AuthentikLogin.logged_in_at, LIFETIME)
 
     assert client.get("/auth/me").status_code == 401
     assert client.get("/recruiter/session").status_code == 401
-    assert OIDC_SESSION_KEY not in read_session(client)
 
 
-def test_friend_login_ends_after_its_lifetime(client, fake, monkeypatch) -> None:
+def test_friend_login_ends_after_its_lifetime(client, fake) -> None:
     log_in(client, fake, ["friends"])
-    _later(monkeypatch, client, LIFETIME + 1)
+    age(AuthentikLogin.logged_in_at, LIFETIME)
 
     assert client.get("/auth/csrf").status_code == 401
-    assert OIDC_SESSION_KEY not in read_session(client)
 
 
-def test_recruiter_link_outlives_an_expired_login(
-    app, client, fake, monkeypatch
-) -> None:
+def test_recruiter_link_outlives_an_expired_login(app, client, fake) -> None:
     redeem_recruiter_link(app, client)
     log_in(client, fake, ["friends"])
-    _later(monkeypatch, client, LIFETIME + 1)
+    age(AuthentikLogin.logged_in_at, LIFETIME)
 
     assert client.get("/recruiter/session").status_code == 200

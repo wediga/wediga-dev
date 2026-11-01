@@ -21,7 +21,6 @@ PDF_BYTES = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
 @pytest.fixture()
 def app(migrated_db, monkeypatch):
     monkeypatch.setenv("ADMIN_PASSWORD", ADMIN_PASSWORD)
-    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
 
     from app.auth.bootstrap import ensure_admin
 

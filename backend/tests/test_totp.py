@@ -19,7 +19,6 @@ ADMIN_PASSWORD = "correct horse battery staple"
 def client(migrated_db, monkeypatch):
     """A TestClient with a bootstrapped admin and a TOTP encryption key set."""
     monkeypatch.setenv("ADMIN_PASSWORD", ADMIN_PASSWORD)
-    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
     monkeypatch.setenv("TOTP_ENC_KEY", Fernet.generate_key().decode())
 
     from app.auth.bootstrap import ensure_admin

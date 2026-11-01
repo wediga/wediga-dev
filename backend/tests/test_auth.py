@@ -16,7 +16,6 @@ def client(migrated_db, monkeypatch):
     an https base URL for the cookie to round-trip.
     """
     monkeypatch.setenv("ADMIN_PASSWORD", ADMIN_PASSWORD)
-    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
 
     from app.auth.bootstrap import ensure_admin
 

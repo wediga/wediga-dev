@@ -145,3 +145,19 @@ systemctl --user stop backend.service
 podman exec -i wediga-db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' < ~/wediga-dev/backups/wediga-YYYY-MM-DD.dump
 systemctl --user start backend.service
 ```
+
+## Ending sessions
+
+Sessions live in the app's database, and the cookie only holds a random token that points at one of them. Deleting a row ends that session with the very next request. Ending every session sends the admin and friends back to the login, and recruiters open their link again, which stays valid:
+
+```
+podman exec wediga-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DELETE FROM access.session"'
+```
+
+A change in authentik, such as a removed group or a locked account, does not end a running session here, so after such a change I end the sessions of that account by hand. The number at the end is the account's ID in authentik:
+
+```
+podman exec wediga-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DELETE FROM access.session s USING access.authentik_login l, access.account a WHERE l.session_id = s.id AND a.id = l.account_id AND a.authentik_user_id = 21"'
+```
+
+Expired sessions are deleted by the backend itself once an hour.
