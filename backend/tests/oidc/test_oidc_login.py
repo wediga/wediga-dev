@@ -162,6 +162,20 @@ def test_login_without_a_name_is_refused(client, fake, name) -> None:
     assert LOGIN not in read_session(client)
 
 
+def test_start_keeps_the_token_of_a_running_session(client, fake) -> None:
+    # A link from another site to the start must not swap the token of a
+    # visitor who is logged in.
+    log_in(client, fake, ["friends"])
+    before = client.cookies.get(SESSION_COOKIE_NAME)
+    csrf = read_session(client)["csrf_token"]
+
+    start_login(client)
+
+    assert client.cookies.get(SESSION_COOKIE_NAME) == before
+    assert read_session(client)["csrf_token"] == csrf
+    assert LOGIN in read_session(client)
+
+
 def test_login_gives_the_session_a_new_token(client, fake) -> None:
     start_login(client)
     before = client.cookies.get(SESSION_COOKIE_NAME)

@@ -212,6 +212,14 @@ def renew(request: Request) -> uuid.UUID:
     return session_id
 
 
+def ensure(request: Request) -> uuid.UUID:
+    """Return the ID of the session, made first if there is none. The token
+    stays, so a link from another site cannot swap it."""
+    known = current(request)
+
+    return renew(request) if known is None else known.id
+
+
 def end(request: Request) -> None:
     """Delete the session with all its parts and remove the cookie."""
     known = current(request)

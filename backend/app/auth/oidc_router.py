@@ -228,7 +228,8 @@ def login(
     leads to a login.
     """
     metadata = _metadata_or_502(settings)
-    session_id = sessions.renew(request)
+    # No new token yet, the callback gives one once the login succeeds.
+    session_id = sessions.ensure(request)
     sessions.drop_parts(request, LoginFlow)
     flow = LoginFlow(
         session_id=session_id,
