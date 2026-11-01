@@ -1,7 +1,12 @@
 import { RecruiterNav } from "./RecruiterNav";
 import { GenerativeAccents } from "./GenerativeAccents";
 import { ScrollToTop } from "@/components/ScrollToTop";
-import { SiteHeader, SiteFooter, ChromeLink } from "@/components/site/SiteChrome";
+import {
+  SiteHeader,
+  SiteFooter,
+  ChromeLink,
+  LegalLinks,
+} from "@/components/site/SiteChrome";
 
 // Shared chrome around the three recruiter views: navigation between them and a
 // way back to the landing (the brand wordmark). It sits inside the gate in
@@ -32,7 +37,7 @@ export function RecruiterShell({ children }: { children: React.ReactNode }) {
         outerClassName="border-t border-line"
         rowClassName="mx-auto flex w-full max-w-[1600px] items-center justify-end gap-6 px-6 py-6 text-sm text-muted-2 lg:px-10"
       >
-        <ChromeLink href="/impressum">Impressum</ChromeLink>
+        <LegalLinks />
         <ChromeLink href="/">Zur Startseite</ChromeLink>
       </SiteFooter>
     </div>

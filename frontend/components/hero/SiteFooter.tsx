@@ -1,8 +1,10 @@
-import Link from "next/link";
-import { SiteFooter as SharedSiteFooter } from "@/components/site/SiteChrome";
+import {
+  LegalLinks,
+  SiteFooter as SharedSiteFooter,
+} from "@/components/site/SiteChrome";
 import { MotionToggle } from "@/components/MotionToggle";
 
-// The site footer: Impressum and the motion switch. Fixed over the ride or in
+// The site footer: the legal links and the motion switch. Fixed over the ride or in
 // flow at the foot of the quiet column; the switch is the same in both.
 export function SiteFooter({
   variant,
@@ -32,9 +34,7 @@ export function SiteFooter({
         </p>
       ) : null}
       <div className="flex gap-5 text-sm text-muted">
-        <Link href="/impressum" className="transition-colors hover:text-ink">
-          Impressum
-        </Link>
+        <LegalLinks />
       </div>
       <MotionToggle unavailable={webglFailed} />
     </SharedSiteFooter>

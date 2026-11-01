@@ -53,6 +53,17 @@ export function ChromeLink({
   );
 }
 
+// The legal pages. Both have to be one click away from every public page, so
+// every footer takes them from here.
+export function LegalLinks() {
+  return (
+    <>
+      <ChromeLink href="/impressum">Impressum</ChromeLink>
+      <ChromeLink href="/datenschutz">Datenschutz</ChromeLink>
+    </>
+  );
+}
+
 // The header: a brand wordmark and a right-hand slot on a row whose width and
 // surface differ per context (a quiet centred bar, the recruiter's sticky
 // full-width bar).

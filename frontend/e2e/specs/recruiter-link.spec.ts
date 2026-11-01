@@ -42,6 +42,12 @@ test("a recruiter link lands on the landing, opens the portfolio through the acc
   // The seeded project shows in the gated recruiter view, proving the gated
   // read carried the recruiter session through to the backend.
   await expect(visitorPage.getByText("Example Project")).toBeVisible();
+  // The recruiter views link to the privacy policy like every public page.
+  await expect(
+    visitorPage
+      .getByRole("contentinfo")
+      .getByRole("link", { name: "Datenschutz" }),
+  ).toBeVisible();
 
   // The admin revokes the link. Revoke is now a two-step inline confirmation
   // (a deliberate Phase H5 guard against accidental destructive clicks): the
