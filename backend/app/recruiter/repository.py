@@ -14,11 +14,11 @@ import uuid
 from datetime import UTC, date, datetime, time
 from enum import Enum, auto
 
-from sqlalchemy import RowMapping, func, select
+from sqlalchemy import RowMapping, delete, func, select
 from sqlalchemy.orm import Session
 
 from app.db.connection import get_session, now
-from app.recruiter.models import LinkView, RecruiterLink
+from app.recruiter.models import LinkView, RecruiterAccess, RecruiterLink
 
 # 32 url-safe random bytes, a 256-bit token.
 _TOKEN_BYTES = 32
@@ -161,29 +161,37 @@ def validate_token(token: str) -> tuple[LinkStatus, uuid.UUID] | None:
         return LinkStatus.OK, link.id
 
 
-def link_is_active(link_id: object) -> bool:
+def link_is_active(link_id: uuid.UUID | None) -> bool:
     """Return whether the link behind a recruiter session is still usable.
 
     Called on every recruiter read, so revoking or expiring a link cuts an
-    already redeemed session, not just a new redeem. The id comes from the
-    cookie, and anything that is not a UUID, such as the number a cookie from
-    the time of SQLite still holds, finds no link.
+    already redeemed session, not just a new redeem.
     """
-    if not isinstance(link_id, str):
-        return False
-
-    try:
-        parsed = uuid.UUID(link_id)
-    except ValueError:
+    if link_id is None:
         return False
 
     with get_session() as session:
-        link = session.get(RecruiterLink, parsed)
+        link = session.get(RecruiterLink, link_id)
 
         if link is None:
             return False
 
         return _is_active(link.expires_at, link.revoked_at)
+
+
+def grant_access(session_id: uuid.UUID, link_id: uuid.UUID) -> None:
+    """Make the link the recruiter part of the session, replacing an earlier
+    one."""
+    with get_session() as session:
+        session.execute(
+            delete(RecruiterAccess).where(RecruiterAccess.session_id == session_id)
+        )
+        session.add(
+            RecruiterAccess(
+                session_id=session_id, recruiter_link_id=link_id, redeemed_at=now()
+            )
+        )
+        session.commit()
 
 
 def record_view(link_id: uuid.UUID, origin: str) -> None:

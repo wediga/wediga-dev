@@ -6,7 +6,19 @@ from app.db.base import ACCESS_SCHEMA, SITE_SCHEMA
 from app.db.connection import get_session
 
 EXPECTED_TABLES = {
-    ACCESS_SCHEMA: {"admin", "link_view", "recruiter_link"},
+    ACCESS_SCHEMA: {
+        "account",
+        "admin",
+        "authentik_login",
+        "authentik_login_role",
+        "legacy_admin_login",
+        "link_view",
+        "login_flow",
+        "recruiter_access",
+        "recruiter_link",
+        "role",
+        "session",
+    },
     SITE_SCHEMA: {
         "cv_document",
         "github_repo",

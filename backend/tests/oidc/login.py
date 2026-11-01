@@ -1,41 +1,85 @@
 """Helpers that drive the login through authentik in the tests.
 
 The client uses an https base URL so the Secure session cookie round-trips,
-and the session content is read straight from the signed cookie.
+and the session content is read from the database by the token in the cookie.
 """
 
-import base64
-import json
+from datetime import timedelta
 from urllib.parse import parse_qs, urlsplit
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from itsdangerous import TimestampSigner
-from starlette.middleware.sessions import SessionMiddleware
+from sqlalchemy import select, update
+from sqlalchemy.orm import InstrumentedAttribute
 
-from app.auth.csrf import CSRF_HEADER_NAME, CSRF_SESSION_KEY
-from app.auth.sessions import SESSION_COOKIE_NAME
+from app.auth.csrf import CSRF_HEADER_NAME
+from app.auth.models import (
+    Account,
+    AuthentikLogin,
+    AuthentikLoginRole,
+    BrowserSession,
+    LegacyAdminLogin,
+    LoginFlow,
+    Role,
+)
+from app.auth.sessions import SESSION_COOKIE_NAME, hash_token
+from app.db.connection import get_session
+from app.recruiter.models import RecruiterAccess
 from tests.oidc.oidc_fake import make_id_token
 
 ADMIN_PASSWORD = "correct horse battery staple"
 
+PARTS = (AuthentikLogin, LoginFlow, LegacyAdminLogin, RecruiterAccess)
+
 
 def read_session(client: TestClient) -> dict:
-    cookie = client.cookies.get(SESSION_COOKIE_NAME)
+    """Return the client's session as stored, with every part it has under
+    its table name, whatever its age. The login through authentik also
+    carries its roles and the account."""
+    token = client.cookies.get(SESSION_COOKIE_NAME)
 
-    if cookie is None:
+    if token is None:
         return {}
 
-    # The app may have been imported by another test before SESSION_SECRET was
-    # set, so the secret is taken from the middleware actually in use.
-    app = client.app
-    assert isinstance(app, FastAPI)
-    middleware = next(m for m in app.user_middleware if m.cls is SessionMiddleware)
-    secret_key = middleware.kwargs["secret_key"]
-    assert isinstance(secret_key, str)
-    signer = TimestampSigner(secret_key)
+    with get_session() as db:
+        row = db.scalar(
+            select(BrowserSession).where(BrowserSession.token_hash == hash_token(token))
+        )
 
-    return json.loads(base64.b64decode(signer.unsign(cookie)))
+        if row is None:
+            return {}
+
+        stored = row.as_dict()
+
+        for model in PARTS:
+            part = db.scalar(select(model).where(model.session_id == row.id))
+
+            if part is not None:
+                stored[model.__tablename__] = part.as_dict()
+
+        login = stored.get(AuthentikLogin.__tablename__)
+
+        if login is not None:
+            login["roles"] = list(
+                db.scalars(
+                    select(Role.key)
+                    .join(AuthentikLoginRole, AuthentikLoginRole.role_id == Role.id)
+                    .where(AuthentikLoginRole.authentik_login_id == login["id"])
+                    .order_by(Role.key)
+                )
+            )
+            account = db.get_one(Account, login["account_id"])
+            login["account"] = account.as_dict()
+
+    return stored
+
+
+def age(column: InstrumentedAttribute, by: timedelta) -> None:
+    """Move a time in every row back by ``by``, as if that much had passed."""
+    with get_session() as db:
+        db.execute(
+            update(column.property.parent.class_).values({column.key: column - by})
+        )
+        db.commit()
 
 
 def start_login(client: TestClient, target: str | None = None) -> dict[str, str]:
@@ -76,6 +120,6 @@ def redeem_recruiter_link(app, client: TestClient) -> None:
 
 
 def log_out(client: TestClient):
-    csrf = read_session(client).get(CSRF_SESSION_KEY, "")
+    csrf = read_session(client).get("csrf_token", "")
 
     return client.post("/auth/oidc/logout", headers={CSRF_HEADER_NAME: csrf})

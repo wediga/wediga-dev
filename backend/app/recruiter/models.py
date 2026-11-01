@@ -1,4 +1,5 @@
-"""Models of the recruiter links and the views recorded for them."""
+"""Models of the recruiter links, the views recorded for them and the sessions
+they were redeemed in."""
 
 import uuid
 from datetime import datetime
@@ -6,6 +7,7 @@ from datetime import datetime
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.auth.models import SESSION_ID
 from app.db.base import ACCESS_SCHEMA, UUID_DEFAULT, Base
 
 
@@ -35,3 +37,21 @@ class LinkView(Base):
     )
     viewed_at: Mapped[datetime]
     origin: Mapped[str]
+
+
+class RecruiterAccess(Base):
+    """The part of a session that a redeemed link opens."""
+
+    __tablename__ = "recruiter_access"
+    __table_args__ = ({"schema": ACCESS_SCHEMA},)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True, server_default=UUID_DEFAULT, init=False
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(SESSION_ID, ondelete="CASCADE"), unique=True
+    )
+    recruiter_link_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{ACCESS_SCHEMA}.recruiter_link.id")
+    )
+    redeemed_at: Mapped[datetime]

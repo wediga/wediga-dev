@@ -4,24 +4,20 @@ authentik is replaced by the fake from ``oidc_fake``, which signs real ID
 tokens.
 """
 
-import json
-import time
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from authlib.oauth2.rfc7636 import create_s256_code_challenge
 
-from app.auth import oidc_router
-from app.auth.csrf import CSRF_SESSION_KEY
-from app.auth.sessions import (
-    ADMIN_SESSION_KEY,
-    OIDC_FLOW_SESSION_KEY,
-    OIDC_SESSION_KEY,
-    RECRUITER_SESSION_KEY,
-)
+from app.auth import oidc_router, sessions
+from app.auth.models import AuthentikLogin, LegacyAdminLogin, LoginFlow
+from app.auth.sessions import SESSION_COOKIE_NAME
+from app.recruiter.models import RecruiterAccess
 from tests.oidc.login import (
     ADMIN_PASSWORD,
+    age,
     finish_login,
     log_in,
     log_out,
@@ -29,7 +25,12 @@ from tests.oidc.login import (
     redeem_recruiter_link,
     start_login,
 )
-from tests.oidc.oidc_fake import ACCOUNT_ID, METADATA, make_id_token
+from tests.oidc.oidc_fake import ACCOUNT_ID, METADATA, NAME, make_id_token
+
+LOGIN = AuthentikLogin.__tablename__
+FLOW = LoginFlow.__tablename__
+LEGACY = LegacyAdminLogin.__tablename__
+RECRUITER = RecruiterAccess.__tablename__
 
 BLUEPRINT = (
     Path(__file__).resolve().parents[3] / "deploy/authentik/blueprints/wediga.yaml"
@@ -78,7 +79,7 @@ def test_start_sends_the_browser_to_authentik_with_pkce(client) -> None:
     location = response.headers["location"]
     assert location.startswith(METADATA["authorization_endpoint"])
     query = parse_qs(urlsplit(location).query)
-    flow = read_session(client)[OIDC_FLOW_SESSION_KEY]
+    flow = read_session(client)[FLOW]
     assert query["state"] == [flow["state"]]
     assert query["nonce"] == [flow["nonce"]]
     assert query["code_challenge"] == [create_s256_code_challenge(flow["verifier"])]
@@ -110,18 +111,20 @@ def test_admin_lands_in_admin_with_both_roles(client, fake) -> None:
     assert response.status_code == 303
     assert response.headers["location"] == "/admin"
     session = read_session(client)
-    assert session[OIDC_SESSION_KEY]["user_id"] == int(ACCOUNT_ID)
-    assert session[OIDC_SESSION_KEY]["roles"] == ["admin", "hub"]
-    assert abs(session[OIDC_SESSION_KEY]["login_at"] - time.time()) < 5
-    assert OIDC_FLOW_SESSION_KEY not in session
-    assert session[CSRF_SESSION_KEY]
+    login = session[LOGIN]
+    assert login["account"]["authentik_user_id"] == int(ACCOUNT_ID)
+    assert login["account"]["name"] == NAME
+    assert login["roles"] == ["admin", "hub"]
+    assert abs((datetime.now(UTC) - login["logged_in_at"]).total_seconds()) < 5
+    assert FLOW not in session
+    assert session["csrf_token"]
 
 
 def test_friend_lands_in_hub_without_admin_role(client, fake) -> None:
     response = log_in(client, fake, ["friends"])
 
     assert response.headers["location"] == "/hub"
-    assert read_session(client)[OIDC_SESSION_KEY]["roles"] == ["hub"]
+    assert read_session(client)[LOGIN]["roles"] == ["hub"]
 
 
 @pytest.mark.parametrize("groups", [[], ["valheim"], "wediga-admins", None, [1]])
@@ -129,15 +132,45 @@ def test_account_without_matching_group_gets_no_session(client, fake, groups) ->
     response = log_in(client, fake, groups)
 
     assert response.headers["location"] == "/no-access"
-    assert OIDC_SESSION_KEY not in read_session(client)
+    assert LOGIN not in read_session(client)
 
 
 def test_session_holds_no_token_from_authentik(client, fake) -> None:
     log_in(client, fake, ["friends"])
 
-    cookie = json.dumps(read_session(client))
-    assert fake.id_token not in cookie
-    assert "access" not in read_session(client)[OIDC_SESSION_KEY]
+    assert fake.id_token not in str(read_session(client))
+
+
+def test_account_keeps_the_name_of_the_last_login(client, fake) -> None:
+    log_in(client, fake, ["friends"])
+    first = read_session(client)[LOGIN]["account"]
+
+    log_in(client, fake, ["friends"], name="New Name")
+
+    account = read_session(client)[LOGIN]["account"]
+    assert account["id"] == first["id"]
+    assert account["name"] == "New Name"
+    assert account["first_login_at"] == first["first_login_at"]
+    assert account["last_login_at"] > first["last_login_at"]
+
+
+@pytest.mark.parametrize("name", [None, 7])
+def test_login_without_a_name_is_refused(client, fake, name) -> None:
+    response = log_in(client, fake, ["friends"], name=name)
+
+    assert response.status_code == 400
+    assert LOGIN not in read_session(client)
+
+
+def test_login_gives_the_session_a_new_token(client, fake) -> None:
+    start_login(client)
+    before = client.cookies.get(SESSION_COOKIE_NAME)
+    old_csrf = read_session(client)["csrf_token"]
+
+    log_in(client, fake, ["friends"])
+
+    assert client.cookies.get(SESSION_COOKIE_NAME) != before
+    assert read_session(client)["csrf_token"] != old_csrf
 
 
 def test_safe_target_is_kept(client, fake) -> None:
@@ -174,7 +207,7 @@ def test_wrong_state_is_refused_and_ends_the_flow(client, fake) -> None:
 
     assert finish_login(client, "wrong-state").status_code == 400
     assert finish_login(client, query["state"]).status_code == 400
-    assert OIDC_SESSION_KEY not in read_session(client)
+    assert LOGIN not in read_session(client)
 
 
 def test_state_works_only_once(client, fake) -> None:
@@ -197,14 +230,10 @@ def test_callback_without_code_is_refused(client) -> None:
     assert finish_login(client, query["state"], code="").status_code == 400
 
 
-def test_flow_older_than_the_limit_is_refused(client, fake, monkeypatch) -> None:
+def test_flow_older_than_the_limit_is_refused(client, fake) -> None:
     query = start_login(client)
-    later = time.time() + oidc_router.FLOW_MAX_AGE_SECONDS + 1
-    # The token itself is still valid then, so only the age of the flow counts.
-    fake.id_token = make_id_token(
-        nonce=query["nonce"], groups=["friends"], exp=int(later) + 300
-    )
-    monkeypatch.setattr(oidc_router.time, "time", lambda: later)
+    fake.id_token = make_id_token(nonce=query["nonce"], groups=["friends"])
+    age(LoginFlow.started_at, sessions.LOGIN_FLOW_LIFETIME)
 
     assert finish_login(client, query["state"]).status_code == 400
 
@@ -222,7 +251,7 @@ def test_invalid_id_token_is_refused(client, fake, claims) -> None:
     response = log_in(client, fake, ["wediga-admins"], **claims)
 
     assert response.status_code == 400
-    assert OIDC_SESSION_KEY not in read_session(client)
+    assert LOGIN not in read_session(client)
 
 
 # A hashed sub, as authentik sends it without sub_mode user_id, and values
@@ -232,7 +261,7 @@ def test_login_without_numeric_account_id_is_refused(client, fake, sub) -> None:
     response = log_in(client, fake, ["wediga-admins"], sub=sub)
 
     assert response.status_code == 400
-    assert OIDC_SESSION_KEY not in read_session(client)
+    assert LOGIN not in read_session(client)
 
 
 def test_nonce_of_another_login_is_refused(client, fake) -> None:
@@ -249,18 +278,18 @@ def test_failed_token_exchange_answers_502(client, fake) -> None:
     fake.token_error = oidc_router.oidc.OidcProviderError("down")
 
     assert finish_login(client, query["state"]).status_code == 502
-    assert OIDC_SESSION_KEY not in read_session(client)
+    assert LOGIN not in read_session(client)
 
 
-def test_login_drops_the_old_admin_marker_and_csrf_token(client, fake) -> None:
+def test_login_drops_the_old_admin_login_and_csrf_token(client, fake) -> None:
     assert client.post("/auth/login", json={"password": ADMIN_PASSWORD}).is_success
     old_csrf = client.get("/auth/csrf").json()["csrf_token"]
 
     log_in(client, fake, ["friends"])
 
     session = read_session(client)
-    assert ADMIN_SESSION_KEY not in session
-    assert session[CSRF_SESSION_KEY] != old_csrf
+    assert LEGACY not in session
+    assert session["csrf_token"] != old_csrf
     assert client.get("/auth/me").status_code == 403
 
 
@@ -269,7 +298,7 @@ def test_failed_login_also_ends_an_earlier_one(client, fake) -> None:
 
     log_in(client, fake, [])
 
-    assert OIDC_SESSION_KEY not in read_session(client)
+    assert LOGIN not in read_session(client)
 
 
 # --- logout ------------------------------------------------------------------
@@ -279,18 +308,29 @@ def test_logout_needs_the_csrf_token(client, fake) -> None:
     log_in(client, fake, ["friends"])
 
     assert client.post("/auth/oidc/logout").status_code == 403
-    assert OIDC_SESSION_KEY in read_session(client)
+    assert LOGIN in read_session(client)
 
 
 def test_logout_ends_the_login_and_points_to_authentik(client, fake) -> None:
     log_in(client, fake, ["wediga-admins"])
 
+    old_csrf = read_session(client)["csrf_token"]
+
     response = log_out(client)
 
     assert response.json() == {"redirect": METADATA["end_session_endpoint"]}
     session = read_session(client)
-    assert OIDC_SESSION_KEY not in session
-    assert CSRF_SESSION_KEY not in session
+    assert LOGIN not in session
+    assert session["csrf_token"] != old_csrf
+
+
+def test_logout_after_the_lifetime_still_points_to_authentik(client, fake) -> None:
+    log_in(client, fake, ["friends"])
+    age(AuthentikLogin.logged_in_at, sessions.AUTHENTIK_LOGIN_LIFETIME)
+
+    response = log_out(client)
+
+    assert response.json() == {"redirect": METADATA["end_session_endpoint"]}
 
 
 @pytest.mark.usefixtures("fake")
@@ -301,7 +341,7 @@ def test_logout_of_a_password_login_skips_authentik(client) -> None:
     response = log_out(client)
 
     assert response.json() == {"redirect": "/login"}
-    assert ADMIN_SESSION_KEY not in read_session(client)
+    assert LEGACY not in read_session(client)
 
 
 def test_logout_keeps_the_recruiter_session(app, client, fake) -> None:
@@ -310,7 +350,7 @@ def test_logout_keeps_the_recruiter_session(app, client, fake) -> None:
 
     assert log_out(client).is_success
 
-    assert RECRUITER_SESSION_KEY in read_session(client)
+    assert RECRUITER in read_session(client)
     assert client.get("/recruiter/session").status_code == 200
 
 
@@ -329,7 +369,7 @@ def test_logout_still_works_when_authentik_is_down(client, fake) -> None:
     response = log_out(client)
 
     assert response.json() == {"redirect": "/"}
-    assert OIDC_SESSION_KEY not in read_session(client)
+    assert LOGIN not in read_session(client)
 
 
 # --- groups ------------------------------------------------------------------

@@ -10,13 +10,16 @@ from datetime import date, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from app.auth.sessions import RECRUITER_ACCESS_LIFETIME
+from app.recruiter.models import RecruiterAccess
+from tests.oidc.login import age, read_session
+
 ADMIN_PASSWORD = "correct horse battery staple"
 
 
 @pytest.fixture()
 def app(migrated_db, monkeypatch):
     monkeypatch.setenv("ADMIN_PASSWORD", ADMIN_PASSWORD)
-    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
 
     from app.auth.bootstrap import ensure_admin
 
@@ -185,23 +188,38 @@ def test_revocation_cuts_an_active_recruiter_session(app, admin_client) -> None:
     assert visitor.get("/content/contact").status_code == 401
 
 
-def test_redeem_keeps_the_link_id_as_text_in_the_cookie(app, admin_client) -> None:
-    from app.auth.sessions import RECRUITER_SESSION_KEY
-    from tests.oidc.login import read_session
-
-    created = _create_link(admin_client, label="Cookie")
+def test_redeem_keeps_the_link_in_the_session(app, admin_client) -> None:
+    created = _create_link(admin_client, label="Session")
     visitor = TestClient(app, base_url="https://testserver")
     visitor.post(f"/recruiter/redeem/{created['token']}")
 
-    assert read_session(visitor)[RECRUITER_SESSION_KEY] == created["id"]
+    access = read_session(visitor)[RecruiterAccess.__tablename__]
+    assert access["recruiter_link_id"] == uuid.UUID(created["id"])
 
 
-@pytest.mark.parametrize("stale_id", [1, "1", "not-a-uuid", None])
-def test_a_link_id_that_is_no_uuid_finds_no_link(migrated_db, stale_id) -> None:
-    # A cookie from the time of SQLite still holds the number of the link.
-    from app.recruiter import repository as repo
+def test_recruiter_access_ends_after_its_lifetime(app, admin_client) -> None:
+    created = _create_link(admin_client, label="Week")
+    visitor = TestClient(app, base_url="https://testserver")
+    visitor.post(f"/recruiter/redeem/{created['token']}")
+    age(RecruiterAccess.redeemed_at, RECRUITER_ACCESS_LIFETIME - timedelta(minutes=1))
 
-    assert repo.link_is_active(stale_id) is False
+    assert visitor.get("/recruiter/session").status_code == 200
+
+    age(RecruiterAccess.redeemed_at, timedelta(minutes=1))
+
+    assert visitor.get("/recruiter/session").status_code == 401
+
+
+def test_redeeming_again_replaces_the_link(app, admin_client) -> None:
+    first = _create_link(admin_client, label="First")
+    second = _create_link(admin_client, label="Second")
+    visitor = TestClient(app, base_url="https://testserver")
+    visitor.post(f"/recruiter/redeem/{first['token']}")
+
+    assert visitor.post(f"/recruiter/redeem/{second['token']}").is_success
+
+    access = read_session(visitor)[RecruiterAccess.__tablename__]
+    assert access["recruiter_link_id"] == uuid.UUID(second["id"])
 
 
 # --- login rate limit ----------------------------------------------------

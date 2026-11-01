@@ -1,54 +1,34 @@
 """Auth dependencies for protecting routes.
 
-Admin and recruiter are two separate session markers in the same signed
-cookie. An admin session never grants recruiter access implicitly and a
-recruiter session never grants admin access: each dependency checks only its
-own key, so a shared recruiter link can never reach an admin route.
+Admin and recruiter are separate parts of the same session. An admin session
+never grants recruiter access implicitly and a recruiter session never grants
+admin access: each dependency checks only its own part, so a shared recruiter
+link can never reach an admin route.
 
-Until the password login is removed, an admin is either the old admin marker
+Until the password login is removed, an admin is either the old admin login
 or the admin role from the login through authentik. That login counts for
 eight hours after it happened, then the visitor goes back to authentik.
 """
 
-import time
-
 from fastapi import HTTPException, Request, status
 
 from app.auth.oidc_router import ADMIN_ROLE, HUB_ROLE
-from app.auth.sessions import (
-    ADMIN_SESSION_KEY,
-    OIDC_SESSION_KEY,
-    RECRUITER_SESSION_KEY,
-)
-
-OIDC_LOGIN_LIFETIME_SECONDS = 8 * 60 * 60
+from app.auth.sessions import current
 
 
-def oidc_roles(request: Request) -> list[str]:
-    """Return the roles of the login through authentik.
+def oidc_roles(request: Request) -> tuple[str, ...]:
+    """Return the roles of the login through authentik, none after its
+    lifetime, so authentik is asked again and reads the groups afresh."""
+    state = current(request)
 
-    A login older than the lifetime gives no roles and is removed from the
-    session, so authentik is asked again and reads the groups afresh.
-    """
-    login = request.session.get(OIDC_SESSION_KEY)
-
-    if login is None:
-        return []
-
-    if time.time() - login["login_at"] > OIDC_LOGIN_LIFETIME_SECONDS:
-        request.session.pop(OIDC_SESSION_KEY)
-
-        return []
-
-    return login["roles"]
+    return () if state is None else state.roles
 
 
 def is_admin(request: Request) -> bool:
-    """True for the old admin marker or the admin role from authentik."""
-    if request.session.get(ADMIN_SESSION_KEY):
-        return True
+    """True for the old admin login or the admin role from authentik."""
+    state = current(request)
 
-    return ADMIN_ROLE in oidc_roles(request)
+    return state is not None and (state.legacy_admin or ADMIN_ROLE in state.roles)
 
 
 def require_admin(request: Request) -> None:
@@ -76,7 +56,7 @@ def require_admin(request: Request) -> None:
 def require_login(request: Request) -> None:
     """Pass an admin or anyone with a role from authentik, for routes every
     logged in visitor needs, such as fetching the CSRF token to log out."""
-    if not (request.session.get(ADMIN_SESSION_KEY) or oidc_roles(request)):
+    if not (is_admin(request) or oidc_roles(request)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
@@ -85,29 +65,28 @@ def require_login(request: Request) -> None:
 
 def require_hub(request: Request) -> int:
     """Pass a login through authentik with the hub role and return the
-    account's ID in authentik.
+    account's ID in authentik."""
+    state = current(request)
 
-    A login from before the ID was kept in the session counts as none, so the
-    visitor goes back to authentik and comes back with it.
-    """
-    roles = oidc_roles(request)
-    user_id = request.session.get(OIDC_SESSION_KEY, {}).get("user_id")
-
-    if HUB_ROLE not in roles or user_id is None:
+    if state is None or HUB_ROLE not in state.roles or state.authentik_user_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Hub authentication required",
         )
 
-    return user_id
+    return state.authentik_user_id
 
 
 def require_recruiter_or_admin(request: Request) -> None:
     """Pass a recruiter or an admin session, since the admin previews the
-    recruiter pages. Neither marker present is a 401.
+    recruiter pages. Neither part present is a 401.
     """
-    if not (request.session.get(RECRUITER_SESSION_KEY) or is_admin(request)):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Recruiter or admin authentication required",
-        )
+    state = current(request)
+
+    if is_admin(request) or (state is not None and state.recruiter_link_id):
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Recruiter or admin authentication required",
+    )

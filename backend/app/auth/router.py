@@ -9,13 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 
-from app.auth import totp
-from app.auth.csrf import issue_csrf_token, require_csrf
+from app.auth import sessions, totp
+from app.auth.csrf import csrf_token, require_csrf
 from app.auth.dependencies import require_admin, require_login
-from app.auth.models import Admin
+from app.auth.models import Admin, LegacyAdminLogin
 from app.auth.passwords import verify_password
 from app.auth.ratelimit import client_ip, login_limiter, totp_limiter
-from app.auth.sessions import ADMIN_SESSION_KEY, PENDING_2FA_SESSION_KEY
 from app.db.connection import get_session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -29,18 +28,23 @@ class CodeRequest(BaseModel):
     code: str = Field(max_length=16)
 
 
-def _start_admin_session(request: Request) -> None:
-    """Drop any prior session state and issue a fresh admin session.
+def _start_session(request: Request, second_factor_done: bool) -> None:
+    """Replace any prior session with a new one holding only the old admin
+    login, done or waiting for the second factor.
 
-    Clearing first removes the ``pending_2fa`` marker and any recruiter state,
-    so the elevated session carries only the admin marker and a new CSRF token.
-    The signed cookie is rewritten on this change, so no stale marker survives
-    the factor transition.
+    The new session drops a pending login and any recruiter part and comes
+    with a new token and CSRF token, so nothing survives the factor
+    transition.
     """
-    request.session.clear()
-    request.session[ADMIN_SESSION_KEY] = True
-    # Mint the CSRF token now so the admin can read it right after login.
-    issue_csrf_token(request)
+    session_id = sessions.start(request)
+
+    with get_session() as session:
+        session.add(
+            LegacyAdminLogin(
+                session_id=session_id, second_factor_done=second_factor_done
+            )
+        )
+        session.commit()
 
 
 def _decrypt_secret_or_500(stored: str) -> str:
@@ -65,8 +69,8 @@ def login(request: Request, body: LoginRequest) -> dict[str, bool]:
 
     The per-IP rate limit returns 429 before the password is checked, so the
     argon2 verify cannot be used as a timing or load amplifier. With the second
-    factor enabled a correct password only sets ``pending_2fa`` and grants no
-    admin rights until the TOTP step succeeds.
+    factor enabled a correct password only starts a login waiting for it and
+    grants no admin rights until the TOTP step succeeds.
     """
     ip = client_ip(request)
     if not login_limiter.hit(ip):
@@ -88,26 +92,24 @@ def login(request: Request, body: LoginRequest) -> dict[str, bool]:
     # never lock out a legitimate admin.
     login_limiter.reset(ip)
 
-    if admin.totp_enabled:
-        # The password alone grants no admin rights; only the second factor
-        # below promotes this to an admin session.
-        request.session.clear()
-        request.session[PENDING_2FA_SESSION_KEY] = True
-        return {"ok": True, "totp_required": True}
+    # The password alone grants no admin rights when the second factor is
+    # active; only the step below promotes the login.
+    _start_session(request, second_factor_done=not admin.totp_enabled)
 
-    _start_admin_session(request)
-    return {"ok": True, "totp_required": False}
+    return {"ok": True, "totp_required": admin.totp_enabled}
 
 
 @router.post("/login/totp")
 def login_totp(request: Request, body: CodeRequest) -> dict[str, bool]:
     """Verify the TOTP code for a pending login and issue the admin session.
 
-    Without a ``pending_2fa`` marker there is nothing to verify, so the step
+    Without a login waiting for it there is nothing to verify, so the step
     cannot mint an admin session on its own. A second per-IP limiter caps online
     guessing of the six-digit code.
     """
-    if not request.session.get(PENDING_2FA_SESSION_KEY):
+    state = sessions.current(request)
+
+    if state is None or not state.pending_second_factor:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="No pending second factor",
@@ -143,14 +145,14 @@ def login_totp(request: Request, body: CodeRequest) -> dict[str, bool]:
         )
 
     totp_limiter.reset(ip)
-    _start_admin_session(request)
+    _start_session(request, second_factor_done=True)
     return {"ok": True}
 
 
 @router.post("/logout")
 def logout(request: Request) -> dict[str, bool]:
-    """Clear the session."""
-    request.session.clear()
+    """End the session."""
+    sessions.end(request)
     return {"ok": True}
 
 
@@ -161,10 +163,10 @@ def me() -> dict[str, bool]:
 
 
 @router.get("/csrf", dependencies=[Depends(require_login)])
-def csrf(request: Request) -> dict[str, str]:
+def csrf(request: Request) -> dict[str, str | None]:
     """Return the session CSRF token to send on writes. Every logged in
     visitor gets it, since logging out is a write as well."""
-    return {"csrf_token": issue_csrf_token(request)}
+    return {"csrf_token": csrf_token(request)}
 
 
 @router.get("/totp/status", dependencies=[Depends(require_admin)])

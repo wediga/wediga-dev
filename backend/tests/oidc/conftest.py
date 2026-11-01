@@ -12,7 +12,6 @@ from tests.oidc.oidc_fake import SETTINGS, FakeAuthentik
 @pytest.fixture()
 def app(migrated_db, monkeypatch):
     monkeypatch.setenv("ADMIN_PASSWORD", ADMIN_PASSWORD)
-    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
 
     from app.auth.bootstrap import ensure_admin
 
