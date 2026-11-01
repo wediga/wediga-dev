@@ -5,13 +5,14 @@ The client uses an https base URL so the Secure session cookie round-trips.
 
 import importlib
 import uuid
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.auth.sessions import RECRUITER_ACCESS_LIFETIME
 from app.recruiter.models import RecruiterAccess
+from app.recruiter.schemas import DEFAULT_LINK_LIFETIME
 from tests.oidc.login import age, read_session
 
 ADMIN_PASSWORD = "correct horse battery staple"
@@ -91,6 +92,27 @@ def test_revoke_missing_link_is_404(admin_client) -> None:
     assert (
         admin_client.post(f"/recruiter/links/{uuid.uuid4()}/revoke").status_code == 404
     )
+
+
+# --- expiry --------------------------------------------------------------
+
+
+def _today() -> date:
+    return datetime.now(UTC).date()
+
+
+def test_create_without_expiry_gets_the_default_lifetime(admin_client) -> None:
+    created = _create_link(admin_client, label="Default")
+    expected = (_today() + DEFAULT_LINK_LIFETIME).isoformat()
+
+    assert created["expires_at"] == f"{expected}T23:59:59Z"
+
+
+def test_create_with_null_expiry_never_expires(admin_client) -> None:
+    created = _create_link(admin_client, label="Forever", expires_on=None)
+
+    assert created["expires_at"] is None
+    assert created["active"] is True
 
 
 # --- redemption ----------------------------------------------------------

@@ -56,7 +56,11 @@ export default function AdminLinksPage() {
       "create",
       async () => {
         setCreatedUrl("");
-        const body = { label: label || null, expires_on: expiresOn || null };
+        // Without a date the backend applies the default lifetime.
+        const body = {
+          label: label || null,
+          ...(expiresOn ? { expires_on: expiresOn } : {}),
+        };
         const response = await apiWrite(
           "/api/recruiter/links",
           "POST",
@@ -112,7 +116,7 @@ export default function AdminLinksPage() {
         />
         <AdminField
           label="Expires on"
-          hint="Optional"
+          hint="Empty: default lifetime"
           type="date"
           value={expiresOn}
           onChange={setExpiresOn}
