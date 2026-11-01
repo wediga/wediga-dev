@@ -46,6 +46,9 @@ SESSION_COOKIE_NAME = "wediga_session"
 
 IDLE_TIMEOUT = timedelta(hours=2)
 AUTHENTIK_LOGIN_LIFETIME = timedelta(hours=8)
+# The password login always starts a new session, so it counts from the
+# session's creation, as long as a login through authentik.
+LEGACY_ADMIN_LOGIN_LIFETIME = AUTHENTIK_LOGIN_LIFETIME
 RECRUITER_ACCESS_LIFETIME = timedelta(days=7)
 # A login that is not finished within this time has to start over.
 LOGIN_FLOW_LIFETIME = timedelta(minutes=10)
@@ -127,9 +130,13 @@ def _load(token: str) -> SessionState | None:
                 )
             )
         )
-        second_factor_done = db.scalar(
-            select(LegacyAdminLogin.second_factor_done).where(
-                LegacyAdminLogin.session_id == row.id
+        second_factor_done = (
+            None
+            if row.created_at <= moment - LEGACY_ADMIN_LOGIN_LIFETIME
+            else db.scalar(
+                select(LegacyAdminLogin.second_factor_done).where(
+                    LegacyAdminLogin.session_id == row.id
+                )
             )
         )
         recruiter_link_id = db.scalar(
@@ -275,6 +282,13 @@ def delete_expired() -> None:
 
         for model, began, lifetime in _PART_LIFETIMES:
             db.execute(delete(model).where(began <= moment - lifetime))
+
+        db.execute(
+            delete(LegacyAdminLogin).where(
+                LegacyAdminLogin.session_id == BrowserSession.id,
+                BrowserSession.created_at <= moment - LEGACY_ADMIN_LOGIN_LIFETIME,
+            )
+        )
 
         db.commit()
 

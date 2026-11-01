@@ -152,3 +152,26 @@ def test_clean_up_deletes_only_what_has_expired(app) -> None:
     assert _session_count() == 1
     assert LegacyAdminLogin.__tablename__ in read_session(fresh)
     assert fresh.get("/auth/me").status_code == 200
+
+
+def test_password_login_counts_until_its_lifetime(client) -> None:
+    _log_in(client)
+    age(BrowserSession.created_at, sessions.LEGACY_ADMIN_LOGIN_LIFETIME - ONE_MINUTE)
+
+    assert client.get("/auth/me").status_code == 200
+
+
+def test_password_login_ends_after_its_lifetime_despite_use(client) -> None:
+    _log_in(client)
+    age(BrowserSession.created_at, sessions.LEGACY_ADMIN_LOGIN_LIFETIME)
+
+    assert client.get("/auth/me").status_code == 401
+
+
+def test_clean_up_deletes_an_expired_password_login(client) -> None:
+    _log_in(client)
+    age(BrowserSession.created_at, sessions.LEGACY_ADMIN_LOGIN_LIFETIME)
+
+    sessions.delete_expired()
+
+    assert LegacyAdminLogin.__tablename__ not in read_session(client)
