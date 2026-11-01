@@ -138,6 +138,24 @@ def revoke_link(link_id: uuid.UUID) -> dict | None:
         return _get_link(session, link_id)
 
 
+def set_expiry(link_id: uuid.UUID, expires_on: date | None) -> dict | None:
+    """Replace a link's expiry; return its read view or None for a missing link.
+
+    Moving the expiry into the future makes an expired link usable again, a
+    revoked link stays revoked whatever its expiry.
+    """
+    with get_session() as session:
+        link = session.get(RecruiterLink, link_id)
+
+        if link is None:
+            return None
+
+        link.expires_at = _expiry(expires_on)
+        session.commit()
+
+        return _get_link(session, link_id)
+
+
 def validate_token(token: str) -> tuple[LinkStatus, uuid.UUID] | None:
     """Look a token up by its hash and classify it.
 

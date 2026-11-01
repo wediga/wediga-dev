@@ -20,6 +20,7 @@ from app.recruiter.dependencies import require_recruiter_view
 from app.recruiter.schemas import (
     RecruiterLinkCreate,
     RecruiterLinkCreated,
+    RecruiterLinkExpiry,
     RecruiterLinkRead,
 )
 from app.recruiter.tracking import coarse_origin
@@ -61,6 +62,21 @@ def revoke_link(link_id: uuid.UUID) -> dict:
     link = repo.revoke_link(link_id)
     if link is None:
         raise not_found("Link not found")
+    return link
+
+
+@router.put(
+    "/links/{link_id}/expiry",
+    response_model=RecruiterLinkRead,
+    dependencies=WRITE_DEPS,
+)
+def set_expiry(link_id: uuid.UUID, body: RecruiterLinkExpiry) -> dict:
+    """Extend, shorten or remove the expiry of a link."""
+    link = repo.set_expiry(link_id, body.expires_on)
+
+    if link is None:
+        raise not_found("Link not found")
+
     return link
 
 

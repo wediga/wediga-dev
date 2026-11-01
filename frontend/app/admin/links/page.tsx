@@ -11,6 +11,7 @@ import {
   EmptyState,
   Feedback,
   useActionFeedback,
+  type ActionStatus,
 } from "@/components/admin/ui";
 
 // Label and tone are derived together, so the rendered word and its colour
@@ -25,6 +26,41 @@ function linkStatus(link: RecruiterLink): { label: string; tone: string } {
 function fmt(value: string | null): string {
   if (!value) return "-";
   return value.slice(0, 16).replace("T", " ");
+}
+
+// The date of one link's expiry with its own input state, so editing one link
+// leaves the others untouched. An empty date removes the expiry.
+function ExpiryForm({
+  link,
+  status,
+  onSave,
+}: {
+  link: RecruiterLink;
+  status: ActionStatus;
+  onSave: (expiresOn: string) => void;
+}) {
+  const [value, setValue] = useState(link.expires_at?.slice(0, 10) ?? "");
+
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <AdminField
+        label="Expires on"
+        hint="Empty: never"
+        type="date"
+        value={value}
+        onChange={setValue}
+        className="max-w-56"
+      />
+      <AdminButton
+        pending={status.state === "pending"}
+        pendingLabel="Saving…"
+        onClick={() => onSave(value)}
+      >
+        Save expiry
+      </AdminButton>
+      <Feedback status={status} />
+    </div>
+  );
 }
 
 export default function AdminLinksPage() {
@@ -78,6 +114,22 @@ export default function AdminLinksPage() {
         return response.ok;
       },
       { success: "Link created", error: "Couldn't create the link. Try again." },
+    );
+
+  const saveExpiry = (id: string, expiresOn: string) =>
+    run(
+      `expiry-${id}`,
+      async () => {
+        const response = await apiWrite(
+          `/api/recruiter/links/${id}/expiry`,
+          "PUT",
+          token,
+          { expires_on: expiresOn || null },
+        );
+        if (response.ok) await load();
+        return response.ok;
+      },
+      { success: "Expiry saved", error: "Couldn't save the expiry. Try again." },
     );
 
   const revoke = (id: string) =>
@@ -175,15 +227,22 @@ export default function AdminLinksPage() {
                 </span>
               </div>
               {link.revoked_at ? null : (
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <ConfirmButton
-                    label="Revoke"
-                    prompt="Revoke this link?"
-                    pendingLabel="Revoking…"
-                    pending={get(`revoke-${link.id}`).state === "pending"}
-                    onConfirm={() => revoke(link.id)}
+                <div className="mt-3 space-y-3">
+                  <ExpiryForm
+                    link={link}
+                    status={get(`expiry-${link.id}`)}
+                    onSave={(expiresOn) => saveExpiry(link.id, expiresOn)}
                   />
-                  <Feedback status={get(`revoke-${link.id}`)} />
+                  <div className="flex flex-wrap items-center gap-3">
+                    <ConfirmButton
+                      label="Revoke"
+                      prompt="Revoke this link?"
+                      pendingLabel="Revoking…"
+                      pending={get(`revoke-${link.id}`).state === "pending"}
+                      onConfirm={() => revoke(link.id)}
+                    />
+                    <Feedback status={get(`revoke-${link.id}`)} />
+                  </div>
                 </div>
               )}
               </li>

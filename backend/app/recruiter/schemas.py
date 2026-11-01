@@ -29,6 +29,12 @@ class RecruiterLinkCreate(BaseModel):
     expires_on: date | None = Field(default_factory=_default_expiry)
 
 
+class RecruiterLinkExpiry(BaseModel):
+    """A new expiry for an existing link, null removes it."""
+
+    expires_on: date | None
+
+
 class RecruiterLinkRead(BaseModel):
     """A link with its call statistics for the admin list."""
 
