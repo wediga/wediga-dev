@@ -5,13 +5,14 @@ The client uses an https base URL so the Secure session cookie round-trips.
 
 import importlib
 import uuid
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.auth.sessions import RECRUITER_ACCESS_LIFETIME
 from app.recruiter.models import RecruiterAccess
+from app.recruiter.schemas import DEFAULT_LINK_LIFETIME
 from tests.oidc.login import age, read_session
 
 ADMIN_PASSWORD = "correct horse battery staple"
@@ -91,6 +92,109 @@ def test_revoke_missing_link_is_404(admin_client) -> None:
     assert (
         admin_client.post(f"/recruiter/links/{uuid.uuid4()}/revoke").status_code == 404
     )
+
+
+# --- expiry --------------------------------------------------------------
+
+
+def _today() -> date:
+    return datetime.now(UTC).date()
+
+
+def _set_expiry(admin_client, link_id: str, expires_on: date | None):
+    return admin_client.put(
+        f"/recruiter/links/{link_id}/expiry",
+        json={"expires_on": expires_on.isoformat() if expires_on else None},
+    )
+
+
+def test_create_without_expiry_gets_the_default_lifetime(admin_client) -> None:
+    created = _create_link(admin_client, label="Default")
+    expected = (_today() + DEFAULT_LINK_LIFETIME).isoformat()
+
+    assert created["expires_at"] == f"{expected}T23:59:59Z"
+
+
+def test_create_with_null_expiry_never_expires(admin_client) -> None:
+    created = _create_link(admin_client, label="Forever", expires_on=None)
+
+    assert created["expires_at"] is None
+    assert created["active"] is True
+
+
+def test_set_expiry_moves_the_date(admin_client) -> None:
+    created = _create_link(admin_client, label="Extend")
+    later = _today() + DEFAULT_LINK_LIFETIME * 2
+
+    response = _set_expiry(admin_client, created["id"], later)
+
+    assert response.status_code == 200
+    assert response.json()["expires_at"] == f"{later.isoformat()}T23:59:59Z"
+    assert admin_client.get("/recruiter/links").json()[0]["expires_at"] == (
+        f"{later.isoformat()}T23:59:59Z"
+    )
+
+
+def test_set_expiry_to_null_removes_it(admin_client) -> None:
+    created = _create_link(admin_client, label="Unlimited")
+
+    response = _set_expiry(admin_client, created["id"], None)
+
+    assert response.status_code == 200
+    assert response.json()["expires_at"] is None
+
+
+def test_set_expiry_in_the_past_ends_the_link(app, admin_client) -> None:
+    created = _create_link(admin_client, label="Shorten")
+
+    response = _set_expiry(admin_client, created["id"], _today() - timedelta(days=1))
+
+    assert response.json()["active"] is False
+    visitor = TestClient(app, base_url="https://testserver")
+    assert visitor.post(f"/recruiter/redeem/{created['token']}").status_code == 410
+
+
+def test_extending_an_expired_link_makes_it_usable_again(app, admin_client) -> None:
+    yesterday = _today() - timedelta(days=1)
+    created = _create_link(
+        admin_client, label="Renew", expires_on=yesterday.isoformat()
+    )
+
+    response = _set_expiry(admin_client, created["id"], _today())
+
+    assert response.json()["active"] is True
+    visitor = TestClient(app, base_url="https://testserver")
+    assert visitor.post(f"/recruiter/redeem/{created['token']}").status_code == 200
+
+
+def test_extending_a_revoked_link_keeps_it_revoked(app, admin_client) -> None:
+    created = _create_link(admin_client, label="Gone")
+    admin_client.post(f"/recruiter/links/{created['id']}/revoke")
+
+    response = _set_expiry(admin_client, created["id"], None)
+
+    assert response.json()["active"] is False
+    visitor = TestClient(app, base_url="https://testserver")
+    assert visitor.post(f"/recruiter/redeem/{created['token']}").status_code == 410
+
+
+def test_set_expiry_requires_the_field(admin_client) -> None:
+    created = _create_link(admin_client, label="Body")
+
+    response = admin_client.put(f"/recruiter/links/{created['id']}/expiry", json={})
+
+    assert response.status_code == 422
+
+
+def test_set_expiry_on_missing_link_is_404(admin_client) -> None:
+    assert _set_expiry(admin_client, str(uuid.uuid4()), None).status_code == 404
+
+
+def test_set_expiry_requires_admin_and_csrf(client, session_client) -> None:
+    path = f"/recruiter/links/{uuid.uuid4()}/expiry"
+
+    assert client.put(path, json={"expires_on": None}).status_code == 401
+    assert session_client.put(path, json={"expires_on": None}).status_code == 403
 
 
 # --- redemption ----------------------------------------------------------

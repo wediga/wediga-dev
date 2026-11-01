@@ -1,24 +1,52 @@
 """Pydantic schemas for recruiter magic links.
 
-A link carries a label and an optional expiry. The plaintext token leaves the
-backend once, in the create response, and never again; the database holds only
-its hash.
+A link carries a label and an expiry, by default one year after its creation.
+The plaintext token leaves the backend once, in the create response, and never
+again; the database holds only its hash.
 """
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from pydantic import BaseModel, Field
 
+from app.db.connection import now
+
 LABEL_MAX = 200
+DEFAULT_LINK_LIFETIME = timedelta(days=365)
+
+
+def _default_expiry() -> date:
+    return (now() + DEFAULT_LINK_LIFETIME).date()
 
 
 class RecruiterLinkCreate(BaseModel):
     """A link as created from the admin."""
 
     label: str | None = Field(default=None, max_length=LABEL_MAX)
-    # Valid through the end of this day in UTC; empty means never expires.
-    expires_on: date | None = None
+    # Valid through the end of this day in UTC. Left out, the link gets the
+    # default lifetime, and null means it never expires.
+    expires_on: date | None = Field(default_factory=_default_expiry)
+
+
+class RecruiterLinkFromKey(BaseModel):
+    """A link created over the SSH key, which always names the company and
+    gets the default lifetime.
+
+    The label arrives as free text from outside, so control characters such as
+    line breaks are refused along with an empty label.
+    """
+
+    label: str = Field(
+        min_length=1, max_length=LABEL_MAX, pattern=r"^[^\x00-\x1f\x7f]+$"
+    )
+    expires_on: date = Field(default_factory=_default_expiry)
+
+
+class RecruiterLinkExpiry(BaseModel):
+    """A new expiry for an existing link, null removes it."""
+
+    expires_on: date | None
 
 
 class RecruiterLinkRead(BaseModel):
