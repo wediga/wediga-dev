@@ -22,6 +22,7 @@ from app.recruiter.schemas import (
     RecruiterLinkCreated,
     RecruiterLinkExpiry,
     RecruiterLinkRead,
+    RecruiterRedeem,
 )
 from app.recruiter.tracking import coarse_origin
 
@@ -80,8 +81,8 @@ def set_expiry(link_id: uuid.UUID, body: RecruiterLinkExpiry) -> dict:
     return link
 
 
-@router.post("/redeem/{token}")
-def redeem(token: str, request: Request) -> dict[str, bool]:
+@router.post("/redeem")
+def redeem(body: RecruiterRedeem, request: Request) -> dict[str, bool]:
     """Validate a token, start the recruiter session and record the view.
 
     Unknown token is 404, revoked or expired is 410. On success the session
@@ -95,7 +96,7 @@ def redeem(token: str, request: Request) -> dict[str, bool]:
             detail="Too many attempts, try again later",
         )
 
-    found = repo.validate_token(token)
+    found = repo.validate_token(body.token)
 
     if found is None:
         raise not_found("Link not found")

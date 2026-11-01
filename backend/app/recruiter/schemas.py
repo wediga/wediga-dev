@@ -62,6 +62,13 @@ class RecruiterLinkRead(BaseModel):
     active: bool
 
 
+class RecruiterRedeem(BaseModel):
+    """The token a recruiter opened. It comes in the body and not in the path,
+    because the access log records every path."""
+
+    token: str
+
+
 class RecruiterLinkCreated(RecruiterLinkRead):
     """The create response, carrying the plaintext token shown only once."""
 
