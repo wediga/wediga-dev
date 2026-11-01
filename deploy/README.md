@@ -14,6 +14,7 @@ The commands in this file run as that user. After switching to it with `sudo`, r
 | Secrets for the identity provider | `~/authentik/authentik.env`, `~/authentik/authentik-db.env` |
 | Setup of the identity provider (`authentik/blueprints/`) | `~/authentik/blueprints/` |
 | Database dumps of the identity provider | `~/authentik/backups/` |
+| Command of the key for recruiter links (`create-recruiter-link.sh`) | `~/wediga-dev/create-recruiter-link.sh` |
 | Backup scripts, services and timers (`systemd/`) | `~/authentik/backup.sh`, `~/wediga-dev/backup.sh`, `~/.config/systemd/user/` |
 
 Caddy is the only container that publishes host ports. Every other container is reached by name over an internal Podman network.
@@ -161,3 +162,19 @@ podman exec wediga-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DELE
 ```
 
 Expired sessions are deleted by the backend itself once an hour.
+
+## Recruiter links over SSH
+
+Recruiter links can be created without the admin area, through an SSH key that may do nothing else. Its line in `~/.ssh/authorized_keys` starts with `restrict,command="/home/web/wediga-dev/create-recruiter-link.sh"`, so the key gets no shell, no terminal and no forwarding, and every login runs that one script whatever the caller asks for. The script hands the text the caller sent to the backend container as the label, through stdin and never through a shell, and prints the new link, which gets the default lifetime:
+
+```
+ssh -i ~/.ssh/wediga_recruiter_link -o IdentitiesOnly=yes web@<server> "Acme Corp"
+```
+
+The label must not be empty, longer than 200 characters or contain control characters. Expiry and revoke stay in the admin area. To install or update the script, fetch it from the repository:
+
+```
+curl -fsSL https://raw.githubusercontent.com/wediga/wediga-dev/main/deploy/create-recruiter-link.sh -o ~/wediga-dev/create-recruiter-link.sh && chmod 700 ~/wediga-dev/create-recruiter-link.sh
+```
+
+To lock the key out, delete its line from `~/.ssh/authorized_keys`. Links it already created stay valid until they are revoked.

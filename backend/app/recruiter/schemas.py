@@ -29,6 +29,20 @@ class RecruiterLinkCreate(BaseModel):
     expires_on: date | None = Field(default_factory=_default_expiry)
 
 
+class RecruiterLinkFromKey(BaseModel):
+    """A link created over the SSH key, which always names the company and
+    gets the default lifetime.
+
+    The label arrives as free text from outside, so control characters such as
+    line breaks are refused along with an empty label.
+    """
+
+    label: str = Field(
+        min_length=1, max_length=LABEL_MAX, pattern=r"^[^\x00-\x1f\x7f]+$"
+    )
+    expires_on: date = Field(default_factory=_default_expiry)
+
+
 class RecruiterLinkExpiry(BaseModel):
     """A new expiry for an existing link, null removes it."""
 
