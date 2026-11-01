@@ -14,14 +14,21 @@ export async function GET(
 ) {
   const { token } = await params;
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+  };
   const forwardedFor = request.headers.get("x-forwarded-for");
   if (forwardedFor) headers["x-forwarded-for"] = forwardedFor;
 
-  const backendResponse = await fetch(
-    backendUrl(`/recruiter/redeem/${encodeURIComponent(token)}`),
-    { method: "POST", headers, cache: "no-store", redirect: "manual" },
-  );
+  // The token goes in the body, because the backend's access log records
+  // every path.
+  const backendResponse = await fetch(backendUrl("/recruiter/redeem"), {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ token }),
+    cache: "no-store",
+    redirect: "manual",
+  });
 
   // Relative redirects: the browser resolves them against the public URL in the
   // address bar. Building an absolute URL from request.url would use the internal

@@ -116,7 +116,7 @@ def redeem_recruiter_link(app, client: TestClient) -> None:
     admin.headers[CSRF_HEADER_NAME] = admin.get("/auth/csrf").json()["csrf_token"]
     token = admin.post("/recruiter/links", json={"label": "r"}).json()["token"]
 
-    assert client.post(f"/recruiter/redeem/{token}").is_success
+    assert client.post("/recruiter/redeem", json={"token": token}).is_success
 
 
 def log_out(client: TestClient):

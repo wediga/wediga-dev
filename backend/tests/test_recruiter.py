@@ -151,7 +151,10 @@ def test_set_expiry_in_the_past_ends_the_link(app, admin_client) -> None:
 
     assert response.json()["active"] is False
     visitor = TestClient(app, base_url="https://testserver")
-    assert visitor.post(f"/recruiter/redeem/{created['token']}").status_code == 410
+    assert (
+        visitor.post("/recruiter/redeem", json={"token": created["token"]}).status_code
+        == 410
+    )
 
 
 def test_extending_an_expired_link_makes_it_usable_again(app, admin_client) -> None:
@@ -164,7 +167,10 @@ def test_extending_an_expired_link_makes_it_usable_again(app, admin_client) -> N
 
     assert response.json()["active"] is True
     visitor = TestClient(app, base_url="https://testserver")
-    assert visitor.post(f"/recruiter/redeem/{created['token']}").status_code == 200
+    assert (
+        visitor.post("/recruiter/redeem", json={"token": created["token"]}).status_code
+        == 200
+    )
 
 
 def test_extending_a_revoked_link_keeps_it_revoked(app, admin_client) -> None:
@@ -175,7 +181,10 @@ def test_extending_a_revoked_link_keeps_it_revoked(app, admin_client) -> None:
 
     assert response.json()["active"] is False
     visitor = TestClient(app, base_url="https://testserver")
-    assert visitor.post(f"/recruiter/redeem/{created['token']}").status_code == 410
+    assert (
+        visitor.post("/recruiter/redeem", json={"token": created["token"]}).status_code
+        == 410
+    )
 
 
 def test_set_expiry_requires_the_field(admin_client) -> None:
@@ -205,7 +214,7 @@ def test_redeem_starts_session_and_records_view(app, admin_client) -> None:
     token = created["token"]
 
     visitor = TestClient(app, base_url="https://testserver")
-    redeem = visitor.post(f"/recruiter/redeem/{token}")
+    redeem = visitor.post("/recruiter/redeem", json={"token": token})
     assert redeem.status_code == 200
     assert visitor.cookies.get("wediga_session") is not None
 
@@ -221,15 +230,29 @@ def test_redeem_starts_session_and_records_view(app, admin_client) -> None:
 
 
 def test_redeem_invalid_token_is_404(client) -> None:
-    assert client.post("/recruiter/redeem/not-a-real-token").status_code == 404
+    assert (
+        client.post("/recruiter/redeem", json={"token": "not-a-real-token"}).status_code
+        == 404
+    )
+
+
+def test_redeem_takes_no_token_in_the_path(app, admin_client) -> None:
+    # The access log records every path, so a token there would end up in the
+    # server's logs in plain text.
+    created = admin_client.post("/recruiter/links", json={}).json()
+    visitor = TestClient(app)
+
+    assert visitor.post(f"/recruiter/redeem/{created['token']}").status_code == 404
 
 
 def test_redeem_is_rate_limited(client) -> None:
     # The redeem limiter allows thirty attempts per window per IP; the next one
     # is 429, checked before the token is validated.
     for _ in range(30):
-        client.post("/recruiter/redeem/whatever")
-    assert client.post("/recruiter/redeem/whatever").status_code == 429
+        client.post("/recruiter/redeem", json={"token": "whatever"})
+    assert (
+        client.post("/recruiter/redeem", json={"token": "whatever"}).status_code == 429
+    )
 
 
 def test_redeem_revoked_link_is_410(app, admin_client) -> None:
@@ -239,7 +262,10 @@ def test_redeem_revoked_link_is_410(app, admin_client) -> None:
     assert revoke.json()["active"] is False
 
     visitor = TestClient(app, base_url="https://testserver")
-    assert visitor.post(f"/recruiter/redeem/{created['token']}").status_code == 410
+    assert (
+        visitor.post("/recruiter/redeem", json={"token": created["token"]}).status_code
+        == 410
+    )
 
 
 def test_redeem_expired_link_is_410(app, admin_client) -> None:
@@ -248,7 +274,10 @@ def test_redeem_expired_link_is_410(app, admin_client) -> None:
     assert created["active"] is False
 
     visitor = TestClient(app, base_url="https://testserver")
-    assert visitor.post(f"/recruiter/redeem/{created['token']}").status_code == 410
+    assert (
+        visitor.post("/recruiter/redeem", json={"token": created["token"]}).status_code
+        == 410
+    )
 
 
 # --- session separation and the gate -------------------------------------
@@ -258,7 +287,10 @@ def test_recruiter_session_grants_no_admin_rights(app, admin_client) -> None:
     created = _create_link(admin_client, label="Recruiter only")
 
     visitor = TestClient(app, base_url="https://testserver")
-    assert visitor.post(f"/recruiter/redeem/{created['token']}").status_code == 200
+    assert (
+        visitor.post("/recruiter/redeem", json={"token": created["token"]}).status_code
+        == 200
+    )
 
     # A recruiter session must not reach any admin surface.
     assert visitor.get("/auth/me").status_code == 401
@@ -277,7 +309,10 @@ def test_recruiter_gate_blocks_anonymous_but_admin_passes(client, admin_client) 
 def test_revocation_cuts_an_active_recruiter_session(app, admin_client) -> None:
     created = _create_link(admin_client, label="Cut me")
     visitor = TestClient(app, base_url="https://testserver")
-    assert visitor.post(f"/recruiter/redeem/{created['token']}").status_code == 200
+    assert (
+        visitor.post("/recruiter/redeem", json={"token": created["token"]}).status_code
+        == 200
+    )
     assert visitor.get("/content/projects").status_code == 200
 
     # The admin revokes the link the visitor is currently using.
@@ -295,7 +330,7 @@ def test_revocation_cuts_an_active_recruiter_session(app, admin_client) -> None:
 def test_redeem_keeps_the_link_in_the_session(app, admin_client) -> None:
     created = _create_link(admin_client, label="Session")
     visitor = TestClient(app, base_url="https://testserver")
-    visitor.post(f"/recruiter/redeem/{created['token']}")
+    visitor.post("/recruiter/redeem", json={"token": created["token"]})
 
     access = read_session(visitor)[RecruiterAccess.__tablename__]
     assert access["recruiter_link_id"] == uuid.UUID(created["id"])
@@ -304,7 +339,7 @@ def test_redeem_keeps_the_link_in_the_session(app, admin_client) -> None:
 def test_recruiter_access_ends_after_its_lifetime(app, admin_client) -> None:
     created = _create_link(admin_client, label="Week")
     visitor = TestClient(app, base_url="https://testserver")
-    visitor.post(f"/recruiter/redeem/{created['token']}")
+    visitor.post("/recruiter/redeem", json={"token": created["token"]})
     age(RecruiterAccess.redeemed_at, RECRUITER_ACCESS_LIFETIME - timedelta(minutes=1))
 
     assert visitor.get("/recruiter/session").status_code == 200
@@ -318,9 +353,9 @@ def test_redeeming_again_replaces_the_link(app, admin_client) -> None:
     first = _create_link(admin_client, label="First")
     second = _create_link(admin_client, label="Second")
     visitor = TestClient(app, base_url="https://testserver")
-    visitor.post(f"/recruiter/redeem/{first['token']}")
+    visitor.post("/recruiter/redeem", json={"token": first["token"]})
 
-    assert visitor.post(f"/recruiter/redeem/{second['token']}").is_success
+    assert visitor.post("/recruiter/redeem", json={"token": second["token"]}).is_success
 
     access = read_session(visitor)[RecruiterAccess.__tablename__]
     assert access["recruiter_link_id"] == uuid.UUID(second["id"])
