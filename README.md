@@ -22,7 +22,7 @@ The public landing is a single animated page with my skills and a legal imprint,
 
 - **Next.js 16** (App Router) for the frontend, with a BFF layer so the browser never talks to the backend directly
 - **FastAPI** on **Python 3.12** with **uv** for the backend
-- **PostgreSQL** with **SQLAlchemy** and **Alembic** migrations for storage, signed session cookies for auth
+- **PostgreSQL** with **SQLAlchemy** and **Alembic** migrations for storage, and sessions kept there too, with only a random token in the cookie
 - **Tailwind CSS** and a **Three.js** WebGL hero for the look
 - Container images built and scanned in GitHub Actions, running under rootless **Podman** behind a **Caddy** reverse proxy
 - **authentik** as a self-hosted identity provider on its own subdomain, with its setup kept in a blueprint file. The site does not sign anyone in through it yet
