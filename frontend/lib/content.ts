@@ -5,7 +5,7 @@ import type {
   Contact,
   CvStatus,
   Impressum,
-  Project,
+  PortfolioTile,
   SkillCategory,
 } from "./types";
 
@@ -68,8 +68,8 @@ export function getImpressum(): Promise<Impressum | null> {
   return getJson<Impressum>("/content/impressum");
 }
 
-export async function getProjects(): Promise<Project[]> {
-  return (await getJsonWithSession<Project[]>("/content/projects")) ?? [];
+export async function getPortfolio(): Promise<PortfolioTile[]> {
+  return (await getJsonWithSession<PortfolioTile[]>("/portfolio")) ?? [];
 }
 
 export async function getSkills(): Promise<SkillCategory[]> {

@@ -1,5 +1,7 @@
 // Shared content types, mirroring the backend pydantic schemas.
 
+import type { StatusKey } from "./projectStatus";
+
 // The kinds of link a profile can carry with their labels, the same kinds as
 // ``LinkKind`` in the backend schemas (a backend test compares both).
 export const LINK_LABELS = {
@@ -34,21 +36,6 @@ export interface Impressum {
   email: string;
 }
 
-export interface Project {
-  id: string;
-  name: string;
-  tagline: string | null;
-  problem: string | null;
-  solution: string | null;
-  learning: string | null;
-  tech_stack: string[];
-  demo_link: string | null;
-  github_link: string | null;
-  status: string | null;
-  sort_order: number;
-  visible: boolean;
-}
-
 export interface RecruiterLink {
   id: string;
   label: string | null;
@@ -73,19 +60,65 @@ export interface GithubSync {
   error: string | null;
 }
 
-// A public repo as the last successful sync saw it, read-only in the admin.
-export interface GithubRepo {
+// The texts of a portfolio tile, the same fields as ``TextFieldKey`` in the
+// backend schemas (a backend test compares both).
+export const TEXT_FIELDS = [
+  "name",
+  "description",
+  "problem",
+  "solution",
+  "learning",
+  "ending",
+] as const;
+
+export type TextField = (typeof TEXT_FIELDS)[number];
+
+// A repo always has a name, every other text may be missing.
+export type Texts = Partial<Record<TextField, string>> & { name: string };
+
+export interface ProjectStatus {
   id: string;
-  name: string;
-  description: string | null;
+  key: StatusKey;
+  label: string;
+}
+
+// What the admin sets for a repo. A blank own text means the one from GitHub.
+export interface PortfolioEntryWrite {
+  project_status_id: string;
+  sort_order: number;
+  published: boolean;
+  texts: Partial<Record<TextField, string>>;
+}
+
+export interface PortfolioEntry extends PortfolioEntryWrite {
+  partly_translated: boolean;
+}
+
+// A public repo as the last successful sync saw it, with its entry if any.
+export interface PortfolioRepo {
+  id: string;
+  texts: Texts;
   homepage_url: string | null;
   archived: boolean;
   technologies: string[];
+  entry: PortfolioEntry | null;
 }
 
-export interface GithubOverview {
+export interface PortfolioAdmin {
   last_sync: GithubSync | null;
-  repos: GithubRepo[];
+  statuses: ProjectStatus[];
+  repos: PortfolioRepo[];
+}
+
+// A published repo, each text its own one or else the one from GitHub.
+export interface PortfolioTile {
+  id: string;
+  texts: Texts;
+  status: ProjectStatus;
+  archived: boolean;
+  technologies: string[];
+  demo_url: string | null;
+  github_url: string;
 }
 
 // The CV is a single uploaded PDF, its only state is whether one is present.
