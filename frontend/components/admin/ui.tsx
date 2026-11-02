@@ -1,8 +1,8 @@
-"use client";
-
 // Shared primitives for the admin maintenance pages: input, button, per-action
 // feedback, and the inline destructive confirmation. Dark, drawn from the Sakura
 // tokens in globals.css, without the generative hero accents of the recruiter views.
+// No "use client" here: only client components import this file, so it runs on
+// the client anyway and its function props never cross from the server.
 
 import {
   type ButtonHTMLAttributes,
