@@ -33,7 +33,7 @@ class GithubApiError(RuntimeError):
     """Raised when the GitHub API cannot be read or answers unexpectedly."""
 
 
-def _username() -> str:
+def username() -> str:
     return os.environ.get("GITHUB_USERNAME", DEFAULT_USERNAME) or DEFAULT_USERNAME
 
 
@@ -68,7 +68,7 @@ def _readme(client: httpx2.Client, name: str) -> str:
     """Return the README of a repo as Markdown, empty when it has none."""
     response = _get(
         client,
-        f"/repos/{_username()}/{name}/readme",
+        f"/repos/{username()}/{name}/readme",
         headers={"Accept": README_MEDIA_TYPE},
     )
 
@@ -105,7 +105,7 @@ def _parse(raw: dict, markdown: str) -> SyncedRepo:
 def _page(client: httpx2.Client, page: int) -> list[dict]:
     response = _get(
         client,
-        f"/users/{_username()}/repos",
+        f"/users/{username()}/repos",
         params={"per_page": PER_PAGE, "page": page},
     )
 
