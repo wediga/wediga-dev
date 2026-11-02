@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Hero } from "@/components/hero/Hero";
 import { LandingContent } from "@/components/hero/LandingContent";
-import { getRecruiterSession, getSkills } from "@/lib/content";
+import { getPortraitCrop, getRecruiterSession, getSkills } from "@/lib/content";
 import { INTRO } from "@/components/hero/content";
 
 // The public landing carries only the teaser plus skills; the About story lives
@@ -16,15 +16,17 @@ export const metadata: Metadata = {
 // server-side gate as the recruiter layout, but here it only flips the access
 // door between "log in" and "go to the portfolio".
 export default async function LandingPage() {
-  const [skills, isRecruiter] = await Promise.all([
+  const [skills, isRecruiter, portrait] = await Promise.all([
     getSkills(),
     getRecruiterSession(),
+    getPortraitCrop(),
   ]);
 
   return (
     <Hero
       skills={skills}
       isRecruiter={isRecruiter}
+      portrait={portrait}
       readable={<LandingContent skills={skills} isRecruiter={isRecruiter} />}
     />
   );

@@ -1,3 +1,5 @@
+import { Portrait } from "@/components/Portrait";
+import type { PortraitCrop } from "@/lib/portrait";
 import type { SkillCategory } from "@/lib/types";
 import { INTRO, LANDING, accessLead } from "./content";
 import { AccessButton } from "./LandingContent";
@@ -16,11 +18,13 @@ export function StationsOverlay({
   active,
   skills,
   isRecruiter,
+  portrait,
 }: {
   sectionRefs: React.RefObject<(HTMLDivElement | null)[]>;
   active: number;
   skills: SkillCategory[];
   isRecruiter: boolean;
+  portrait: PortraitCrop | null;
 }) {
   const titleClass = (i: number) =>
     `text-[clamp(2rem,6vh,4.5rem)] font-medium leading-[1.05] tracking-[-0.02em] text-white ${
@@ -52,16 +56,13 @@ export function StationsOverlay({
 
           {kind === "intro" ? (
             <>
-              {/* Plain img: the next/image optimizer is needless for an 88 KB
-                  asset and flaky in dev. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/portrait.jpg"
-                alt="Alexander Wedig"
-                width={56}
-                height={56}
-                className="mx-auto mb-[2vh] h-[clamp(4rem,11vh,8rem)] w-[clamp(4rem,11vh,8rem)] rounded-full object-cover"
-              />
+              {portrait ? (
+                <Portrait
+                  crop={portrait}
+                  alt={INTRO.name}
+                  className="mx-auto mb-[2vh] h-[clamp(4rem,11vh,8rem)] w-[clamp(4rem,11vh,8rem)] rounded-full"
+                />
+              ) : null}
               <h2 key={active === i ? `${i}-on` : `${i}-off`} className={titleClass(i)}>
                 {INTRO.name}
               </h2>
