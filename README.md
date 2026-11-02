@@ -16,7 +16,7 @@ What came out is one site with three faces. The public landing stays minimal, a 
 
 ## What It Does
 
-The public landing is a single animated page with my skills, a legal imprint and a privacy policy that describes what the site actually stores, and nothing beyond that. If a browser can't run the WebGL animation, the page switches to its quiet layout on its own and tells the visitor why, so nobody lands on an empty screen. Invited visitors reach the rest through a personal, revocable link, which opens the portfolio built from my public GitHub repositories, my CV as a downloadable PDF with an inline preview, and my contact details. From the admin area I edit the content, upload the CV and hand out or revoke those links. There I also see what the sync last read from my public GitHub repositories, their topics and the fixed sections of their READMEs included, and decide which of them appear in the portfolio, with which status and with my own texts where the English ones from GitHub shouldn't show. Sessions are cookie-based with CSRF protection and rate limiting on the sensitive routes, and the content, the CV included, lives in a PostgreSQL database so nothing personal ends up in the repo.
+The public landing is a single animated page with my skills, a legal imprint and a privacy policy that describes what the site actually stores, and nothing beyond that. If a browser can't run the WebGL animation, the page switches to its quiet layout on its own and tells the visitor why, so nobody lands on an empty screen. Invited visitors reach the rest through a personal, revocable link, which opens the portfolio built from my public GitHub repositories, my CV as a downloadable PDF with an inline preview, and my contact details. From the admin area I edit the content, upload the CV and my portrait (with a crop I drag and zoom into place) and hand out or revoke those links. There I also see what the sync last read from my public GitHub repositories, their topics and the fixed sections of their READMEs included, and decide which of them appear in the portfolio, with which status and with my own texts where the English ones from GitHub shouldn't show. Sessions are cookie-based with CSRF protection and rate limiting on the sensitive routes, and the content, the CV and the portrait included, lives in a PostgreSQL database so nothing personal ends up in the repo.
 
 ## What I Learned
 
@@ -40,7 +40,7 @@ Running my own identity provider taught me that settings clicked together in an 
 ```
 wediga-dev/
   frontend/         # Next.js app (public, protected and admin views) + BFF route handlers
-  backend/          # FastAPI app: auth, content, CV, recruiter links, GitHub sync, portfolio, migrations
+  backend/          # FastAPI app: auth, content, CV, portrait, recruiter links, GitHub sync, portfolio, migrations
   deploy/           # Dockerfiles, Quadlet units, backup timers, authentik blueprint
   content.example/  # Sample content (in Git)
   content/          # Personal content (NOT in Git)

@@ -8,6 +8,7 @@
 // appearances in their own components. hero-assemble and hero-rise keyframes are
 // in globals.css.
 
+import type { PortraitCrop } from "@/lib/portrait";
 import type { SkillCategory } from "@/lib/types";
 import { useMotionMode } from "@/lib/useMotionMode";
 import { QuietLanding } from "./QuietLanding";
@@ -21,10 +22,12 @@ export function Hero({
   readable,
   skills,
   isRecruiter,
+  portrait,
 }: {
   readable: React.ReactNode;
   skills: SkillCategory[];
   isRecruiter: boolean;
+  portrait: PortraitCrop | null;
 }) {
   // The on-page switch wins over the OS setting. Reduced motion swaps the whole
   // hero for the quiet sun-anchored landing.
@@ -48,6 +51,7 @@ export function Hero({
           canvasRef={canvasRef}
           skills={skills}
           isRecruiter={isRecruiter}
+          portrait={portrait}
           webglFailed={webglFailed}
         />
       ) : (
@@ -76,6 +80,7 @@ export function Hero({
             active={active}
             skills={skills}
             isRecruiter={isRecruiter}
+            portrait={portrait}
           />
 
           {/* Scroll track: one full-viewport snap section per stop (overview,

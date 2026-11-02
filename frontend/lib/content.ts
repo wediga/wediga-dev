@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { backendUrl } from "./backend";
 import { sessionCookieHeader } from "./forwarding";
+import type { PortraitCrop } from "./portrait";
 import type {
   Contact,
   CvStatus,
@@ -70,6 +71,12 @@ export function getImpressum(): Promise<Impressum | null> {
 
 export async function getPortfolio(): Promise<PortfolioTile[]> {
   return (await getJsonWithSession<PortfolioTile[]>("/portfolio")) ?? [];
+}
+
+// The crop of the portrait, or null when none is uploaded and the pages show
+// no portrait.
+export function getPortraitCrop(): Promise<PortraitCrop | null> {
+  return getJson<PortraitCrop>("/portrait/crop");
 }
 
 export async function getSkills(): Promise<SkillCategory[]> {

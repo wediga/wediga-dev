@@ -1,3 +1,5 @@
+import { Portrait } from "@/components/Portrait";
+import type { PortraitCrop } from "@/lib/portrait";
 import type { SkillCategory } from "@/lib/types";
 import { INTRO, LANDING, accessLead } from "./content";
 import { AccessButton } from "./LandingContent";
@@ -13,11 +15,13 @@ export function QuietLanding({
   canvasRef,
   skills,
   isRecruiter,
+  portrait,
   webglFailed,
 }: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   skills: SkillCategory[];
   isRecruiter: boolean;
+  portrait: PortraitCrop | null;
   webglFailed: boolean;
 }) {
   return (
@@ -44,14 +48,13 @@ export function QuietLanding({
             two-track takes over and these reset. */}
         <div className="mx-auto max-w-[34rem] xl:mx-0 xl:w-[34rem] xl:max-w-none xl:text-center">
         <section>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/portrait.jpg"
-            alt="Alexander Wedig"
-            width={64}
-            height={64}
-            className="mb-8 h-28 w-28 rounded-full object-cover sm:h-32 sm:w-32 xl:mx-auto"
-          />
+          {portrait ? (
+            <Portrait
+              crop={portrait}
+              alt={INTRO.name}
+              className="mb-8 h-28 w-28 rounded-full sm:h-32 sm:w-32 xl:mx-auto"
+            />
+          ) : null}
           <h1 className="text-[clamp(2.4rem,4.4vw,4rem)] font-medium leading-[1.02] tracking-[-0.02em] text-ink text-balance">
             {INTRO.name}
           </h1>

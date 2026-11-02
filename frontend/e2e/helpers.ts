@@ -26,3 +26,9 @@ export async function openAdminPage(page: Page, path: string): Promise<void> {
   await page.goto(path);
   await csrf;
 }
+
+// A 1x1 transparent PNG, so the browser can actually render the portrait.
+export const PNG_BYTES = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+  "base64",
+);

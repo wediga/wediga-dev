@@ -17,6 +17,7 @@ from app.auth.dependencies import require_admin
 from app.cv import storage
 from app.errors import not_found
 from app.recruiter.dependencies import require_recruiter_view
+from app.uploads import read_capped
 
 router = APIRouter(prefix="/cv", tags=["cv"])
 
@@ -25,7 +26,6 @@ RECRUITER_READ_DEPS = [Depends(require_recruiter_view)]
 
 # A CV PDF is small; 10 MB caps a hostile upload.
 MAX_PDF_BYTES = 10 * 1024 * 1024
-_CHUNK = 64 * 1024
 PDF_SIGNATURE = b"%PDF-"
 # Neutral name, so no personal data lives in committed code.
 DOWNLOAD_FILENAME = "Lebenslauf.pdf"
@@ -82,7 +82,7 @@ async def upload_cv(file: UploadFile) -> dict[str, bool]:
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="Only application/pdf is accepted",
         )
-    data = await _read_capped(file)
+    data = await read_capped(file, MAX_PDF_BYTES)
     if not data.startswith(PDF_SIGNATURE):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -90,23 +90,3 @@ async def upload_cv(file: UploadFile) -> dict[str, bool]:
         )
     storage.save_cv(data)
     return {"present": True}
-
-
-async def _read_capped(file: UploadFile) -> bytes:
-    """Read the upload in chunks, bailing at the cap so an oversized upload
-    never sits whole in memory.
-    """
-    chunks: list[bytes] = []
-    total = 0
-    while True:
-        chunk = await file.read(_CHUNK)
-        if not chunk:
-            break
-        total += len(chunk)
-        if total > MAX_PDF_BYTES:
-            raise HTTPException(
-                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                detail="The file is too large",
-            )
-        chunks.append(chunk)
-    return b"".join(chunks)
