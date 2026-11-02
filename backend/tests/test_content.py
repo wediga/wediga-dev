@@ -70,6 +70,7 @@ PROFILE = {
     "links": {
         "github": "https://github.com/example",
         "linkedin": "https://linkedin.com/in/example",
+        "website": "https://example.com",
     },
     "address": {"street": "Street 1", "postal_code": "12345", "city": "City"},
 }
