@@ -38,6 +38,10 @@ def _validate_web_link(value: str) -> str:
 LinkKind = Literal["github", "linkedin"]
 LINK_KINDS: tuple[str, ...] = get_args(LinkKind)
 
+# Digits with the usual separators and an optional leading plus, so a stored
+# number can never carry anything else into a tel: link. Empty means none.
+PHONE_PATTERN = r"^(\+?[0-9][0-9 ()/-]*)?$"
+
 ProfileUrl = Annotated[
     str, Field(min_length=1, max_length=MEDIUM), AfterValidator(_validate_web_link)
 ]
@@ -60,6 +64,7 @@ class ContactContent(BaseModel):
 class ProfileContent(ContactContent):
     """The whole profile as the admin edits it."""
 
+    phone: str = Field(default="", max_length=SHORT, pattern=PHONE_PATTERN)
     about_md: str = Field(max_length=TEXT)
     address: ProfileAddress | None = None
 

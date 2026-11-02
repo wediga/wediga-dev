@@ -65,6 +65,7 @@ def admin_client(app):
 PROFILE = {
     "name": "Alexander Wedig",
     "email": "a@example.com",
+    "phone": "+49 151 2345-678",
     "about_md": "# Hi\n\nText",
     "links": {
         "github": "https://github.com/example",
@@ -127,6 +128,23 @@ def test_public_impressum_shows_name_and_email_only(admin_client, client) -> Non
 )
 def test_profile_rejects_bad_links(admin_client, links) -> None:
     body = {**PROFILE, "links": links}
+
+    assert admin_client.put("/content/profile", json=body).status_code == 422
+
+
+def test_profile_without_phone_reads_as_empty(admin_client) -> None:
+    body = {key: value for key, value in PROFILE.items() if key != "phone"}
+
+    assert admin_client.put("/content/profile", json=body).status_code == 200
+    assert admin_client.get("/content/profile").json()["phone"] == ""
+
+
+@pytest.mark.parametrize(
+    "phone",
+    ["javascript:alert(1)", "0151 abc", "+", "++49 151", " 0151", "1" * 201],
+)
+def test_profile_rejects_bad_phone(admin_client, phone) -> None:
+    body = {**PROFILE, "phone": phone}
 
     assert admin_client.put("/content/profile", json=body).status_code == 422
 

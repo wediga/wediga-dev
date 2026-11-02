@@ -121,6 +121,7 @@ def test_profile_takes_over_the_settings(settings_db) -> None:
     assert profile.model_dump() == {
         "name": CONTACT["name"],
         "email": CONTACT["email"],
+        "phone": "",
         "about_md": "# Hi",
         "links": {"github": CONTACT["github"], "linkedin": CONTACT["linkedin"]},
         "address": {"street": "Street 1", "postal_code": "12679", "city": "Berlin"},
