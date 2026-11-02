@@ -6,6 +6,7 @@ import {
   recordString,
   SingleRecordForm,
 } from "@/components/admin/SingleRecordForm";
+import { PortraitEditor } from "@/components/admin/PortraitEditor";
 import { LINK_LABELS, type LinkKind, type ProfileLinks } from "@/lib/types";
 
 type ProfileForm = {
@@ -43,7 +44,7 @@ function asRecord(value: LoadedRecord[string]): LoadedRecord {
   return typeof value === "object" && value !== null ? value : {};
 }
 
-export default function AdminProfilePage() {
+function ProfileRecordForm() {
   return (
     <SingleRecordForm<ProfileForm>
       title="Profile"
@@ -138,5 +139,14 @@ export default function AdminProfilePage() {
         </>
       )}
     </SingleRecordForm>
+  );
+}
+
+export default function AdminProfilePage() {
+  return (
+    <>
+      <ProfileRecordForm />
+      <PortraitEditor />
+    </>
   );
 }
