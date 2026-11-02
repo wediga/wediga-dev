@@ -1,16 +1,21 @@
 """GitHub REST client for the public repos of one account.
 
-Fetches ``GET /users/{username}/repos`` page by page and maps each repo onto
-the mirrored ``github_repo`` fields. The account is ``GITHUB_USERNAME``
-(default ``wediga``) and an optional ``GITHUB_TOKEN`` only lifts the hourly
-rate limit, never logged or written anywhere. Any non-200 or transport failure
-raises ``GithubApiError`` so the caller fails without touching the cache.
+Fetches ``GET /users/{username}/repos`` page by page and the README of each
+repo, and checks every repo where it arrives, so a malformed answer never
+reaches the database. The account is ``GITHUB_USERNAME`` (default ``wediga``)
+and an optional ``GITHUB_TOKEN`` only lifts the hourly rate limit, never logged
+or written anywhere. Any failure raises ``GithubApiError``.
 """
 
 import os
 from http import HTTPStatus
 
 import httpx2
+from pydantic import ValidationError
+
+from app.content.schemas import is_web_link
+from app.github import readme
+from app.github.schemas import SyncedRepo
 
 GITHUB_API_BASE = "https://api.github.com"
 PER_PAGE = 100
@@ -20,9 +25,12 @@ MAX_PAGES = 50
 
 DEFAULT_USERNAME = "wediga"
 
+# Asks the README endpoint for the Markdown itself instead of base64 in JSON.
+README_MEDIA_TYPE = "application/vnd.github.raw+json"
+
 
 class GithubApiError(RuntimeError):
-    """Raised when the GitHub API cannot be read or returns a non-200."""
+    """Raised when the GitHub API cannot be read or answers unexpectedly."""
 
 
 def _username() -> str:
@@ -45,35 +53,80 @@ def _headers() -> dict[str, str]:
     return headers
 
 
-def _map_repo(raw: dict) -> dict:
-    """Map a GitHub repo object onto the mirrored github_repo fields."""
-    return {
+def _get(client: httpx2.Client, path: str, **kwargs) -> httpx2.Response:
+    try:
+        return client.get(path, **kwargs)
+    except httpx2.HTTPError as exc:
+        # Only the error class, not the request internals, so nothing
+        # sensitive leaks into a log, a response or the database.
+        raise GithubApiError(
+            f"request to GitHub failed: {exc.__class__.__name__}"
+        ) from exc
+
+
+def _readme(client: httpx2.Client, name: str) -> str:
+    """Return the README of a repo as Markdown, empty when it has none."""
+    response = _get(
+        client,
+        f"/repos/{_username()}/{name}/readme",
+        headers={"Accept": README_MEDIA_TYPE},
+    )
+
+    if response.status_code == HTTPStatus.NOT_FOUND:
+        return ""
+
+    if response.status_code != HTTPStatus.OK:
+        raise GithubApiError(f"GitHub returned status {response.status_code}")
+
+    return response.text
+
+
+def _parse(raw: dict, markdown: str) -> SyncedRepo:
+    """Turn a GitHub repo object and its README into what the sync stores."""
+    homepage = raw.get("homepage")
+    texts = {
         "name": raw.get("name"),
         "description": raw.get("description"),
-        "language": raw.get("language"),
-        "stars": raw.get("stargazers_count", 0),
-        "url": raw.get("html_url"),
-        "last_push": raw.get("pushed_at"),
+        **readme.sections(markdown),
     }
 
+    return SyncedRepo.model_validate(
+        {
+            "github_id": raw.get("id"),
+            # A homepage that is no web link is never shown, so it is dropped.
+            "homepage_url": homepage if homepage and is_web_link(homepage) else None,
+            "archived": raw.get("archived"),
+            "topics": raw.get("topics"),
+            "texts": {key: text for key, text in texts.items() if text},
+        }
+    )
 
-def _parse_batch(payload) -> list[dict]:
-    """Validate one page payload and map its repos to the mirrored fields.
 
-    Raises ``GithubApiError`` on a malformed page so it never reaches the cache.
-    """
-    if not isinstance(payload, list):
+def _page(client: httpx2.Client, page: int) -> list[dict]:
+    response = _get(
+        client,
+        f"/users/{_username()}/repos",
+        params={"per_page": PER_PAGE, "page": page},
+    )
+
+    if response.status_code != HTTPStatus.OK:
+        raise GithubApiError(f"GitHub returned status {response.status_code}")
+
+    batch = response.json()
+
+    if not isinstance(batch, list) or not all(
+        isinstance(item, dict) and isinstance(item.get("name"), str) and item["name"]
+        for item in batch
+    ):
         raise GithubApiError("unexpected GitHub response shape")
-    for item in payload:
-        if not isinstance(item, dict) or not item.get("name"):
-            raise GithubApiError("unexpected GitHub response shape")
-    return [_map_repo(item) for item in payload]
+
+    return batch
 
 
-def fetch_repos(*, client: httpx2.Client | None = None) -> list[dict]:
-    """Return the account's public repos mapped to the mirrored fields.
+def fetch_repos(*, client: httpx2.Client | None = None) -> list[SyncedRepo]:
+    """Return the account's public repos with their READMEs.
 
-    All pages are fetched before anything returns, so the caller can write them
+    Everything is fetched before anything returns, so the caller can write it
     in one transaction and a failure raises ``GithubApiError`` instead of
     returning a partial list. A ``client`` may be injected for tests.
     """
@@ -83,27 +136,19 @@ def fetch_repos(*, client: httpx2.Client | None = None) -> list[dict]:
             base_url=GITHUB_API_BASE, headers=_headers(), timeout=TIMEOUT
         )
     try:
-        username = _username()
-        repos: list[dict] = []
+        raw_repos: list[dict] = []
+
         for page in range(1, MAX_PAGES + 1):
-            try:
-                response = client.get(
-                    f"/users/{username}/repos",
-                    params={"per_page": PER_PAGE, "page": page},
-                )
-            except httpx2.HTTPError as exc:
-                # Surface only the error class, not the request internals, so
-                # nothing sensitive leaks into a log or response.
-                raise GithubApiError(
-                    f"request to GitHub failed: {exc.__class__.__name__}"
-                ) from exc
-            if response.status_code != HTTPStatus.OK:
-                raise GithubApiError(f"GitHub returned status {response.status_code}")
-            batch = response.json()
-            repos.extend(_parse_batch(batch))
+            batch = _page(client, page)
+            raw_repos.extend(batch)
+
             if len(batch) < PER_PAGE:
                 break
-        return repos
+
+        try:
+            return [_parse(raw, _readme(client, raw["name"])) for raw in raw_repos]
+        except ValidationError:
+            raise GithubApiError("unexpected GitHub response shape") from None
     finally:
         if owns_client:
             client.close()

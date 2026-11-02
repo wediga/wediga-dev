@@ -21,13 +21,16 @@ TOPIC_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
 TOPIC_MAX = 50
 
 
-def _validate_web_link(value: str | None) -> str | None:
-    """Allow only http(s) links, so a stored value never carries a javascript:
+def is_web_link(value: str) -> bool:
+    """Whether a link is http(s), so a stored value never carries a javascript:
     or data: scheme into an href on the rendered pages."""
+    return value.strip().lower().startswith(("http://", "https://"))
+
+
+def _validate_web_link(value: str | None) -> str | None:
     if value is None or value == "":
         return value
-    lowered = value.strip().lower()
-    if not lowered.startswith(("http://", "https://")):
+    if not is_web_link(value):
         raise ValueError("link must start with http:// or https://")
     return value
 

@@ -1,61 +1,56 @@
-"""Pydantic schemas for the GitHub repo layer.
+"""Pydantic schemas for the GitHub layer.
 
-A repo row splits into mirrored fields (from GitHub, overwritten every sync)
-and curation fields (admin-owned, never touched by the sync). The schemas keep
-that split: ``GithubRepoRead`` is the full admin view, ``GithubRepoPublic`` the
-curated recruiter view, ``RepoCurationWrite`` the four curation fields a write
-may change.
+``SyncedRepo`` is one public repo as the client hands it to the sync, checked
+where it arrives from the API. ``GithubOverview`` is what the admin sees of the
+last sync. The texts of a repo are keyed by ``TextFieldKey``, one row each in
+``text_field``.
 """
 
 import uuid
 from datetime import datetime
+from typing import Annotated, Literal, get_args
 
 from pydantic import BaseModel, Field
 
-OVERRIDE_MAX = 500
+from app.content.schemas import TOPIC_MAX, TOPIC_PATTERN
+
+# The texts a portfolio tile shows. Name and description come from the repo,
+# the others from fixed sections of its README.
+TextFieldKey = Literal[
+    "name", "description", "problem", "solution", "learning", "ending"
+]
+TEXT_FIELDS: tuple[str, ...] = get_args(TextFieldKey)
+
+Topic = Annotated[str, Field(pattern=TOPIC_PATTERN, max_length=TOPIC_MAX)]
+
+
+class SyncedRepo(BaseModel):
+    """One public repo with everything the sync stores about it."""
+
+    github_id: int
+    homepage_url: str | None
+    archived: bool
+    topics: list[Topic]
+    texts: dict[TextFieldKey, str]
+
+
+class GithubSyncRead(BaseModel):
+    started_at: datetime
+    finished_at: datetime | None
+    error: str | None
 
 
 class GithubRepoRead(BaseModel):
-    """The full repo row for the admin, mirrored fields plus curation."""
-
     id: uuid.UUID
     name: str
     description: str | None
-    language: str | None
-    stars: int | None
-    url: str | None
-    last_push: datetime | None
-    last_sync: datetime | None
-    visible: bool
-    pinned: bool
-    description_override: str | None
-    sort_order: int
+    homepage_url: str | None
+    archived: bool
+    technologies: list[str]
 
 
-class GithubRepoPublic(BaseModel):
-    """The curated repo as the recruiter view sees it.
+class GithubOverview(BaseModel):
+    """The latest sync, and the repos of the latest one that succeeded."""
 
-    ``description`` is the effective text the repository layer resolves: the
-    admin override when set, else the mirrored GitHub description.
-    """
-
-    name: str
-    description: str | None
-    language: str | None
-    stars: int | None
-    url: str | None
-    last_push: datetime | None
-    pinned: bool
-
-
-class RepoCurationWrite(BaseModel):
-    """The curation fields the admin may set on a repo.
-
-    The mirrored fields are never accepted from a request, so a write cannot
-    spoof the GitHub-sourced data.
-    """
-
-    visible: bool = True
-    pinned: bool = False
-    description_override: str | None = Field(default=None, max_length=OVERRIDE_MAX)
-    sort_order: int = 0
+    last_sync: GithubSyncRead | None
+    repos: list[GithubRepoRead]

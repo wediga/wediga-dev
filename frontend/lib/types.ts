@@ -66,22 +66,26 @@ export interface RecruiterLinkCreated extends RecruiterLink {
   token: string;
 }
 
-// The full repo row for the admin: mirrored GitHub fields plus curation. The
-// mirrored fields are read-only in the UI, only the curation fields are sent
-// back on a write.
+// One run of the GitHub sync. It succeeded when it finished without an error.
+export interface GithubSync {
+  started_at: string;
+  finished_at: string | null;
+  error: string | null;
+}
+
+// A public repo as the last successful sync saw it, read-only in the admin.
 export interface GithubRepo {
   id: string;
   name: string;
   description: string | null;
-  language: string | null;
-  stars: number | null;
-  url: string | null;
-  last_push: string | null;
-  last_sync: string | null;
-  visible: boolean;
-  pinned: boolean;
-  description_override: string | null;
-  sort_order: number;
+  homepage_url: string | null;
+  archived: boolean;
+  technologies: string[];
+}
+
+export interface GithubOverview {
+  last_sync: GithubSync | null;
+  repos: GithubRepo[];
 }
 
 // The CV is a single uploaded PDF, its only state is whether one is present.

@@ -1,104 +1,210 @@
-"""Read and write functions for the ``github_repo`` table.
+"""Read and write functions for the tables of the GitHub sync.
 
-The invariant: the sync upsert writes only the mirrored fields, never the
-curation. The ``ON CONFLICT`` update lists only description, language, stars,
-url, last push and last sync, so an existing row's visible, pinned,
-description override and sort order survive every sync. A new row takes the
-schema's curation defaults. Every query goes through SQLAlchemy with bound
-parameters, no SQL is built from input.
+Only the sync writes them. A run is saved as soon as it starts, so a failed or
+broken run stays visible, and a successful run writes every repo with its
+texts and topics in one transaction. A missing text field is added on the
+way, and a topic without a technology gets one named like the topic, an
+existing technology is never changed. Every query
+goes through SQLAlchemy with bound parameters, no SQL is built from input.
 """
 
 import uuid
+from collections import defaultdict
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import Session
 
+from app.content.models import Technology
 from app.db.connection import get_session
-from app.github.models import GithubRepo
-from app.github.schemas import RepoCurationWrite
+from app.github.models import (
+    GithubRepo,
+    GithubRepoTechnology,
+    GithubRepoText,
+    GithubSync,
+    TextField,
+)
+from app.github.schemas import TEXT_FIELDS, SyncedRepo, TextFieldKey
 
-# Mirrored columns only; the curation columns (visible, pinned,
-# description_override, sort_order) are deliberately absent.
-_MIRRORED = ("description", "language", "stars", "url", "last_push", "last_sync")
+# The columns of a repo that a later run overwrites.
+_SYNCED_COLUMNS = ("homepage_url", "archived", "last_seen_sync_id")
+
+# The texts the admin list shows of each repo.
+_LISTED_TEXTS: tuple[TextFieldKey, ...] = ("name", "description")
 
 
-def upsert_repos(repos: list[dict], synced_at: datetime) -> int:
-    """Upsert the mirrored fields of each repo in one transaction.
-
-    The batch commits once, so either all rows land or none do. Curation is
-    never part of the write.
-    """
+def start_run(started_at: datetime) -> uuid.UUID:
     with get_session() as session:
-        for repo in repos:
-            statement = insert(GithubRepo).values(**repo, last_sync=synced_at)
-            session.execute(
-                statement.on_conflict_do_update(
-                    index_elements=[GithubRepo.name],
-                    set_={column: statement.excluded[column] for column in _MIRRORED},
-                )
-            )
+        run = GithubSync(started_at=started_at)
+        session.add(run)
         session.commit()
 
-    return len(repos)
+        return run.id
 
 
-# Pinned first, then manual sort order, then name as a stable tie-breaker. One
-# ordering serves both the admin and the curated recruiter list.
-_ORDER = (GithubRepo.pinned.desc(), GithubRepo.sort_order, GithubRepo.name)
-
-
-def list_all() -> list[dict]:
-    """Return every repo with all fields, for the admin view."""
+def fail_run(run_id: uuid.UUID, error: str, finished_at: datetime) -> None:
     with get_session() as session:
-        repos = session.scalars(select(GithubRepo).order_by(*_ORDER))
-
-        return [repo.as_dict() for repo in repos]
-
-
-def list_curated() -> list[dict]:
-    """Return the visible repos for the recruiter view, pinned first.
-
-    ``description`` resolves to the admin override when set, else the mirrored
-    GitHub description, so the view stays simple.
-    """
-    query = (
-        select(
-            GithubRepo.name,
-            func.coalesce(
-                func.nullif(GithubRepo.description_override, ""),
-                GithubRepo.description,
-            ).label("description"),
-            GithubRepo.language,
-            GithubRepo.stars,
-            GithubRepo.url,
-            GithubRepo.last_push,
-            GithubRepo.pinned,
+        session.execute(
+            update(GithubSync)
+            .where(GithubSync.id == run_id)
+            .values(finished_at=finished_at, error=error)
         )
-        .where(GithubRepo.visible)
-        .order_by(*_ORDER)
+        session.commit()
+
+
+def _field_ids(session: Session) -> dict[str, uuid.UUID]:
+    session.execute(
+        insert(TextField)
+        .values([{"key": key} for key in TEXT_FIELDS])
+        .on_conflict_do_nothing(index_elements=[TextField.key])
     )
 
-    with get_session() as session:
-        return [dict(row) for row in session.execute(query).mappings()]
+    return dict(session.execute(select(TextField.key, TextField.id)).all())
 
 
-def update_curation(repo_id: uuid.UUID, data: RepoCurationWrite) -> dict | None:
-    """Set the four curation fields of one repo; return it or ``None``.
+def _technology_ids(session: Session, repos: list[SyncedRepo]) -> dict[str, uuid.UUID]:
+    topics = {topic for repo in repos for topic in repo.topics}
 
-    Only the curation columns are written, leaving the mirrored fields as the
-    last sync set them.
+    if not topics:
+        return {}
+
+    session.execute(
+        insert(Technology)
+        .values([{"topic": topic, "name": topic} for topic in topics])
+        .on_conflict_do_nothing(index_elements=[Technology.topic])
+    )
+
+    return dict(
+        session.execute(
+            select(Technology.topic, Technology.id).where(Technology.topic.in_(topics))
+        ).all()
+    )
+
+
+def _save_repo(
+    session: Session,
+    repo: SyncedRepo,
+    run_id: uuid.UUID,
+    field_ids: dict[str, uuid.UUID],
+    technology_ids: dict[str, uuid.UUID],
+) -> None:
+    """Write one repo by its GitHub id and replace its texts and topics."""
+    statement = insert(GithubRepo).values(
+        github_id=repo.github_id,
+        homepage_url=repo.homepage_url,
+        archived=repo.archived,
+        last_seen_sync_id=run_id,
+    )
+    repo_id = session.execute(
+        statement.on_conflict_do_update(
+            index_elements=[GithubRepo.github_id],
+            set_={column: statement.excluded[column] for column in _SYNCED_COLUMNS},
+        ).returning(GithubRepo.id)
+    ).scalar_one()
+    session.execute(
+        delete(GithubRepoText).where(GithubRepoText.github_repo_id == repo_id)
+    )
+    session.execute(
+        delete(GithubRepoTechnology).where(
+            GithubRepoTechnology.github_repo_id == repo_id
+        )
+    )
+    session.add_all(
+        GithubRepoText(
+            github_repo_id=repo_id, text_field_id=field_ids[key], value=value
+        )
+        for key, value in repo.texts.items()
+    )
+    session.add_all(
+        GithubRepoTechnology(
+            github_repo_id=repo_id, technology_id=technology_ids[topic]
+        )
+        for topic in repo.topics
+    )
+
+
+def finish_run(
+    run_id: uuid.UUID, repos: list[SyncedRepo], finished_at: datetime
+) -> None:
+    """Write the repos of a successful run and mark it finished.
+
+    Afterwards only the finished runs that some repo was last seen in are
+    kept, besides this one, because nothing else reads them.
     """
     with get_session() as session:
-        repo = session.get(GithubRepo, repo_id)
+        field_ids = _field_ids(session)
+        technology_ids = _technology_ids(session, repos)
 
-        if repo is None:
-            return None
+        for repo in repos:
+            _save_repo(session, repo, run_id, field_ids, technology_ids)
 
-        repo.visible = data.visible
-        repo.pinned = data.pinned
-        repo.description_override = data.description_override
-        repo.sort_order = data.sort_order
+        session.execute(
+            update(GithubSync)
+            .where(GithubSync.id == run_id)
+            .values(finished_at=finished_at)
+        )
+        session.execute(
+            delete(GithubSync).where(
+                GithubSync.id != run_id,
+                GithubSync.finished_at.is_not(None),
+                GithubSync.id.not_in(select(GithubRepo.last_seen_sync_id)),
+            )
+        )
         session.commit()
 
-        return repo.as_dict()
+
+def _repos_seen_in(session: Session, run_id: uuid.UUID) -> list[dict]:
+    """Return the repos of one run with their name, description and topics."""
+    seen = GithubRepo.last_seen_sync_id == run_id
+    repos = session.scalars(select(GithubRepo).where(seen)).all()
+    texts: dict[uuid.UUID, dict[str, str]] = defaultdict(dict)
+    technologies: dict[uuid.UUID, list[str]] = defaultdict(list)
+
+    for repo_id, key, value in session.execute(
+        select(GithubRepoText.github_repo_id, TextField.key, GithubRepoText.value)
+        .join(TextField)
+        .join(GithubRepo)
+        .where(seen, TextField.key.in_(_LISTED_TEXTS))
+    ):
+        texts[repo_id][key] = value
+
+    for repo_id, name in session.execute(
+        select(GithubRepoTechnology.github_repo_id, Technology.name)
+        .join(Technology)
+        .join(GithubRepo)
+        .where(seen)
+        .order_by(Technology.name)
+    ):
+        technologies[repo_id].append(name)
+
+    listed = [
+        {
+            **repo.as_dict(),
+            "name": texts[repo.id]["name"],
+            "description": texts[repo.id].get("description"),
+            "technologies": technologies[repo.id],
+        }
+        for repo in repos
+    ]
+
+    return sorted(listed, key=lambda repo: repo["name"].lower())
+
+
+def overview() -> dict:
+    """Return the latest run, and the repos of the latest successful one."""
+    newest_first = GithubSync.started_at.desc()
+
+    with get_session() as session:
+        last = session.scalar(select(GithubSync).order_by(newest_first).limit(1))
+        succeeded = session.scalar(
+            select(GithubSync.id)
+            .where(GithubSync.finished_at.is_not(None), GithubSync.error.is_(None))
+            .order_by(newest_first)
+            .limit(1)
+        )
+
+        return {
+            "last_sync": last.as_dict() if last else None,
+            "repos": _repos_seen_in(session, succeeded) if succeeded else [],
+        }
