@@ -1,12 +1,16 @@
 import { getContact } from "@/lib/content";
+import { LINK_LABELS, type LinkKind } from "@/lib/types";
 import { safeHref } from "@/lib/url";
 import { ACCENT_LINK } from "@/components/site/SiteChrome";
 
 export default async function ContactPage() {
   const contact = await getContact();
+  // Name and email take the first two reveal steps, the links follow in order.
+  const links = (Object.keys(LINK_LABELS) as LinkKind[]).flatMap((kind) => {
+    const href = safeHref(contact?.links[kind]);
 
-  const github = safeHref(contact?.github);
-  const linkedin = safeHref(contact?.linkedin);
+    return href ? [{ kind, href }] : [];
+  });
 
   return (
     <div>
@@ -30,20 +34,13 @@ export default async function ContactPage() {
               {contact.email}
             </a>
           </Field>
-          {github ? (
-            <Field label="GitHub" reveal={3}>
-              <a href={github} className={ACCENT_LINK} rel="noreferrer noopener">
-                {contact.github}
+          {links.map((link, index) => (
+            <Field key={link.kind} label={LINK_LABELS[link.kind]} reveal={3 + index}>
+              <a href={link.href} className={ACCENT_LINK} rel="noreferrer noopener">
+                {link.href}
               </a>
             </Field>
-          ) : null}
-          {linkedin ? (
-            <Field label="LinkedIn" reveal={4}>
-              <a href={linkedin} className={ACCENT_LINK} rel="noreferrer noopener">
-                {contact.linkedin}
-              </a>
-            </Field>
-          ) : null}
+          ))}
         </dl>
       ) : (
         <div

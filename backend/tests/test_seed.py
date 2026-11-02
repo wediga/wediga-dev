@@ -2,7 +2,14 @@
 
 from sqlalchemy import func, select
 
-from app.content.models import Project, SiteSetting, Skill, SkillCategory
+from app.content.models import (
+    PostalAddress,
+    Profile,
+    ProfileLink,
+    Project,
+    Skill,
+    SkillCategory,
+)
 from app.db.connection import get_session
 from app.db.seed import run_seed
 
@@ -12,7 +19,9 @@ def _counts() -> dict[str, int]:
         "projects": select(func.count()).select_from(Project),
         "categories": select(func.count()).select_from(SkillCategory),
         "skills": select(func.count()).select_from(Skill),
-        "about": select(func.count()).where(SiteSetting.key == "about_text"),
+        "profiles": select(func.count()).select_from(Profile),
+        "links": select(func.count()).select_from(ProfileLink),
+        "addresses": select(func.count()).select_from(PostalAddress),
     }
 
     with get_session() as session:
@@ -27,7 +36,9 @@ def test_seed_loads_content(migrated_db) -> None:
     counts = _counts()
     assert counts["projects"] == 1
     assert counts["categories"] == 2
-    assert counts["about"] == 1
+    assert counts["profiles"] == 1
+    assert counts["links"] == 2
+    assert counts["addresses"] == 1
     assert counts["skills"] > 0
 
 

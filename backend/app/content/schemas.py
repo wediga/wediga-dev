@@ -1,12 +1,13 @@
-"""Pydantic schemas for the five content types.
+"""Pydantic schemas for the profile, projects and skills.
 
 The write models carry length limits so oversized input is rejected before it
 touches the database.
 """
 
 import uuid
+from typing import Annotated, Literal, get_args
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AfterValidator, BaseModel, Field, field_validator
 
 # Bounded limits so a write can never store an unbounded blob.
 SHORT = 200
@@ -26,38 +27,41 @@ def _validate_web_link(value: str | None) -> str | None:
     return value
 
 
-class AboutContent(BaseModel):
-    """The About markdown text held under the ``about_text`` setting."""
+# The kinds of link a profile can carry, one row each in ``link_kind``.
+LinkKind = Literal["github", "linkedin"]
+LINK_KINDS: tuple[str, ...] = get_args(LinkKind)
 
-    text: str = Field(max_length=TEXT)
-
-
-class ContactContent(BaseModel):
-    """Contact details held as a JSON object under the ``contact`` setting."""
-
-    name: str = Field(max_length=SHORT)
-    email: str = Field(max_length=SHORT)
-    github: str | None = Field(default=None, max_length=MEDIUM)
-    linkedin: str | None = Field(default=None, max_length=MEDIUM)
-
-    _check_links = field_validator("github", "linkedin")(_validate_web_link)
+ProfileUrl = Annotated[
+    str, Field(min_length=1, max_length=MEDIUM), AfterValidator(_validate_web_link)
+]
 
 
-class ImpressumAddress(BaseModel):
+class ProfileAddress(BaseModel):
     street: str = Field(max_length=SHORT)
+    postal_code: str = Field(max_length=SHORT)
     city: str = Field(max_length=SHORT)
 
 
-class ImpressumContent(BaseModel):
-    """Legal notice held as a JSON object under the ``impressum`` setting."""
+class ContactContent(BaseModel):
+    """The contact view on the profile: name, email and links."""
 
     name: str = Field(max_length=SHORT)
     email: str = Field(max_length=SHORT)
-    github: str | None = Field(default=None, max_length=MEDIUM)
-    linkedin: str | None = Field(default=None, max_length=MEDIUM)
-    address: ImpressumAddress | None = None
+    links: dict[LinkKind, ProfileUrl] = Field(default_factory=dict)
 
-    _check_links = field_validator("github", "linkedin")(_validate_web_link)
+
+class ProfileContent(ContactContent):
+    """The whole profile as the admin edits it."""
+
+    about_md: str = Field(max_length=TEXT)
+    address: ProfileAddress | None = None
+
+
+class ImpressumContent(BaseModel):
+    """The public impressum: only name and email, never the address."""
+
+    name: str
+    email: str
 
 
 class ProjectWrite(BaseModel):

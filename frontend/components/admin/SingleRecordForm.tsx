@@ -1,19 +1,12 @@
-"use client";
-
-// Shared scaffold for the single-record content pages (about, contact,
-// impressum): load on mount, edit in place, save with one primary write, delete
-// behind an inline confirmation. The fields, endpoint, and messages differ per
-// page, so they are passed as config and the fields render through a children prop.
+// Scaffold for a single-record content page: load on mount, edit in place and
+// save with one write. The fields, endpoint and messages are passed as config
+// and the fields render through a children prop. It has no "use client" of its
+// own because it takes functions as props and only runs inside client pages.
 
 import { type ReactNode, useEffect, useState } from "react";
 import { apiWrite } from "@/lib/adminClient";
 import { useCsrf } from "@/components/admin/useCsrf";
-import {
-  AdminButton,
-  ConfirmButton,
-  Feedback,
-  useActionFeedback,
-} from "@/components/admin/ui";
+import { AdminButton, Feedback, useActionFeedback } from "@/components/admin/ui";
 
 // The single-record endpoints return free-form nested JSON whose shape each page
 // knows, so it is read loosely and the page's fromResponse picks what it needs.
@@ -35,9 +28,6 @@ type SingleRecordFormProps<T> = {
   fromResponse: (data: LoadedRecord) => T;
   toBody: (value: T) => unknown;
   loadError: string;
-  deletePrompt: string;
-  // Footer spacing differs per page (about uses mt-4, the two-column forms mt-5).
-  actionsClassName?: string;
   children: (
     form: T,
     update: <K extends keyof T>(key: K, value: T[K]) => void,
@@ -52,8 +42,6 @@ export function SingleRecordForm<T>({
   fromResponse,
   toBody,
   loadError,
-  deletePrompt,
-  actionsClassName = "mt-5",
   children,
 }: SingleRecordFormProps<T>) {
   const token = useCsrf();
@@ -85,17 +73,6 @@ export function SingleRecordForm<T>({
       { success: "Saved", error: "Couldn't save. Try again." },
     );
 
-  const remove = () =>
-    run(
-      "delete",
-      async () => {
-        const response = await apiWrite(endpoint, "DELETE", token);
-        if (response.ok) setForm(empty);
-        return response.ok;
-      },
-      { success: "Deleted", error: "Couldn't delete. Try again." },
-    );
-
   return (
     <div>
       <h1 className="text-xl font-semibold text-ink">{title}</h1>
@@ -108,7 +85,7 @@ export function SingleRecordForm<T>({
 
       {children(form, update)}
 
-      <div className={`${actionsClassName} flex flex-wrap items-center gap-3`}>
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         <AdminButton
           variant="primary"
           pending={get("save").state === "pending"}
@@ -117,15 +94,7 @@ export function SingleRecordForm<T>({
         >
           Save
         </AdminButton>
-        <ConfirmButton
-          label="Delete"
-          prompt={deletePrompt}
-          pendingLabel="Deleting…"
-          pending={get("delete").state === "pending"}
-          onConfirm={remove}
-        />
         <Feedback status={get("save")} />
-        <Feedback status={get("delete")} />
       </div>
     </div>
   );

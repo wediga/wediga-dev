@@ -1,27 +1,37 @@
 // Shared content types, mirroring the backend pydantic schemas.
 
-export interface About {
-  text: string;
-}
+// The kinds of link a profile can carry with their labels, the same kinds as
+// ``LinkKind`` in the backend schemas (a backend test compares both).
+export const LINK_LABELS = {
+  github: "GitHub",
+  linkedin: "LinkedIn",
+} as const;
+
+export type LinkKind = keyof typeof LINK_LABELS;
+
+export type ProfileLinks = Partial<Record<LinkKind, string>>;
 
 export interface Contact {
   name: string;
   email: string;
-  github: string | null;
-  linkedin: string | null;
+  links: ProfileLinks;
 }
 
-export interface ImpressumAddress {
+export interface ProfileAddress {
   street: string;
+  postal_code: string;
   city: string;
 }
 
+export interface Profile extends Contact {
+  about_md: string;
+  address: ProfileAddress | null;
+}
+
+// The public impressum carries only name and email.
 export interface Impressum {
   name: string;
   email: string;
-  github: string | null;
-  linkedin: string | null;
-  address: ImpressumAddress | null;
 }
 
 export interface Project {

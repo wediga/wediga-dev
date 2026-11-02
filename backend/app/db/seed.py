@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.content import repository
 from app.content.models import Project, Skill, SkillCategory
+from app.content.schemas import ProfileContent
 from app.db.connection import get_session
 from app.paths import content_dir
 
@@ -40,17 +41,11 @@ def _require(path: Path) -> Path:
     return path
 
 
-def _seed_about(session: Session, base: Path) -> int:
-    path = _require(base / "about.md")
-    text = path.read_text(encoding="utf-8")
-    repository.set_setting(session, "about_text", text)
-    return 1
+def _seed_profile(session: Session, base: Path) -> int:
+    data = json.loads(_require(base / "profile.json").read_text(encoding="utf-8"))
+    about = _require(base / "about.md").read_text(encoding="utf-8")
+    repository.save_profile(session, ProfileContent(**data, about_md=about))
 
-
-def _seed_setting_json(session: Session, base: Path, filename: str, key: str) -> int:
-    path = _require(base / filename)
-    data = json.loads(path.read_text(encoding="utf-8"))
-    repository.set_setting(session, key, data)
     return 1
 
 
@@ -128,13 +123,7 @@ def run_seed() -> dict[str, int]:
     summary: dict[str, int] = {}
 
     with get_session() as session:
-        summary["about"] = _seed_about(session, base)
-        summary["contact"] = _seed_setting_json(
-            session, base, "contact.json", "contact"
-        )
-        summary["impressum"] = _seed_setting_json(
-            session, base, "impressum.json", "impressum"
-        )
+        summary["profile"] = _seed_profile(session, base)
         summary["projects"] = _seed_projects(session, base)
         categories, skills = _seed_skills(session, base)
         summary["skill_categories"] = categories
