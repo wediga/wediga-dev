@@ -1,7 +1,7 @@
 """Tests for the content CRUD layer.
 
 Cover the profile with its two views, create, read, update and delete for
-projects and skills, the public reads that need no session, the 401 when a
+projects, technologies and skills, the public reads that need no session, the 401 when a
 write has no session and the 403 when a write has a session but no valid CSRF
 token. The client uses an
 https base URL so the Secure session cookie round-trips.
@@ -12,6 +12,11 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
+
+from app.content.models import Skill, Technology
+from app.content.schemas import TOPIC_MAX
+from app.db.connection import get_session
 
 ADMIN_PASSWORD = "correct horse battery staple"
 
@@ -155,54 +160,148 @@ def test_project_crud_and_visibility(admin_client) -> None:
     assert admin_client.delete(f"/content/projects/{project_id}").status_code == 404
 
 
-# --- skills --------------------------------------------------------------
+# --- skills and technologies ---------------------------------------------
 
 
-def test_skills_crud(admin_client) -> None:
-    category = admin_client.post(
-        "/content/skills/categories", json={"name": "Languages"}
+def _category(admin_client, name: str) -> str:
+    response = admin_client.post("/content/skills/categories", json={"name": name})
+    assert response.status_code == 201
+
+    return response.json()["id"]
+
+
+def _technology(admin_client, **body) -> dict:
+    response = admin_client.post("/content/technologies", json=body)
+    assert response.status_code == 201
+
+    return response.json()
+
+
+def _skill_names(client) -> dict[str, list[str]]:
+    return {
+        category["name"]: [skill["name"] for skill in category["skills"]]
+        for category in client.get("/content/skills").json()
+    }
+
+
+def test_skills_show_the_name_of_their_technology(admin_client) -> None:
+    category_id = _category(admin_client, "Languages")
+    python = _technology(
+        admin_client, topic="python", name="Python", skill_category_id=category_id
     )
-    assert category.status_code == 201
-    category_id = category.json()["id"]
+    assert _skill_names(admin_client) == {"Languages": ["Python"]}
 
-    skill = admin_client.post(
-        f"/content/skills/categories/{category_id}/skills", json={"name": "Python"}
+    renamed = admin_client.put(
+        f"/content/technologies/{python['id']}",
+        json={"topic": "python", "name": "Python 3", "skill_category_id": category_id},
     )
-    assert skill.status_code == 201
-    skill_id = skill.json()["id"]
+    assert renamed.status_code == 200
+    assert _skill_names(admin_client) == {"Languages": ["Python 3"]}
 
-    skills = admin_client.get("/content/skills").json()
-    assert skills[0]["name"] == "Languages"
-    assert skills[0]["skills"][0]["name"] == "Python"
 
-    assert (
-        admin_client.put(
-            f"/content/skills/{skill_id}", json={"name": "Python 3"}
-        ).status_code
-        == 200
+def test_technology_without_category_is_no_skill(admin_client) -> None:
+    _category(admin_client, "Languages")
+    _technology(admin_client, topic="fastapi", name="FastAPI")
+
+    assert _skill_names(admin_client) == {"Languages": []}
+    assert admin_client.get("/content/technologies").json()[0]["sort_order"] is None
+
+
+def test_technology_moves_to_the_end_of_another_category(admin_client) -> None:
+    languages = _category(admin_client, "Languages")
+    tools = _category(admin_client, "Tools")
+    _technology(admin_client, topic="git", name="Git", skill_category_id=tools)
+    python = _technology(
+        admin_client, topic="python", name="Python", skill_category_id=languages
     )
-    assert (
-        admin_client.put(
-            f"/content/skills/categories/{category_id}", json={"name": "Langs"}
-        ).status_code
-        == 200
+
+    moved = admin_client.put(
+        f"/content/technologies/{python['id']}",
+        json={"topic": "python", "name": "Python", "skill_category_id": tools},
     )
 
-    assert admin_client.delete(f"/content/skills/{skill_id}").status_code == 200
+    assert moved.json()["sort_order"] == 1
+    assert _skill_names(admin_client) == {"Languages": [], "Tools": ["Git", "Python"]}
+
+
+def test_technology_stands_in_at_most_one_category(admin_client) -> None:
+    languages = _category(admin_client, "Languages")
+    tools = _category(admin_client, "Tools")
+    python = _technology(
+        admin_client, topic="python", name="Python", skill_category_id=languages
+    )
+
+    with get_session() as session, pytest.raises(IntegrityError):
+        session.add(
+            Skill(
+                skill_category_id=uuid.UUID(tools),
+                technology_id=uuid.UUID(python["id"]),
+            )
+        )
+        session.commit()
+
+
+def test_deleting_a_category_keeps_its_technologies(admin_client) -> None:
+    category_id = _category(admin_client, "Languages")
+    _technology(
+        admin_client, topic="python", name="Python", skill_category_id=category_id
+    )
+
     assert (
         admin_client.delete(f"/content/skills/categories/{category_id}").status_code
         == 200
     )
     assert admin_client.get("/content/skills").json() == []
+    assert [
+        (technology["name"], technology["skill_category_id"])
+        for technology in admin_client.get("/content/technologies").json()
+    ] == [("Python", None)]
 
 
-def test_create_skill_in_missing_category_is_404(admin_client) -> None:
-    assert (
-        admin_client.post(
-            f"/content/skills/categories/{uuid.uuid4()}/skills", json={"name": "X"}
-        ).status_code
-        == 404
+def test_deleting_a_technology_removes_its_skill(admin_client) -> None:
+    category_id = _category(admin_client, "Languages")
+    python = _technology(
+        admin_client, topic="python", name="Python", skill_category_id=category_id
     )
+
+    assert (
+        admin_client.delete(f"/content/technologies/{python['id']}").status_code == 200
+    )
+    assert _skill_names(admin_client) == {"Languages": []}
+    assert (
+        admin_client.delete(f"/content/technologies/{python['id']}").status_code == 404
+    )
+
+
+def test_duplicate_topic_is_409(admin_client) -> None:
+    _technology(admin_client, topic="python", name="Python")
+
+    response = admin_client.post(
+        "/content/technologies", json={"topic": "python", "name": "Python 3"}
+    )
+    assert response.status_code == 409
+
+
+def test_technology_in_missing_category_is_409(admin_client) -> None:
+    response = admin_client.post(
+        "/content/technologies",
+        json={
+            "topic": "python",
+            "name": "Python",
+            "skill_category_id": str(uuid.uuid4()),
+        },
+    )
+    assert response.status_code == 409
+
+
+@pytest.mark.parametrize(
+    "topic", ["", "Python", "tailwind css", "-python", "a" * (TOPIC_MAX + 1)]
+)
+def test_topic_follows_the_github_rules(admin_client, topic) -> None:
+    response = admin_client.post(
+        "/content/technologies", json={"topic": topic, "name": "X"}
+    )
+    assert response.status_code == 422
 
 
 def test_duplicate_project_name_is_409(admin_client) -> None:
@@ -248,6 +347,24 @@ def test_writes_without_csrf_are_403(session_client) -> None:
 def test_writes_with_wrong_csrf_are_403(session_client) -> None:
     session_client.headers.update({"X-CSRF-Token": "not-the-real-token"})
     assert session_client.put("/content/profile", json=PROFILE).status_code == 403
+
+
+def test_technology_with_a_derived_long_topic_still_loads(admin_client) -> None:
+    # The migration derives topics from names without the limits of a write.
+    topic = "a" * (TOPIC_MAX + 1)
+
+    with get_session() as session:
+        session.add(Technology(topic=topic, name="Long"))
+        session.commit()
+
+    response = admin_client.get("/content/technologies")
+
+    assert response.status_code == 200
+    assert response.json()[0]["topic"] == topic
+
+
+def test_technologies_read_needs_session(client) -> None:
+    assert client.get("/content/technologies").status_code == 401
 
 
 def test_admin_projects_read_needs_session(client) -> None:

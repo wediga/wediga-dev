@@ -1,4 +1,4 @@
-"""Pydantic schemas for the profile, projects and skills.
+"""Pydantic schemas for the profile, projects, technologies and skills.
 
 The write models carry length limits so oversized input is rejected before it
 touches the database.
@@ -14,6 +14,11 @@ SHORT = 200
 MEDIUM = 500
 LONG = 5000
 TEXT = 50000
+
+# A topic as GitHub allows it: lowercase letters, digits and hyphens, starting
+# with a letter or digit, at most 50 characters.
+TOPIC_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
+TOPIC_MAX = 50
 
 
 def _validate_web_link(value: str | None) -> str | None:
@@ -104,6 +109,19 @@ class SkillCategoryRead(BaseModel):
     skills: list[SkillRead] = Field(default_factory=list)
 
 
-class SkillWrite(BaseModel):
+class TechnologyWrite(BaseModel):
+    topic: str = Field(max_length=TOPIC_MAX, pattern=TOPIC_PATTERN)
     name: str = Field(min_length=1, max_length=SHORT)
-    sort_order: int = 0
+    # Without a category the technology is no skill.
+    skill_category_id: uuid.UUID | None = None
+
+
+class TechnologyRead(BaseModel):
+    """Without the checks of the write, so a topic the migration derived from
+    a long name still loads and can be corrected."""
+
+    id: uuid.UUID
+    topic: str
+    name: str
+    skill_category_id: uuid.UUID | None
+    sort_order: int | None

@@ -1,8 +1,9 @@
 {
   "Languages & Frameworks": [
-    "Python (FastAPI, Scikit-learn)"
+    {"name": "Python (FastAPI, Scikit-learn)", "topic": "python"}
   ],
   "Tools & Deployment": [
-    "Docker", "Git"
+    {"name": "Docker", "topic": "docker"},
+    {"name": "Git", "topic": "git"}
   ]
 }

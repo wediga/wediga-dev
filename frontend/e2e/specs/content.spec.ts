@@ -14,18 +14,22 @@ test("a new skill in the admin appears on the public landing page", async ({
   await openAdminPage(page, "/admin/skills");
   await expect(page.getByRole("heading", { name: "Skills" })).toBeVisible();
 
-  // Add a uniquely-marked skill to the first seeded category and wait for the
-  // write to land, so the public read below cannot race ahead of the commit.
-  const marker = `E2E skill marker ${Date.now()}`;
-  await page.getByPlaceholder("New skill").first().fill(marker);
+  // Add a uniquely-marked technology to the first seeded category and wait for
+  // the write to land, so the public read below cannot race ahead of the commit.
+  const stamp = Date.now();
+  const marker = `E2E skill marker ${stamp}`;
+  await page.getByLabel("New technology name").first().fill(marker);
+  await page
+    .getByLabel("New technology topic")
+    .first()
+    .fill(`e2e-marker-${stamp}`);
   const written = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
-      response.url().includes("/api/content/skills/categories/") &&
-      response.url().endsWith("/skills") &&
+      response.url().endsWith("/api/content/technologies") &&
       response.ok(),
   );
-  await page.getByRole("button", { name: "Add skill" }).first().click();
+  await page.getByRole("button", { name: "Add technology" }).first().click();
   await written;
 
   // The public landing page reads skills without a session and must show it.

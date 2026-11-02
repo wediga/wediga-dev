@@ -22,8 +22,8 @@ from app.content.schemas import (
     ProjectWrite,
     SkillCategoryRead,
     SkillCategoryWrite,
-    SkillRead,
-    SkillWrite,
+    TechnologyRead,
+    TechnologyWrite,
 )
 from app.errors import not_found
 from app.recruiter.dependencies import require_recruiter_view
@@ -166,29 +166,45 @@ def delete_category(category_id: uuid.UUID) -> dict[str, bool]:
     return {"ok": True}
 
 
+# --- technologies --------------------------------------------------------
+
+
+@router.get(
+    "/technologies",
+    response_model=list[TechnologyRead],
+    dependencies=[Depends(require_admin)],
+)
+def read_technologies() -> list[dict]:
+    return repo.list_technologies()
+
+
 @router.post(
-    "/skills/categories/{category_id}/skills",
-    response_model=SkillRead,
+    "/technologies",
+    response_model=TechnologyRead,
     status_code=status.HTTP_201_CREATED,
     dependencies=WRITE_DEPS,
 )
-def create_skill(category_id: uuid.UUID, body: SkillWrite) -> dict:
-    created = repo.create_skill(category_id, body)
-    if created is None:
-        raise NOT_FOUND
-    return created
+def create_technology(body: TechnologyWrite) -> dict:
+    return repo.create_technology(body)
 
 
-@router.put("/skills/{skill_id}", response_model=SkillRead, dependencies=WRITE_DEPS)
-def update_skill(skill_id: uuid.UUID, body: SkillWrite) -> dict:
-    updated = repo.update_skill(skill_id, body)
+@router.put(
+    "/technologies/{technology_id}",
+    response_model=TechnologyRead,
+    dependencies=WRITE_DEPS,
+)
+def update_technology(technology_id: uuid.UUID, body: TechnologyWrite) -> dict:
+    updated = repo.update_technology(technology_id, body)
+
     if updated is None:
         raise NOT_FOUND
+
     return updated
 
 
-@router.delete("/skills/{skill_id}", dependencies=WRITE_DEPS)
-def delete_skill(skill_id: uuid.UUID) -> dict[str, bool]:
-    if not repo.delete_skill(skill_id):
+@router.delete("/technologies/{technology_id}", dependencies=WRITE_DEPS)
+def delete_technology(technology_id: uuid.UUID) -> dict[str, bool]:
+    if not repo.delete_technology(technology_id):
         raise NOT_FOUND
+
     return {"ok": True}

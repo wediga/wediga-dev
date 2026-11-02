@@ -1,7 +1,7 @@
-"""Models of the site content: the profile, projects and skills.
+"""Models of the site content: the profile, projects, technologies and skills.
 
-Projects and skills keep the shape the tables had in SQLite, as a step towards
-the data model in the plan, which replaces them with the portfolio from GitHub.
+Projects keep the shape the table had in SQLite, as a step towards the data
+model in the plan, which replaces them with the portfolio from GitHub.
 """
 
 import uuid
@@ -47,20 +47,35 @@ class SkillCategory(Base):
     sort_order: Mapped[int] = mapped_column(default=0)
 
 
-class Skill(Base):
-    __tablename__ = "skill"
-    __table_args__ = (
-        UniqueConstraint("category_id", "name"),
-        {"schema": SITE_SCHEMA},
-    )
+class Technology(Base):
+    """A technology by its GitHub topic, the single place for its shown name."""
+
+    __tablename__ = "technology"
+    __table_args__ = ({"schema": SITE_SCHEMA},)
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True, server_default=UUID_DEFAULT, init=False
     )
-    category_id: Mapped[uuid.UUID] = mapped_column(
+    topic: Mapped[str] = mapped_column(unique=True)
+    name: Mapped[str]
+
+
+class Skill(Base):
+    """A technology shown in a category. The unique reference keeps a
+    technology in at most one category."""
+
+    __tablename__ = "skill"
+    __table_args__ = ({"schema": SITE_SCHEMA},)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True, server_default=UUID_DEFAULT, init=False
+    )
+    skill_category_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey(f"{SITE_SCHEMA}.skill_category.id")
     )
-    name: Mapped[str]
+    technology_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{SITE_SCHEMA}.technology.id", ondelete="CASCADE"), unique=True
+    )
     sort_order: Mapped[int] = mapped_column(default=0)
 
 

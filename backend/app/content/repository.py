@@ -1,14 +1,14 @@
 """Read and write functions for the content tables.
 
 The profile is a single row with its links and its postal address, projects
-live in ``project`` with the tech stack as a ``jsonb`` list, skills in
-``skill_category`` and ``skill``. Every query goes through SQLAlchemy with
+live in ``project`` with the tech stack as a ``jsonb`` list, and a skill is a
+``technology`` placed in a ``skill_category``. Every query goes through SQLAlchemy with
 bound parameters, no SQL is built from input.
 """
 
 import uuid
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -20,13 +20,14 @@ from app.content.models import (
     Project,
     Skill,
     SkillCategory,
+    Technology,
 )
 from app.content.schemas import (
     ProfileAddress,
     ProfileContent,
     ProjectWrite,
     SkillCategoryWrite,
-    SkillWrite,
+    TechnologyWrite,
 )
 from app.db.connection import get_session
 
@@ -164,11 +165,24 @@ def delete_project(project_id: uuid.UUID) -> bool:
     return True
 
 
-# --- skills --------------------------------------------------------------
+# --- skills and technologies ---------------------------------------------
 
 
-def _skill_to_dict(skill: Skill) -> dict:
-    return {"id": skill.id, "name": skill.name, "sort_order": skill.sort_order}
+def _skills_by_category(session: Session, *conditions) -> dict[uuid.UUID, list[dict]]:
+    rows = session.execute(
+        select(Skill.skill_category_id, Skill.id, Technology.name, Skill.sort_order)
+        .join(Technology, Technology.id == Skill.technology_id)
+        .where(*conditions)
+        .order_by(Skill.sort_order, Technology.name)
+    )
+    by_category: dict[uuid.UUID, list[dict]] = {}
+
+    for row in rows:
+        by_category.setdefault(row.skill_category_id, []).append(
+            {"id": row.id, "name": row.name, "sort_order": row.sort_order}
+        )
+
+    return by_category
 
 
 def list_skill_categories() -> list[dict]:
@@ -176,11 +190,7 @@ def list_skill_categories() -> list[dict]:
         categories = session.scalars(
             select(SkillCategory).order_by(SkillCategory.sort_order, SkillCategory.id)
         ).all()
-        skills = session.scalars(select(Skill).order_by(Skill.sort_order, Skill.id))
-        by_category: dict[uuid.UUID, list[dict]] = {}
-
-        for skill in skills:
-            by_category.setdefault(skill.category_id, []).append(_skill_to_dict(skill))
+        by_category = _skills_by_category(session)
 
         return [
             {**category.as_dict(), "skills": by_category.get(category.id, [])}
@@ -207,68 +217,118 @@ def update_category(category_id: uuid.UUID, data: SkillCategoryWrite) -> dict | 
         category.name = data.name
         category.sort_order = data.sort_order
         session.commit()
-        skills = session.scalars(
-            select(Skill)
-            .where(Skill.category_id == category_id)
-            .order_by(Skill.sort_order, Skill.id)
+        by_category = _skills_by_category(
+            session, Skill.skill_category_id == category_id
         )
 
-        return {
-            **category.as_dict(),
-            "skills": [_skill_to_dict(skill) for skill in skills],
-        }
+        return {**category.as_dict(), "skills": by_category.get(category_id, [])}
 
 
 def delete_category(category_id: uuid.UUID) -> bool:
+    """Delete a category and its skills. The technologies stay, without one."""
     with get_session() as session:
         category = session.get(SkillCategory, category_id)
 
         if category is None:
             return False
 
-        session.execute(delete(Skill).where(Skill.category_id == category_id))
+        session.execute(delete(Skill).where(Skill.skill_category_id == category_id))
         session.delete(category)
         session.commit()
 
     return True
 
 
-def create_skill(category_id: uuid.UUID, data: SkillWrite) -> dict | None:
-    with get_session() as session:
-        if session.get(SkillCategory, category_id) is None:
-            return None
+def _technology_to_dict(technology: Technology, skill: Skill | None) -> dict:
+    return {
+        **technology.as_dict(),
+        "skill_category_id": skill.skill_category_id if skill else None,
+        "sort_order": skill.sort_order if skill else None,
+    }
 
+
+def _place(
+    session: Session, technology_id: uuid.UUID, category_id: uuid.UUID | None
+) -> Skill | None:
+    """Put a technology into a category, at its end when it moves there, or
+    take it out of its category when there is none."""
+    skill = session.scalar(select(Skill).where(Skill.technology_id == technology_id))
+
+    if category_id is None:
+        if skill is not None:
+            session.delete(skill)
+
+        return None
+
+    if skill is not None and skill.skill_category_id == category_id:
+        return skill
+
+    last = session.scalar(
+        select(func.max(Skill.sort_order)).where(Skill.skill_category_id == category_id)
+    )
+    sort_order = 0 if last is None else last + 1
+
+    if skill is None:
         skill = Skill(
-            category_id=category_id, name=data.name, sort_order=data.sort_order
+            skill_category_id=category_id,
+            technology_id=technology_id,
+            sort_order=sort_order,
         )
         session.add(skill)
+    else:
+        skill.skill_category_id = category_id
+        skill.sort_order = sort_order
+
+    return skill
+
+
+def list_technologies() -> list[dict]:
+    with get_session() as session:
+        rows = session.execute(
+            select(Technology, Skill)
+            .outerjoin(Skill, Skill.technology_id == Technology.id)
+            # In the order of their category, technologies without one last.
+            .order_by(Skill.sort_order, Technology.name)
+        )
+
+        return [_technology_to_dict(technology, skill) for technology, skill in rows]
+
+
+def create_technology(data: TechnologyWrite) -> dict:
+    with get_session() as session:
+        technology = Technology(topic=data.topic, name=data.name)
+        session.add(technology)
+        session.flush()
+        skill = _place(session, technology.id, data.skill_category_id)
         session.commit()
 
-        return _skill_to_dict(skill)
+        return _technology_to_dict(technology, skill)
 
 
-def update_skill(skill_id: uuid.UUID, data: SkillWrite) -> dict | None:
+def update_technology(technology_id: uuid.UUID, data: TechnologyWrite) -> dict | None:
     with get_session() as session:
-        skill = session.get(Skill, skill_id)
+        technology = session.get(Technology, technology_id)
 
-        if skill is None:
+        if technology is None:
             return None
 
-        skill.name = data.name
-        skill.sort_order = data.sort_order
+        technology.topic = data.topic
+        technology.name = data.name
+        skill = _place(session, technology_id, data.skill_category_id)
         session.commit()
 
-        return _skill_to_dict(skill)
+        return _technology_to_dict(technology, skill)
 
 
-def delete_skill(skill_id: uuid.UUID) -> bool:
+def delete_technology(technology_id: uuid.UUID) -> bool:
+    """Delete a technology, and with it its skill."""
     with get_session() as session:
-        skill = session.get(Skill, skill_id)
+        technology = session.get(Technology, technology_id)
 
-        if skill is None:
+        if technology is None:
             return False
 
-        session.delete(skill)
+        session.delete(technology)
         session.commit()
 
     return True
