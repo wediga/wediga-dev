@@ -39,9 +39,10 @@ test("a recruiter link lands on the landing, opens the portfolio through the acc
   await expect(
     visitorPage.getByRole("heading", { name: "Portfolio" }),
   ).toBeVisible();
-  // The seeded project shows in the gated recruiter view, proving the gated
-  // read carried the recruiter session through to the backend.
-  await expect(visitorPage.getByText("Example Project")).toBeVisible();
+  // The seeded name shows on the gated contact page, proving the gated read
+  // carried the recruiter session through to the backend.
+  await visitorPage.goto("/contact");
+  await expect(visitorPage.getByText("Your Name")).toBeVisible();
   // The recruiter views link to the privacy policy like every public page.
   await expect(
     visitorPage

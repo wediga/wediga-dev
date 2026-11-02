@@ -1,9 +1,8 @@
 """Read and write functions for the content tables.
 
-The profile is a single row with its links and its postal address, projects
-live in ``project`` with the tech stack as a ``jsonb`` list, and a skill is a
-``technology`` placed in a ``skill_category``. Every query goes through SQLAlchemy with
-bound parameters, no SQL is built from input.
+The profile is a single row with its links and its postal address, and a
+skill is a ``technology`` placed in a ``skill_category``. Every query goes
+through SQLAlchemy with bound parameters, no SQL is built from input.
 """
 
 import uuid
@@ -17,7 +16,6 @@ from app.content.models import (
     PostalAddress,
     Profile,
     ProfileLink,
-    Project,
     Skill,
     SkillCategory,
     Technology,
@@ -25,7 +23,6 @@ from app.content.models import (
 from app.content.schemas import (
     ProfileAddress,
     ProfileContent,
-    ProjectWrite,
     SkillCategoryWrite,
     TechnologyWrite,
 )
@@ -103,66 +100,6 @@ def set_profile(data: ProfileContent) -> None:
     with get_session() as session:
         save_profile(session, data)
         session.commit()
-
-
-# --- projects ------------------------------------------------------------
-
-
-def _project_to_dict(project: Project) -> dict:
-    return {**project.as_dict(), "tech_stack": project.tech_stack or []}
-
-
-def list_projects(include_hidden: bool = True) -> list[dict]:
-    query = select(Project)
-
-    if not include_hidden:
-        query = query.where(Project.visible)
-    query = query.order_by(Project.sort_order, Project.id)
-
-    with get_session() as session:
-        return [_project_to_dict(project) for project in session.scalars(query)]
-
-
-def get_project(project_id: uuid.UUID) -> dict | None:
-    with get_session() as session:
-        project = session.get(Project, project_id)
-        return _project_to_dict(project) if project is not None else None
-
-
-def create_project(data: ProjectWrite) -> dict:
-    with get_session() as session:
-        project = Project(**data.model_dump())
-        session.add(project)
-        session.commit()
-
-        return _project_to_dict(project)
-
-
-def update_project(project_id: uuid.UUID, data: ProjectWrite) -> dict | None:
-    with get_session() as session:
-        project = session.get(Project, project_id)
-
-        if project is None:
-            return None
-
-        for key, value in data.model_dump().items():
-            setattr(project, key, value)
-        session.commit()
-
-        return _project_to_dict(project)
-
-
-def delete_project(project_id: uuid.UUID) -> bool:
-    with get_session() as session:
-        project = session.get(Project, project_id)
-
-        if project is None:
-            return False
-
-        session.delete(project)
-        session.commit()
-
-    return True
 
 
 # --- skills and technologies ---------------------------------------------

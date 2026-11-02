@@ -64,7 +64,7 @@ def test_cookie_settings(client) -> None:
 
 
 def test_visitor_without_a_login_gets_no_session(client) -> None:
-    response = client.get("/content/projects")
+    response = client.get("/portfolio")
 
     assert "set-cookie" not in response.headers
     assert _session_count() == 0

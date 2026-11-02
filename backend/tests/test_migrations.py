@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from app.content import repository
 from app.db.base import ACCESS_SCHEMA, SITE_SCHEMA
 from app.db.connection import get_session
+from app.portfolio import repository as portfolio
 from tests.conftest import alembic_config
 
 EXPECTED_TABLES = {
@@ -33,10 +34,12 @@ EXPECTED_TABLES = {
         "github_repo_text",
         "github_sync",
         "link_kind",
+        "portfolio_entry",
+        "portfolio_text_override",
         "postal_address",
         "profile",
         "profile_link",
-        "project",
+        "project_status",
         "skill",
         "skill_category",
         "technology",
@@ -228,3 +231,132 @@ def test_old_repos_are_removed_for_the_next_sync(old_repo_db) -> None:
         repos = session.scalar(text(f"SELECT count(*) FROM {SITE_SCHEMA}.github_repo"))
 
     assert repos == 0
+
+
+# The revision before the portfolio, with projects in the old table.
+BEFORE_PORTFOLIO = "0005_github_sync"
+
+
+@pytest.fixture()
+def projects_db(_schema):
+    yield from _back_to(BEFORE_PORTFOLIO)
+
+
+def _insert_synced_repo(name: str) -> None:
+    """Write a repo as the sync of revision 0005 left it, with only its name."""
+    with get_session() as session:
+        run_id = session.execute(
+            text(
+                f"INSERT INTO {SITE_SCHEMA}.github_sync (started_at, finished_at) "
+                "VALUES (now(), now()) RETURNING id"
+            )
+        ).scalar_one()
+        repo_id = session.execute(
+            text(
+                f"INSERT INTO {SITE_SCHEMA}.github_repo "
+                "(github_id, archived, last_seen_sync_id) "
+                "VALUES (1, false, :run_id) RETURNING id"
+            ),
+            {"run_id": run_id},
+        ).scalar_one()
+        field_id = session.execute(
+            text(
+                f"INSERT INTO {SITE_SCHEMA}.text_field (key) "
+                "VALUES ('name') RETURNING id"
+            )
+        ).scalar_one()
+        session.execute(
+            text(
+                f"INSERT INTO {SITE_SCHEMA}.github_repo_text "
+                "(github_repo_id, text_field_id, value) VALUES (:repo, :field, :name)"
+            ),
+            {"repo": repo_id, "field": field_id, "name": name},
+        )
+        session.commit()
+
+
+def _insert_projects(*projects: dict) -> None:
+    with get_session() as session:
+        session.execute(
+            text(
+                f"INSERT INTO {SITE_SCHEMA}.project "
+                "(name, tagline, problem, github_link, status, sort_order, visible) "
+                "VALUES (:name, :tagline, :problem, :github_link, :status, "
+                ":sort_order, :visible)"
+            ),
+            [
+                {
+                    "tagline": None,
+                    "problem": None,
+                    "sort_order": 0,
+                    "visible": True,
+                    **project,
+                }
+                for project in projects
+            ],
+        )
+        session.commit()
+
+
+def test_projects_become_entries_of_their_repos(projects_db) -> None:
+    _insert_synced_repo("monster-cr-predictor")
+    _insert_projects(
+        {
+            "name": "Monster CR Predictor",
+            "tagline": "CR vorhersagen",
+            "problem": "Zu grob",
+            "github_link": "https://github.com/wediga/Monster-CR-Predictor/",
+            "status": "Fertig",
+            "sort_order": 3,
+        },
+        {
+            "name": "Arcanalyse",
+            "github_link": "https://github.com/wediga/Arcanalyse",
+            "status": "Frühe Entwicklung",
+        },
+    )
+
+    command.upgrade(alembic_config(), "head")
+    [tile] = portfolio.tiles()
+    [repo] = portfolio.admin_overview()["repos"]
+
+    assert tile["texts"] == {
+        "name": "Monster CR Predictor",
+        "description": "CR vorhersagen",
+        "problem": "Zu grob",
+    }
+    assert tile["status"]["label"] == "Fertig"
+    assert repo["entry"]["sort_order"] == 3
+
+
+def test_hidden_project_becomes_an_unpublished_entry(projects_db) -> None:
+    _insert_synced_repo("alpha")
+    _insert_projects(
+        {
+            "name": "Alpha",
+            "github_link": "https://github.com/wediga/alpha",
+            "status": "In Entwicklung",
+            "visible": False,
+        }
+    )
+
+    command.upgrade(alembic_config(), "head")
+    [repo] = portfolio.admin_overview()["repos"]
+
+    assert portfolio.tiles() == []
+    assert repo["entry"]["published"] is False
+    assert repo["entry"]["texts"] == {"name": "Alpha"}
+
+
+def test_status_without_a_match_stops_the_migration(projects_db) -> None:
+    _insert_synced_repo("alpha")
+    _insert_projects(
+        {
+            "name": "Alpha",
+            "github_link": "https://github.com/wediga/alpha",
+            "status": "Irgendwas",
+        }
+    )
+
+    with pytest.raises(ValueError, match="Irgendwas"):
+        command.upgrade(alembic_config(), "head")

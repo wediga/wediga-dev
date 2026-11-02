@@ -1,8 +1,8 @@
 """Pydantic schemas for the GitHub layer.
 
 ``SyncedRepo`` is one public repo as the client hands it to the sync, checked
-where it arrives from the API. ``GithubOverview`` is what the admin sees of the
-last sync. The texts of a repo are keyed by ``TextFieldKey``, one row each in
+where it arrives from the API. ``GithubSyncRead`` and ``GithubRepoRead`` are
+what the admin sees of the last sync. The texts of a repo are keyed by ``TextFieldKey``, one row each in
 ``text_field``.
 """
 
@@ -42,15 +42,7 @@ class GithubSyncRead(BaseModel):
 
 class GithubRepoRead(BaseModel):
     id: uuid.UUID
-    name: str
-    description: str | None
+    texts: dict[TextFieldKey, str]
     homepage_url: str | None
     archived: bool
     technologies: list[str]
-
-
-class GithubOverview(BaseModel):
-    """The latest sync, and the repos of the latest one that succeeded."""
-
-    last_sync: GithubSyncRead | None
-    repos: list[GithubRepoRead]

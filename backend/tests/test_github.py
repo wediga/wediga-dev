@@ -170,7 +170,7 @@ def _sync(monkeypatch, *repos: SyncedRepo) -> int:
 
 
 def _listed() -> dict[str, dict]:
-    return {repo["name"]: repo for repo in repository.overview()["repos"]}
+    return {repo["texts"]["name"]: repo for repo in repository.overview()["repos"]}
 
 
 def _count(model) -> int:
@@ -289,7 +289,11 @@ def test_sync_writes_repos_texts_and_technologies(migrated_db, monkeypatch):
 
     assert count == 2
     assert list(_listed()) == ["Alpha", "beta"]
-    assert _listed()["beta"]["description"] == "b"
+    assert _listed()["beta"]["texts"] == {
+        "name": "beta",
+        "description": "b",
+        "problem": "p",
+    }
     # A new topic becomes a technology named like it, an existing one keeps
     # its name.
     assert _listed()["beta"]["technologies"] == ["Python", "dnd5e"]
@@ -307,7 +311,7 @@ def test_second_sync_replaces_texts_and_topics(migrated_db, monkeypatch):
     _sync(monkeypatch, _repo(1, "alpha", topics=["go"], description="new"))
 
     assert _listed()["alpha"]["technologies"] == ["go"]
-    assert _listed()["alpha"]["description"] == "new"
+    assert _listed()["alpha"]["texts"] == {"name": "alpha", "description": "new"}
 
 
 def test_vanished_repo_is_not_listed_but_kept(migrated_db, monkeypatch):
@@ -326,7 +330,7 @@ def test_rename_keeps_the_repo(migrated_db, monkeypatch):
     [after] = repository.overview()["repos"]
 
     assert after["id"] == before["id"]
-    assert after["name"] == "new-name"
+    assert after["texts"]["name"] == "new-name"
 
 
 def test_failed_sync_keeps_the_last_successful_one(migrated_db, monkeypatch):
@@ -360,19 +364,12 @@ def test_old_runs_are_removed_unless_a_repo_was_last_seen_in_them(
 # --- routes --------------------------------------------------------------
 
 
-def test_overview_needs_a_session(client):
-    assert client.get("/github/admin/repos").status_code == 401
-
-
 def test_sync_without_csrf_is_403(session_client):
     assert session_client.post("/github/sync").status_code == 403
 
 
-def test_overview_starts_empty(admin_client):
-    assert admin_client.get("/github/admin/repos").json() == {
-        "last_sync": None,
-        "repos": [],
-    }
+def test_overview_starts_empty(migrated_db):
+    assert repository.overview() == {"last_sync": None, "repos": []}
 
 
 def test_sync_endpoint_runs_and_the_overview_shows_it(admin_client, monkeypatch):
@@ -381,11 +378,11 @@ def test_sync_endpoint_runs_and_the_overview_shows_it(admin_client, monkeypatch)
     )
 
     response = admin_client.post("/github/sync")
-    overview = admin_client.get("/github/admin/repos").json()
+    overview = repository.overview()
 
     assert response.json() == {"ok": True, "synced": 1}
     assert overview["last_sync"]["error"] is None
-    assert [repo["name"] for repo in overview["repos"]] == ["alpha"]
+    assert list(_listed()) == ["alpha"]
     assert overview["repos"][0]["technologies"] == ["python"]
 
 

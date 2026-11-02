@@ -11,6 +11,7 @@ from app.content.router import router as content_router
 from app.cv.router import router as cv_router
 from app.github.router import router as github_router
 from app.hub.router import router as hub_router
+from app.portfolio.router import router as portfolio_router
 from app.recruiter.router import router as recruiter_router
 
 api_router = APIRouter()
@@ -21,6 +22,7 @@ api_router.include_router(github_router)
 api_router.include_router(hub_router)
 api_router.include_router(oidc_router)
 api_router.include_router(oidc_status_router)
+api_router.include_router(portfolio_router)
 api_router.include_router(recruiter_router)
 
 

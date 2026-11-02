@@ -19,6 +19,7 @@ MODEL_MODULES = (
     "app.content.models",
     "app.cv.models",
     "app.github.models",
+    "app.portfolio.models",
     "app.recruiter.models",
 )
 

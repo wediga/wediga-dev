@@ -64,9 +64,14 @@ def unmigrated_db(_schema):
     command.upgrade(alembic_config(), "head")
 
 
+# Tables whose rows the migrations write and nothing else does.
+MIGRATION_DATA = ("project_status",)
+
+
 @pytest.fixture()
 def migrated_db(_schema, monkeypatch) -> None:
-    """Empty every table of the migrated schema for this test."""
+    """Empty every table of the migrated schema for this test, except the
+    ones the migrations fill."""
     from app.db.base import ACCESS_SCHEMA, SITE_SCHEMA
     from app.db.connection import get_session
 
@@ -76,9 +81,14 @@ def migrated_db(_schema, monkeypatch) -> None:
         tables = session.scalars(
             text(
                 "SELECT quote_ident(schemaname) || '.' || quote_ident(tablename) "
-                "FROM pg_tables WHERE schemaname IN (:access, :site)"
+                "FROM pg_tables WHERE schemaname IN (:access, :site) "
+                "AND tablename <> ALL(:kept)"
             ),
-            {"access": ACCESS_SCHEMA, "site": SITE_SCHEMA},
+            {
+                "access": ACCESS_SCHEMA,
+                "site": SITE_SCHEMA,
+                "kept": list(MIGRATION_DATA),
+            },
         ).all()
         session.execute(text(f"TRUNCATE {', '.join(tables)}"))
         session.commit()
