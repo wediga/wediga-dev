@@ -36,6 +36,7 @@ EXPECTED_TABLES = {
         "link_kind",
         "portfolio_entry",
         "portfolio_text_override",
+        "portrait",
         "postal_address",
         "profile",
         "profile_link",
