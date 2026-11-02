@@ -35,7 +35,7 @@ def _validate_web_link(value: str) -> str:
 
 
 # The kinds of link a profile can carry, one row each in ``link_kind``.
-LinkKind = Literal["github", "linkedin"]
+LinkKind = Literal["github", "linkedin", "website"]
 LINK_KINDS: tuple[str, ...] = get_args(LinkKind)
 
 # Digits with the usual separators and an optional leading plus, so a stored

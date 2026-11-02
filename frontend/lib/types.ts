@@ -7,6 +7,7 @@ import type { StatusKey } from "./projectStatus";
 export const LINK_LABELS = {
   github: "GitHub",
   linkedin: "LinkedIn",
+  website: "Website",
 } as const;
 
 export type LinkKind = keyof typeof LINK_LABELS;
@@ -17,6 +18,12 @@ export interface Contact {
   name: string;
   email: string;
   links: ProfileLinks;
+}
+
+// The public contact card on /hi: the contact plus the phone number, empty
+// when there is none.
+export interface Card extends Contact {
+  phone: string;
 }
 
 export interface ProfileAddress {
