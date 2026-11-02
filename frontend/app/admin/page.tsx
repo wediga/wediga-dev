@@ -1,11 +1,9 @@
 import Link from "next/link";
 
 const SECTIONS = [
-  { href: "/admin/about", label: "About", hint: "Markdown intro text" },
+  { href: "/admin/profile", label: "Profile", hint: "About, contact and impressum" },
   { href: "/admin/projects", label: "Projects", hint: "Showcase projects" },
   { href: "/admin/skills", label: "Skills", hint: "Categories and skills" },
-  { href: "/admin/contact", label: "Contact", hint: "Contact details" },
-  { href: "/admin/impressum", label: "Impressum", hint: "Legal notice" },
   { href: "/admin/repos", label: "Repos", hint: "GitHub sync and curation" },
   { href: "/admin/cv", label: "CV", hint: "Upload the CV PDF" },
   { href: "/admin/links", label: "Links", hint: "Recruiter magic links" },

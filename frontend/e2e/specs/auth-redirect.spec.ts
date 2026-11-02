@@ -15,7 +15,7 @@ test("admin lands in the admin area after login and is not bounced to /login", a
   await expect(page).toHaveURL(/\/admin$/);
 
   // A second protected admin page must also render, not redirect.
-  await page.goto("/admin/about");
-  await expect(page).toHaveURL(/\/admin\/about$/);
-  await expect(page.getByRole("heading", { name: "About" })).toBeVisible();
+  await page.goto("/admin/profile");
+  await expect(page).toHaveURL(/\/admin\/profile$/);
+  await expect(page.getByRole("heading", { name: "Profile" })).toBeVisible();
 });

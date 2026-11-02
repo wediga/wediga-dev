@@ -7,11 +7,9 @@ import { usePathname } from "next/navigation";
 // server layout still gates every render.
 const NAV = [
   { href: "/admin", label: "Overview" },
-  { href: "/admin/about", label: "About" },
+  { href: "/admin/profile", label: "Profile" },
   { href: "/admin/projects", label: "Projects" },
   { href: "/admin/skills", label: "Skills" },
-  { href: "/admin/contact", label: "Contact" },
-  { href: "/admin/impressum", label: "Impressum" },
   { href: "/admin/repos", label: "Repos" },
   { href: "/admin/cv", label: "CV" },
   { href: "/admin/links", label: "Links" },

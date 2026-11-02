@@ -1,7 +1,8 @@
 """Content routes: public reads and admin-protected writes.
 
-About and skills are public so the Server Components render the public site.
-Impressum keeps its name-and-email split (public read vs full admin read).
+Skills and the impressum are public so the Server Components render the
+public site. Contact and impressum are views on the profile that each copy
+only what they may show, so the address never leaves through them.
 Writes and recruiter reads use the standard gates (see WRITE_DEPS and
 ``require_recruiter_view``).
 """
@@ -14,9 +15,9 @@ from app.auth.csrf import require_csrf
 from app.auth.dependencies import require_admin
 from app.content import repository as repo
 from app.content.schemas import (
-    AboutContent,
     ContactContent,
     ImpressumContent,
+    ProfileContent,
     ProjectRead,
     ProjectWrite,
     SkillCategoryRead,
@@ -35,29 +36,23 @@ RECRUITER_READ_DEPS = [Depends(require_recruiter_view)]
 NOT_FOUND = not_found()
 
 
-# --- about ---------------------------------------------------------------
+# --- profile and its views ----------------------------------------------
 
 
-@router.get("/about", response_model=AboutContent)
-def read_about() -> AboutContent:
-    text = repo.get_about()
-    return AboutContent(text=text if text is not None else "")
+@router.get(
+    "/profile",
+    response_model=ProfileContent | None,
+    dependencies=[Depends(require_admin)],
+)
+def read_profile() -> ProfileContent | None:
+    return repo.get_profile()
 
 
-@router.put("/about", response_model=AboutContent, dependencies=WRITE_DEPS)
-def write_about(body: AboutContent) -> AboutContent:
-    repo.set_about(body.text)
+@router.put("/profile", response_model=ProfileContent, dependencies=WRITE_DEPS)
+def write_profile(body: ProfileContent) -> ProfileContent:
+    repo.set_profile(body)
+
     return body
-
-
-@router.delete("/about", dependencies=WRITE_DEPS)
-def remove_about() -> dict[str, bool]:
-    # Delete is idempotent: removing absent content is still a success.
-    repo.delete_about()
-    return {"ok": True}
-
-
-# --- contact -------------------------------------------------------------
 
 
 @router.get(
@@ -66,55 +61,22 @@ def remove_about() -> dict[str, bool]:
     dependencies=RECRUITER_READ_DEPS,
 )
 def read_contact() -> ContactContent | None:
-    data = repo.get_contact()
-    return ContactContent(**data) if data is not None else None
+    profile = repo.get_profile()
 
+    if profile is None:
+        return None
 
-@router.put("/contact", response_model=ContactContent, dependencies=WRITE_DEPS)
-def write_contact(body: ContactContent) -> ContactContent:
-    repo.set_contact(body)
-    return body
-
-
-@router.delete("/contact", dependencies=WRITE_DEPS)
-def remove_contact() -> dict[str, bool]:
-    repo.delete_contact()
-    return {"ok": True}
-
-
-# --- impressum -----------------------------------------------------------
+    return ContactContent(name=profile.name, email=profile.email, links=profile.links)
 
 
 @router.get("/impressum", response_model=ImpressumContent | None)
 def read_impressum() -> ImpressumContent | None:
-    """Public read: only name and email."""
-    data = repo.get_impressum()
-    if data is None:
+    profile = repo.get_profile()
+
+    if profile is None:
         return None
-    return ImpressumContent(name=data.get("name", ""), email=data.get("email", ""))
 
-
-@router.get(
-    "/admin/impressum",
-    response_model=ImpressumContent | None,
-    dependencies=[Depends(require_admin)],
-)
-def read_full_impressum() -> ImpressumContent | None:
-    """Admin read: the full legal record for the editor."""
-    data = repo.get_impressum()
-    return ImpressumContent(**data) if data is not None else None
-
-
-@router.put("/impressum", response_model=ImpressumContent, dependencies=WRITE_DEPS)
-def write_impressum(body: ImpressumContent) -> ImpressumContent:
-    repo.set_impressum(body)
-    return body
-
-
-@router.delete("/impressum", dependencies=WRITE_DEPS)
-def remove_impressum() -> dict[str, bool]:
-    repo.delete_impressum()
-    return {"ok": True}
+    return ImpressumContent(name=profile.name, email=profile.email)
 
 
 # --- projects ------------------------------------------------------------

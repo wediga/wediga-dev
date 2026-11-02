@@ -1,18 +1,19 @@
-"""Models of the site content: projects, skills and the key-value settings.
+"""Models of the site content: the profile, projects and skills.
 
-They keep the shape the tables had in SQLite, as a step towards the data model
-in the plan, which replaces them with the profile and the portfolio from
-GitHub.
+Projects and skills keep the shape the tables had in SQLite, as a step towards
+the data model in the plan, which replaces them with the portfolio from GitHub.
 """
 
 import uuid
-from datetime import datetime
 
-from sqlalchemy import ForeignKey, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import SITE_SCHEMA, UUID_DEFAULT, Base
+
+# The links and the address of the profile go away together with it.
+PROFILE_ID = f"{SITE_SCHEMA}.profile.id"
 
 
 class Project(Base):
@@ -63,14 +64,64 @@ class Skill(Base):
     sort_order: Mapped[int] = mapped_column(default=0)
 
 
-class SiteSetting(Base):
-    __tablename__ = "site_setting"
+class Profile(Base):
+    """The person behind the site. Contact, impressum and about are views on
+    this single row."""
+
+    __tablename__ = "profile"
+    # A unique index on a constant allows at most one row.
+    __table_args__ = (
+        Index("profile_single_row", text("(true)"), unique=True),
+        {"schema": SITE_SCHEMA},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True, server_default=UUID_DEFAULT, init=False
+    )
+    name: Mapped[str]
+    email: Mapped[str]
+    about_md: Mapped[str]
+
+
+class LinkKind(Base):
+    __tablename__ = "link_kind"
     __table_args__ = ({"schema": SITE_SCHEMA},)
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True, server_default=UUID_DEFAULT, init=False
     )
     key: Mapped[str] = mapped_column(unique=True)
-    # The about text is a JSON string, contact and impressum are objects.
-    value: Mapped[str | dict] = mapped_column(JSONB)
-    updated_at: Mapped[datetime]
+
+
+class ProfileLink(Base):
+    __tablename__ = "profile_link"
+    __table_args__ = (
+        UniqueConstraint("profile_id", "link_kind_id"),
+        {"schema": SITE_SCHEMA},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True, server_default=UUID_DEFAULT, init=False
+    )
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(PROFILE_ID, ondelete="CASCADE")
+    )
+    link_kind_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{SITE_SCHEMA}.link_kind.id")
+    )
+    url: Mapped[str]
+
+
+class PostalAddress(Base):
+    __tablename__ = "postal_address"
+    __table_args__ = ({"schema": SITE_SCHEMA},)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True, server_default=UUID_DEFAULT, init=False
+    )
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(PROFILE_ID, ondelete="CASCADE"), unique=True
+    )
+    street: Mapped[str]
+    postal_code: Mapped[str]
+    city: Mapped[str]

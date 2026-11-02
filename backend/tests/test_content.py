@@ -1,8 +1,9 @@
 """Tests for the content CRUD layer.
 
-Cover create, read, update and delete for each of the five content types, the
-public reads that need no session, the 401 when a write has no session and the
-403 when a write has a session but no valid CSRF token. The client uses an
+Cover the profile with its two views, create, read, update and delete for
+projects and skills, the public reads that need no session, the 401 when a
+write has no session and the 403 when a write has a session but no valid CSRF
+token. The client uses an
 https base URL so the Secure session cookie round-trips.
 """
 
@@ -54,63 +55,75 @@ def admin_client(app):
     return client
 
 
-# --- about ---------------------------------------------------------------
+# --- profile -------------------------------------------------------------
+
+PROFILE = {
+    "name": "Alexander Wedig",
+    "email": "a@example.com",
+    "about_md": "# Hi\n\nText",
+    "links": {
+        "github": "https://github.com/example",
+        "linkedin": "https://linkedin.com/in/example",
+    },
+    "address": {"street": "Street 1", "postal_code": "12345", "city": "City"},
+}
 
 
-def test_about_crud(admin_client) -> None:
-    put = admin_client.put("/content/about", json={"text": "# Hi\n\nText"})
-    assert put.status_code == 200
-    assert admin_client.get("/content/about").json() == {"text": "# Hi\n\nText"}
-
-    admin_client.put("/content/about", json={"text": "changed"})
-    assert admin_client.get("/content/about").json()["text"] == "changed"
-
-    assert admin_client.delete("/content/about").status_code == 200
-    assert admin_client.get("/content/about").json() == {"text": ""}
+def test_profile_round_trip(admin_client) -> None:
+    assert admin_client.put("/content/profile", json=PROFILE).status_code == 200
+    assert admin_client.get("/content/profile").json() == PROFILE
 
 
-# --- contact -------------------------------------------------------------
-
-
-def test_contact_crud(admin_client) -> None:
-    payload = {
-        "name": "Alexander",
-        "email": "a@example.com",
-        "github": None,
-        "linkedin": None,
+def test_profile_update_replaces_links_and_address(admin_client) -> None:
+    admin_client.put("/content/profile", json=PROFILE)
+    changed = {
+        **PROFILE,
+        "name": "Changed",
+        "links": {"github": "https://github.com/other"},
+        "address": None,
     }
-    assert admin_client.put("/content/contact", json=payload).status_code == 200
-    got = admin_client.get("/content/contact").json()
-    assert got["name"] == "Alexander"
-    assert got["email"] == "a@example.com"
 
-    assert admin_client.delete("/content/contact").status_code == 200
+    assert admin_client.put("/content/profile", json=changed).status_code == 200
+    assert admin_client.get("/content/profile").json() == changed
+
+
+def test_views_are_empty_without_profile(admin_client) -> None:
+    assert admin_client.get("/content/profile").json() is None
     assert admin_client.get("/content/contact").json() is None
-
-
-# --- impressum -----------------------------------------------------------
-
-
-def test_impressum_crud(admin_client) -> None:
-    payload = {
-        "name": "Alexander Wedig",
-        "email": "a@example.com",
-        "address": {"street": "Street 1", "city": "12345 City"},
-    }
-    assert admin_client.put("/content/impressum", json=payload).status_code == 200
-
-    # The admin read returns the full record.
-    full = admin_client.get("/content/admin/impressum").json()
-    assert full["address"]["city"] == "12345 City"
-
-    # The public read exposes only name and email, never the address.
-    public = admin_client.get("/content/impressum").json()
-    assert public["name"] == "Alexander Wedig"
-    assert public["email"] == "a@example.com"
-    assert public["address"] is None
-
-    assert admin_client.delete("/content/impressum").status_code == 200
     assert admin_client.get("/content/impressum").json() is None
+
+
+def test_contact_shows_name_email_and_links_only(admin_client) -> None:
+    admin_client.put("/content/profile", json=PROFILE)
+
+    assert admin_client.get("/content/contact").json() == {
+        "name": PROFILE["name"],
+        "email": PROFILE["email"],
+        "links": PROFILE["links"],
+    }
+
+
+def test_public_impressum_shows_name_and_email_only(admin_client, client) -> None:
+    admin_client.put("/content/profile", json=PROFILE)
+
+    assert client.get("/content/impressum").json() == {
+        "name": PROFILE["name"],
+        "email": PROFILE["email"],
+    }
+
+
+@pytest.mark.parametrize(
+    "links",
+    [
+        {"mastodon": "https://example.social/@a"},
+        {"github": "javascript:alert(1)"},
+        {"github": ""},
+    ],
+)
+def test_profile_rejects_bad_links(admin_client, links) -> None:
+    body = {**PROFILE, "links": links}
+
+    assert admin_client.put("/content/profile", json=body).status_code == 422
 
 
 # --- projects ------------------------------------------------------------
@@ -201,19 +214,12 @@ def test_duplicate_project_name_is_409(admin_client) -> None:
     )
 
 
-def test_setting_delete_is_idempotent(admin_client) -> None:
-    # Deleting absent content still succeeds, so the admin never sees a spurious
-    # failure when removing content that was never saved.
-    assert admin_client.delete("/content/contact").status_code == 200
-    assert admin_client.delete("/content/contact").status_code == 200
-
-
 # --- public reads --------------------------------------------------------
 
 
 def test_public_reads_need_no_session(client) -> None:
-    # About and skills feed the public landing page, so they stay open.
-    assert client.get("/content/about").status_code == 200
+    # The impressum and skills feed the public pages, so they stay open.
+    assert client.get("/content/impressum").status_code == 200
     assert client.get("/content/skills").status_code == 200
 
 
@@ -227,13 +233,13 @@ def test_recruiter_reads_need_a_session(client) -> None:
 
 
 def test_writes_without_session_are_401(client) -> None:
-    assert client.put("/content/about", json={"text": "x"}).status_code == 401
+    assert client.put("/content/profile", json=PROFILE).status_code == 401
     assert client.post("/content/projects", json={"name": "X"}).status_code == 401
     assert client.delete("/content/projects/1").status_code == 401
 
 
 def test_writes_without_csrf_are_403(session_client) -> None:
-    assert session_client.put("/content/about", json={"text": "x"}).status_code == 403
+    assert session_client.put("/content/profile", json=PROFILE).status_code == 403
     assert (
         session_client.post("/content/projects", json={"name": "X"}).status_code == 403
     )
@@ -241,15 +247,15 @@ def test_writes_without_csrf_are_403(session_client) -> None:
 
 def test_writes_with_wrong_csrf_are_403(session_client) -> None:
     session_client.headers.update({"X-CSRF-Token": "not-the-real-token"})
-    assert session_client.put("/content/about", json={"text": "x"}).status_code == 403
+    assert session_client.put("/content/profile", json=PROFILE).status_code == 403
 
 
 def test_admin_projects_read_needs_session(client) -> None:
     assert client.get("/content/admin/projects").status_code == 401
 
 
-def test_admin_impressum_read_needs_session(client) -> None:
-    assert client.get("/content/admin/impressum").status_code == 401
+def test_profile_read_needs_session(client) -> None:
+    assert client.get("/content/profile").status_code == 401
 
 
 def test_invalid_body_is_422(admin_client) -> None:

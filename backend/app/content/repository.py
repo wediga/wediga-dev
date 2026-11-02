@@ -1,11 +1,9 @@
 """Read and write functions for the content tables.
 
-About, contact and impressum live in the key-value ``site_setting`` table as
-``jsonb`` (the about text as a JSON string, contact and impressum as objects).
-Projects live in ``project`` with the tech stack as a ``jsonb`` list, skills in
-``skill_category`` and ``skill``. Every
-query goes through SQLAlchemy with bound parameters, no SQL is built from
-input.
+The profile is a single row with its links and its postal address, projects
+live in ``project`` with the tech stack as a ``jsonb`` list, skills in
+``skill_category`` and ``skill``. Every query goes through SQLAlchemy with
+bound parameters, no SQL is built from input.
 """
 
 import uuid
@@ -14,129 +12,96 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.content.models import Project, SiteSetting, Skill, SkillCategory
+from app.content.models import (
+    LinkKind,
+    PostalAddress,
+    Profile,
+    ProfileLink,
+    Project,
+    Skill,
+    SkillCategory,
+)
 from app.content.schemas import (
-    ContactContent,
-    ImpressumContent,
+    ProfileAddress,
+    ProfileContent,
     ProjectWrite,
     SkillCategoryWrite,
     SkillWrite,
 )
-from app.db.connection import get_session, now
+from app.db.connection import get_session
 
-ABOUT_KEY = "about_text"
-CONTACT_KEY = "contact"
-IMPRESSUM_KEY = "impressum"
+# --- profile -------------------------------------------------------------
 
 
-# --- site_setting helpers ------------------------------------------------
+def get_profile() -> ProfileContent | None:
+    with get_session() as session:
+        profile = session.scalar(select(Profile))
 
+        if profile is None:
+            return None
 
-def _find_setting(session: Session, key: str) -> SiteSetting | None:
-    return session.scalar(select(SiteSetting).where(SiteSetting.key == key))
-
-
-def _get_setting(session: Session, key: str) -> str | dict | None:
-    setting = _find_setting(session, key)
-    return setting.value if setting is not None else None
-
-
-def set_setting(session: Session, key: str, value: str | dict) -> None:
-    statement = insert(SiteSetting).values(key=key, value=value, updated_at=now())
-    session.execute(
-        statement.on_conflict_do_update(
-            index_elements=[SiteSetting.key],
-            set_={
-                "value": statement.excluded.value,
-                "updated_at": statement.excluded.updated_at,
-            },
+        links = session.execute(
+            select(LinkKind.key, ProfileLink.url)
+            .join(LinkKind, LinkKind.id == ProfileLink.link_kind_id)
+            .where(ProfileLink.profile_id == profile.id)
         )
-    )
+        address = session.scalar(
+            select(PostalAddress).where(PostalAddress.profile_id == profile.id)
+        )
+
+        return ProfileContent.model_validate(
+            {
+                "name": profile.name,
+                "email": profile.email,
+                "about_md": profile.about_md,
+                "links": dict(links.all()),
+                "address": ProfileAddress.model_validate(address, from_attributes=True)
+                if address is not None
+                else None,
+            }
+        )
 
 
-def _delete_setting(session: Session, key: str) -> bool:
-    setting = _find_setting(session, key)
+def save_profile(session: Session, data: ProfileContent) -> None:
+    """Write the single profile row and replace its links and address."""
+    profile = session.scalar(select(Profile))
 
-    if setting is None:
-        return False
+    if profile is None:
+        profile = Profile(name=data.name, email=data.email, about_md=data.about_md)
+        session.add(profile)
+        session.flush()
+    else:
+        profile.name = data.name
+        profile.email = data.email
+        profile.about_md = data.about_md
 
-    session.delete(setting)
+    session.execute(delete(ProfileLink).where(ProfileLink.profile_id == profile.id))
+    session.execute(delete(PostalAddress).where(PostalAddress.profile_id == profile.id))
 
-    return True
+    if data.links:
+        session.execute(
+            insert(LinkKind)
+            .values([{"key": kind} for kind in data.links])
+            .on_conflict_do_nothing()
+        )
+        kind_ids = dict(
+            session.execute(
+                select(LinkKind.key, LinkKind.id).where(LinkKind.key.in_(data.links))
+            ).all()
+        )
+        session.add_all(
+            ProfileLink(profile_id=profile.id, link_kind_id=kind_ids[kind], url=url)
+            for kind, url in data.links.items()
+        )
+
+    if data.address is not None:
+        session.add(PostalAddress(profile_id=profile.id, **data.address.model_dump()))
 
 
-# --- about ---------------------------------------------------------------
-
-
-def get_about() -> str | None:
+def set_profile(data: ProfileContent) -> None:
     with get_session() as session:
-        text = _get_setting(session, ABOUT_KEY)
-
-    assert text is None or isinstance(text, str)
-
-    return text
-
-
-def set_about(text: str) -> None:
-    with get_session() as session:
-        set_setting(session, ABOUT_KEY, text)
+        save_profile(session, data)
         session.commit()
-
-
-def delete_about() -> bool:
-    with get_session() as session:
-        deleted = _delete_setting(session, ABOUT_KEY)
-        session.commit()
-
-    return deleted
-
-
-# --- contact and impressum (JSON objects) --------------------------------
-
-
-def _get_object(key: str) -> dict | None:
-    with get_session() as session:
-        data = _get_setting(session, key)
-
-    assert data is None or isinstance(data, dict)
-
-    return data
-
-
-def get_contact() -> dict | None:
-    return _get_object(CONTACT_KEY)
-
-
-def set_contact(data: ContactContent) -> None:
-    with get_session() as session:
-        set_setting(session, CONTACT_KEY, data.model_dump())
-        session.commit()
-
-
-def delete_contact() -> bool:
-    with get_session() as session:
-        deleted = _delete_setting(session, CONTACT_KEY)
-        session.commit()
-
-    return deleted
-
-
-def get_impressum() -> dict | None:
-    return _get_object(IMPRESSUM_KEY)
-
-
-def set_impressum(data: ImpressumContent) -> None:
-    with get_session() as session:
-        set_setting(session, IMPRESSUM_KEY, data.model_dump())
-        session.commit()
-
-
-def delete_impressum() -> bool:
-    with get_session() as session:
-        deleted = _delete_setting(session, IMPRESSUM_KEY)
-        session.commit()
-
-    return deleted
 
 
 # --- projects ------------------------------------------------------------
