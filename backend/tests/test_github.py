@@ -1,23 +1,64 @@
-"""Tests for the GitHub sync, curation and routes.
+"""Tests for the GitHub client, the README sections, the sync and the routes.
 
-The sync logic is validated against mocked GitHub responses, no live call is
-made. The cases cover: the client maps and paginates correctly; a first sync
-creates rows; a second sync keeps the curation (hidden stays hidden, override
-stays, sort order stays) while refreshing the mirrored fields; the curated read
-returns only visible repos with pinned first and the override applied; and a
-failing fetch never clears or corrupts the existing cache. The route cases
-cover the session and CSRF protection. The client uses an https base URL so the
-Secure session cookie round-trips.
+No live call is made: the client runs against a mocked transport, and the sync
+tests stub ``fetch_repos``. The client uses an https base URL so the Secure
+session cookie round-trips.
 """
 
 import importlib
-import uuid
 
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+
+from app.content.models import Technology
+from app.db.connection import get_session
+from app.github import client as gh
+from app.github import repository, sync
+from app.github.models import GithubRepo, GithubSync
+from app.github.readme import sections
+from app.github.schemas import SyncedRepo
 
 ADMIN_PASSWORD = "correct horse battery staple"
+
+README = """# Alpha
+
+**Tagline** with [a link](https://example.com)
+
+## Why This Exists
+
+I wanted **bold** words, `code` and a [link](https://example.com).
+A second line of the same paragraph.
+
+![screenshot](shot.png)
+
+## What It Does
+
+### Model Performance
+
+| Model | MAE |
+|-------|-----|
+| Forest | 0.83 |
+
+- first item
+- second *item*
+
+```bash
+## not a heading
+curl example
+```
+
+---
+
+<img src="x.png"> After the image.
+
+## What I Learned
+
+## Try It
+
+Nothing of this is kept.
+"""
 
 
 # --- fixtures ------------------------------------------------------------
@@ -68,49 +109,39 @@ def admin_client(app):
 # --- helpers -------------------------------------------------------------
 
 
-def _raw_repo(
-    name, description=None, language="Python", stars=1, pushed="2026-01-01T00:00:00Z"
-):
+def _raw_repo(github_id, name, **fields):
     """A GitHub API repo object with the fields the client reads."""
     return {
+        "id": github_id,
         "name": name,
-        "description": description,
-        "language": language,
-        "stargazers_count": stars,
-        "html_url": f"https://github.com/wediga/{name}",
-        "pushed_at": pushed,
+        "description": None,
+        "homepage": None,
+        "archived": False,
+        "topics": [],
+        **fields,
     }
 
 
-def _mapped(
-    name,
-    description="github desc",
-    language="Python",
-    stars=1,
-    last_push="2026-01-01T00:00:00Z",
-):
-    """A repo already mapped to the mirrored fields, as the client returns them.
+def _mock_client(pages, readmes=None, readme_status=None):
+    """An httpx2.Client that serves fixed repo pages and READMEs by repo name.
 
-    Used to stub ``fetch_repos`` directly, so the sync and curation tests do not
-    re-implement the client's mapping.
+    A repo without a README answers 404, unless ``readme_status`` sets another
+    status for every README.
     """
-    return {
-        "name": name,
-        "description": description,
-        "language": language,
-        "stars": stars,
-        "url": f"https://github.com/wediga/{name}",
-        "last_push": last_push,
-    }
-
-
-def _mock_client(pages):
-    """Build an httpx2.Client backed by a transport that serves fixed pages.
-
-    ``pages`` is a list of response bodies keyed by the 1-based page number.
-    """
+    readmes = readmes or {}
 
     def handler(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path.endswith("/readme"):
+            name = request.url.path.split("/")[-2]
+
+            if readme_status is not None:
+                return httpx2.Response(readme_status)
+
+            if name not in readmes:
+                return httpx2.Response(404)
+
+            return httpx2.Response(200, text=readmes[name])
+
         page = int(request.url.params.get("page", "1"))
         body = pages[page - 1] if page - 1 < len(pages) else []
         return httpx2.Response(200, json=body)
@@ -121,261 +152,249 @@ def _mock_client(pages):
     )
 
 
+def _repo(github_id, name, *, topics=(), archived=False, **texts) -> SyncedRepo:
+    return SyncedRepo.model_validate(
+        {
+            "github_id": github_id,
+            "homepage_url": None,
+            "archived": archived,
+            "topics": list(topics),
+            "texts": {"name": name, **texts},
+        }
+    )
+
+
+def _sync(monkeypatch, *repos: SyncedRepo) -> int:
+    monkeypatch.setattr(gh, "fetch_repos", lambda **_: list(repos))
+    return sync.sync_repos()
+
+
+def _listed() -> dict[str, dict]:
+    return {repo["name"]: repo for repo in repository.overview()["repos"]}
+
+
+def _count(model) -> int:
+    with get_session() as session:
+        return session.execute(select(func.count()).select_from(model)).scalar_one()
+
+
+# --- README sections -----------------------------------------------------
+
+
+def test_readme_sections_become_plain_text():
+    assert sections(README) == {
+        "problem": "I wanted bold words, code and a link. "
+        "A second line of the same paragraph.",
+        "solution": "Model Performance\n\n- first item\n- second item\n\nAfter the image.",
+    }
+
+
+def test_readme_without_sections_has_no_texts():
+    assert sections("# Title\n\nJust an intro.\n\n## Usage\n\nRun it.") == {}
+
+
+def test_why_it_ended_is_read():
+    assert sections("## Why It Ended\n\nIt was done.") == {"ending": "It was done."}
+
+
 # --- client --------------------------------------------------------------
 
 
-def test_client_maps_fields():
-    from app.github import client as gh
+def test_client_reads_repo_and_readme():
+    raw = _raw_repo(
+        7,
+        "alpha",
+        description="desc",
+        homepage="https://alpha.example",
+        archived=True,
+        topics=["python", "fastapi"],
+    )
 
-    repos = gh.fetch_repos(client=_mock_client([[_raw_repo("alpha", "desc", "Go", 7)]]))
+    repos = gh.fetch_repos(client=_mock_client([[raw]], {"alpha": README}))
+
     assert repos == [
-        {
-            "name": "alpha",
-            "description": "desc",
-            "language": "Go",
-            "stars": 7,
-            "url": "https://github.com/wediga/alpha",
-            "last_push": "2026-01-01T00:00:00Z",
-        }
+        SyncedRepo(
+            github_id=7,
+            homepage_url="https://alpha.example",
+            archived=True,
+            topics=["python", "fastapi"],
+            texts={"name": "alpha", "description": "desc", **sections(README)},
+        )
     ]
 
 
-def test_client_paginates_until_short_page():
-    from app.github import client as gh
+def test_client_drops_empty_texts_and_homepage_without_scheme():
+    raw = _raw_repo(7, "alpha", description="", homepage="alpha.example")
 
-    full = [_raw_repo(f"r{i}") for i in range(100)]
-    second = [_raw_repo("last")]
+    [repo] = gh.fetch_repos(client=_mock_client([[raw]]))
+
+    assert repo.texts == {"name": "alpha"}
+    assert repo.homepage_url is None
+
+
+def test_client_paginates_until_short_page():
+    full = [_raw_repo(i, f"r{i}") for i in range(100)]
+    second = [_raw_repo(100, "last")]
+
     repos = gh.fetch_repos(client=_mock_client([full, second]))
+
     assert len(repos) == 101
-    assert repos[-1]["name"] == "last"
+    assert repos[-1].texts["name"] == "last"
 
 
 def test_client_non_200_raises():
-    from app.github import client as gh
-
     def handler(request):
         return httpx2.Response(403, json={"message": "rate limited"})
 
     bad = httpx2.Client(
         transport=httpx2.MockTransport(handler), base_url="https://api.github.com"
     )
+
     with pytest.raises(gh.GithubApiError):
         gh.fetch_repos(client=bad)
 
 
-# --- sync and curation ---------------------------------------------------
+def test_client_failing_readme_raises():
+    client = _mock_client([[_raw_repo(7, "alpha")]], readme_status=500)
+
+    with pytest.raises(gh.GithubApiError):
+        gh.fetch_repos(client=client)
 
 
-def test_sync_creates_then_preserves_curation(migrated_db, monkeypatch):
-    from app.github import client as gh
-    from app.github import repository as repo
-    from app.github import sync
-    from app.github.schemas import RepoCurationWrite
+@pytest.mark.parametrize(
+    "fields",
+    [{"topics": ["Not A Topic"]}, {"id": None}, {"archived": None}],
+    ids=["topic", "id", "archived"],
+)
+def test_client_rejects_a_malformed_repo(fields):
+    client = _mock_client([[_raw_repo(7, "alpha", **fields)]])
 
-    monkeypatch.setattr(
-        gh,
-        "fetch_repos",
-        lambda **_: [
-            _mapped("alpha", "first alpha", stars=1),
-            _mapped("beta", "first beta", stars=2),
-        ],
-    )
-    assert sync.sync_repos() == 2
+    with pytest.raises(gh.GithubApiError):
+        gh.fetch_repos(client=client)
 
-    rows = {r["name"]: r for r in repo.list_all()}
-    alpha_id = rows["alpha"]["id"]
-    beta_id = rows["beta"]["id"]
 
-    # Curate: hide beta, pin alpha, override alpha's description, set sort order.
-    repo.update_curation(
-        alpha_id,
-        RepoCurationWrite(
-            visible=True, pinned=True, description_override="curated text", sort_order=5
-        ),
-    )
-    repo.update_curation(
-        beta_id,
-        RepoCurationWrite(
-            visible=False, pinned=False, description_override=None, sort_order=0
-        ),
+# --- sync ----------------------------------------------------------------
+
+
+def test_sync_writes_repos_texts_and_technologies(migrated_db, monkeypatch):
+    with get_session() as session:
+        session.add(Technology(topic="python", name="Python"))
+        session.commit()
+
+    count = _sync(
+        monkeypatch,
+        _repo(1, "beta", topics=["python", "dnd5e"], description="b", problem="p"),
+        _repo(2, "Alpha"),
     )
 
-    # Second sync with changed mirrored data (new stars, new descriptions).
-    monkeypatch.setattr(
-        gh,
-        "fetch_repos",
-        lambda **_: [
-            _mapped("alpha", "second alpha", stars=99),
-            _mapped("beta", "second beta", stars=88),
-        ],
-    )
-    assert sync.sync_repos() == 2
-
-    rows = {r["name"]: r for r in repo.list_all()}
-    # Mirrored fields refreshed.
-    assert rows["alpha"]["stars"] == 99
-    assert rows["alpha"]["description"] == "second alpha"
-    # Curation preserved across the sync.
-    assert rows["alpha"]["pinned"] is True
-    assert rows["alpha"]["description_override"] == "curated text"
-    assert rows["alpha"]["sort_order"] == 5
-    assert rows["beta"]["visible"] is False
+    assert count == 2
+    assert list(_listed()) == ["Alpha", "beta"]
+    assert _listed()["beta"]["description"] == "b"
+    # A new topic becomes a technology named like it, an existing one keeps
+    # its name.
+    assert _listed()["beta"]["technologies"] == ["Python", "dnd5e"]
+    assert _count(Technology) == 2
 
 
-def test_curated_read_orders_and_applies_override(migrated_db, monkeypatch):
-    from app.github import client as gh
-    from app.github import repository as repo
-    from app.github import sync
-    from app.github.schemas import RepoCurationWrite
+def test_archived_repo(migrated_db, monkeypatch):
+    _sync(monkeypatch, _repo(1, "alpha", archived=True))
 
-    monkeypatch.setattr(
-        gh,
-        "fetch_repos",
-        lambda **_: [
-            _mapped("alpha"),
-            _mapped("beta"),
-            _mapped("gamma"),
-        ],
-    )
-    sync.sync_repos()
-    rows = {r["name"]: r for r in repo.list_all()}
-
-    # gamma pinned, alpha visible with override, beta hidden.
-    repo.update_curation(
-        rows["gamma"]["id"], RepoCurationWrite(visible=True, pinned=True, sort_order=0)
-    )
-    repo.update_curation(
-        rows["alpha"]["id"],
-        RepoCurationWrite(
-            visible=True, pinned=False, description_override="my words", sort_order=1
-        ),
-    )
-    repo.update_curation(
-        rows["beta"]["id"], RepoCurationWrite(visible=False, pinned=False, sort_order=0)
-    )
-
-    curated = repo.list_curated()
-    names = [r["name"] for r in curated]
-    # Hidden beta absent, pinned gamma first.
-    assert names == ["gamma", "alpha"]
-    # Override wins over the GitHub description; gamma keeps the mirrored one.
-    by_name = {r["name"]: r for r in curated}
-    assert by_name["alpha"]["description"] == "my words"
-    assert by_name["gamma"]["description"] == "github desc"
+    assert _listed()["alpha"]["archived"] is True
 
 
-def test_empty_override_falls_back_to_github_description(migrated_db, monkeypatch):
-    from app.github import client as gh
-    from app.github import repository as repo
-    from app.github import sync
-    from app.github.schemas import RepoCurationWrite
+def test_second_sync_replaces_texts_and_topics(migrated_db, monkeypatch):
+    _sync(monkeypatch, _repo(1, "alpha", topics=["python"], problem="old"))
+    _sync(monkeypatch, _repo(1, "alpha", topics=["go"], description="new"))
 
-    monkeypatch.setattr(
-        gh, "fetch_repos", lambda **_: [_mapped("alpha", "github desc")]
-    )
-    sync.sync_repos()
-    alpha_id = repo.list_all()[0]["id"]
-
-    # An empty-string override must collapse to the GitHub description, not to
-    # an empty line in the recruiter view.
-    repo.update_curation(
-        alpha_id,
-        RepoCurationWrite(
-            visible=True, pinned=False, description_override="", sort_order=0
-        ),
-    )
-    curated = repo.list_curated()
-    assert curated[0]["description"] == "github desc"
+    assert _listed()["alpha"]["technologies"] == ["go"]
+    assert _listed()["alpha"]["description"] == "new"
 
 
-def test_failed_sync_keeps_cache(migrated_db, monkeypatch):
-    from app.github import client as gh
-    from app.github import repository as repo
-    from app.github import sync
+def test_vanished_repo_is_not_listed_but_kept(migrated_db, monkeypatch):
+    _sync(monkeypatch, _repo(1, "alpha"), _repo(2, "beta"))
+    _sync(monkeypatch, _repo(1, "alpha"))
 
-    monkeypatch.setattr(
-        gh,
-        "fetch_repos",
-        lambda **_: [
-            _mapped("alpha", "cached", stars=3),
-        ],
-    )
-    sync.sync_repos()
-    before = repo.list_all()
-    assert len(before) == 1
+    assert list(_listed()) == ["alpha"]
+    assert _count(GithubRepo) == 2
+
+
+def test_rename_keeps_the_repo(migrated_db, monkeypatch):
+    _sync(monkeypatch, _repo(1, "old-name"))
+    [before] = repository.overview()["repos"]
+
+    _sync(monkeypatch, _repo(1, "new-name"))
+    [after] = repository.overview()["repos"]
+
+    assert after["id"] == before["id"]
+    assert after["name"] == "new-name"
+
+
+def test_failed_sync_keeps_the_last_successful_one(migrated_db, monkeypatch):
+    _sync(monkeypatch, _repo(1, "alpha"))
 
     def boom(**_):
-        raise gh.GithubApiError("rate limited")
+        raise gh.GithubApiError("GitHub returned status 403")
 
     monkeypatch.setattr(gh, "fetch_repos", boom)
+
     with pytest.raises(gh.GithubApiError):
         sync.sync_repos()
 
-    # The cache is untouched: same rows, same mirrored data.
-    after = repo.list_all()
-    assert len(after) == 1
-    assert after[0]["description"] == "cached"
-    assert after[0]["stars"] == 3
+    overview = repository.overview()
+    assert overview["last_sync"]["error"] == "GitHub returned status 403"
+    assert overview["last_sync"]["finished_at"] is not None
+    assert list(_listed()) == ["alpha"]
 
 
-# --- route protection ----------------------------------------------------
+def test_old_runs_are_removed_unless_a_repo_was_last_seen_in_them(
+    migrated_db, monkeypatch
+):
+    _sync(monkeypatch, _repo(1, "alpha"), _repo(2, "beta"))
+    _sync(monkeypatch, _repo(1, "alpha"))
+    _sync(monkeypatch, _repo(1, "alpha"))
+
+    # The run that last saw beta and the newest run stay.
+    assert _count(GithubSync) == 2
 
 
-def test_curated_read_needs_a_session(client):
-    assert client.get("/github/repos").status_code == 401
+# --- routes --------------------------------------------------------------
 
 
-def test_admin_list_needs_a_session(client):
+def test_overview_needs_a_session(client):
     assert client.get("/github/admin/repos").status_code == 401
-
-
-def test_curation_write_without_session_is_401(client):
-    assert client.put("/github/repos/1/curation", json={}).status_code == 401
-
-
-def test_curation_write_without_csrf_is_403(session_client):
-    assert session_client.put("/github/repos/1/curation", json={}).status_code == 403
 
 
 def test_sync_without_csrf_is_403(session_client):
     assert session_client.post("/github/sync").status_code == 403
 
 
-def test_admin_can_read_curated_and_admin_lists(admin_client, monkeypatch):
-    # An admin session passes the recruiter gate, so both reads work and start
-    # empty before any sync.
-    assert admin_client.get("/github/repos").json() == []
-    assert admin_client.get("/github/admin/repos").json() == []
+def test_overview_starts_empty(admin_client):
+    assert admin_client.get("/github/admin/repos").json() == {
+        "last_sync": None,
+        "repos": [],
+    }
 
 
-def test_sync_endpoint_runs_and_curation_write_works(admin_client, monkeypatch):
-    from app.github import sync
+def test_sync_endpoint_runs_and_the_overview_shows_it(admin_client, monkeypatch):
+    monkeypatch.setattr(
+        gh, "fetch_repos", lambda **_: [_repo(1, "alpha", topics=["python"])]
+    )
 
-    monkeypatch.setattr(sync, "sync_repos", lambda: 4)
     response = admin_client.post("/github/sync")
-    assert response.status_code == 200
-    assert response.json() == {"ok": True, "synced": 4}
+    overview = admin_client.get("/github/admin/repos").json()
+
+    assert response.json() == {"ok": True, "synced": 1}
+    assert overview["last_sync"]["error"] is None
+    assert [repo["name"] for repo in overview["repos"]] == ["alpha"]
+    assert overview["repos"][0]["technologies"] == ["python"]
 
 
 def test_sync_endpoint_maps_api_error_to_502(admin_client, monkeypatch):
-    from app.github import sync
-    from app.github.client import GithubApiError
-
     def boom():
-        raise GithubApiError("rate limited")
+        raise gh.GithubApiError("rate limited")
 
     monkeypatch.setattr(sync, "sync_repos", boom)
     assert admin_client.post("/github/sync").status_code == 502
-
-
-def test_curation_write_on_missing_repo_is_404(admin_client):
-    assert (
-        admin_client.put(
-            f"/github/repos/{uuid.uuid4()}/curation",
-            json={"visible": True, "pinned": False, "sort_order": 0},
-        ).status_code
-        == 404
-    )
 
 
 def test_lifespan_startup_does_not_block(app):

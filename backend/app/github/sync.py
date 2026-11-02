@@ -1,8 +1,8 @@
-"""The sync step that ties the client to the repository layer.
+"""One run of the sync, from the GitHub API into the database.
 
-The order keeps the cache safe: repos are fetched in full before the
-transactional upsert, so if the fetch raises the database is never touched and
-the existing cache stays whole.
+The run is saved before the fetch. Everything is fetched before anything is
+written, so a failed fetch only marks the run with its error and the repos of
+the last successful run stay as they are.
 """
 
 from app.db.connection import now
@@ -10,10 +10,20 @@ from app.github import client, repository
 
 
 def sync_repos() -> int:
-    """Fetch the public repos and upsert their mirrored fields.
+    """Fetch the public repos and write them, returning how many there are.
 
-    Returns the number of repos written. Raises ``GithubApiError`` from the
-    client on any API problem, in which case nothing was written.
+    Raises ``GithubApiError`` from the client on any API problem, after the run
+    is saved with the error.
     """
-    repos = client.fetch_repos()
-    return repository.upsert_repos(repos, now())
+    run_id = repository.start_run(now())
+
+    try:
+        repos = client.fetch_repos()
+    except client.GithubApiError as exc:
+        repository.fail_run(run_id, str(exc), now())
+
+        raise
+
+    repository.finish_run(run_id, repos, now())
+
+    return len(repos)

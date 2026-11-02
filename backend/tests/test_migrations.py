@@ -29,6 +29,9 @@ EXPECTED_TABLES = {
     SITE_SCHEMA: {
         "cv_document",
         "github_repo",
+        "github_repo_technology",
+        "github_repo_text",
+        "github_sync",
         "link_kind",
         "postal_address",
         "profile",
@@ -37,6 +40,7 @@ EXPECTED_TABLES = {
         "skill",
         "skill_category",
         "technology",
+        "text_field",
     },
 }
 
@@ -197,3 +201,30 @@ def test_clashing_topics_stop_the_migration(skills_db, skills) -> None:
 
     with pytest.raises(IntegrityError):
         command.upgrade(alembic_config(), "head")
+
+
+# The revision before the sync tables, with a repo in the old shape.
+BEFORE_GITHUB_SYNC = "0004_technology"
+
+
+@pytest.fixture()
+def old_repo_db(_schema):
+    yield from _back_to(BEFORE_GITHUB_SYNC)
+
+
+def test_old_repos_are_removed_for_the_next_sync(old_repo_db) -> None:
+    with get_session() as session:
+        session.execute(
+            text(
+                f"INSERT INTO {SITE_SCHEMA}.github_repo (name, pinned) "
+                "VALUES ('alpha', true)"
+            )
+        )
+        session.commit()
+
+    command.upgrade(alembic_config(), "head")
+
+    with get_session() as session:
+        repos = session.scalar(text(f"SELECT count(*) FROM {SITE_SCHEMA}.github_repo"))
+
+    assert repos == 0

@@ -3,7 +3,7 @@
 A plain ``asyncio`` loop keeps the project free of a scheduler dependency. It
 syncs on start and then every interval, each run offloaded to a thread so the
 blocking httpx2 and database calls never stall the event loop. A failed sync only
-logs and keeps the existing cache, the loop survives. The interval is
+logs and keeps the last successful sync, the loop survives. The interval is
 ``GITHUB_SYNC_INTERVAL_SECONDS`` (default six hours), and zero or less disables
 the scheduled run, which keeps tests and local runs quiet.
 """
@@ -36,9 +36,9 @@ async def _run_loop(interval: float) -> None:
             count = await asyncio.to_thread(sync_repos)
             logger.info("github sync: %d repos refreshed", count)
         except Exception:  # noqa: BLE001
-            # Any failure keeps the existing cache and the loop alive. The
+            # Any failure keeps the last successful sync and the loop alive. The
             # token is never part of the message.
-            logger.warning("github sync failed; keeping the existing cache")
+            logger.warning("github sync failed; keeping the last successful sync")
         await asyncio.sleep(interval)
 
 

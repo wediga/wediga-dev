@@ -1,1 +1,1 @@
-"""GitHub layer: repository sync from the GitHub API (added in a later phase)."""
+"""GitHub layer: the public repos and their READMEs, synced from the GitHub API."""
