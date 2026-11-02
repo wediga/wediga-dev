@@ -3,6 +3,7 @@ import { backendUrl } from "./backend";
 import { sessionCookieHeader } from "./forwarding";
 import type { PortraitCrop } from "./portrait";
 import type {
+  Card,
   Contact,
   CvStatus,
   Impressum,
@@ -63,6 +64,10 @@ export async function getRecruiterSession(): Promise<boolean> {
 
 export function getContact(): Promise<Contact | null> {
   return getJsonWithSession<Contact>("/content/contact");
+}
+
+export function getCard(): Promise<Card | null> {
+  return getJson<Card>("/card");
 }
 
 export function getImpressum(): Promise<Impressum | null> {
