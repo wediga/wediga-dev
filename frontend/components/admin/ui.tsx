@@ -237,6 +237,12 @@ export function AdminField({
   );
 }
 
+// Short readable timestamp without a date library.
+export function formatTimestamp(value: string | null): string {
+  if (!value) return "-";
+  return value.slice(0, 16).replace("T", " ");
+}
+
 // Names what is missing and where to add the first item, not just "nothing here".
 export function EmptyState({ children }: { children: ReactNode }) {
   return (

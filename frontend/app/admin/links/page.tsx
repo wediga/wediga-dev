@@ -10,6 +10,7 @@ import {
   ConfirmButton,
   EmptyState,
   Feedback,
+  formatTimestamp,
   useActionFeedback,
   type ActionStatus,
 } from "@/components/admin/ui";
@@ -20,12 +21,6 @@ function linkStatus(link: RecruiterLink): { label: string; tone: string } {
   if (link.revoked_at) return { label: "Revoked", tone: "text-danger" };
   if (!link.active) return { label: "Expired", tone: "text-muted" };
   return { label: "Active", tone: "text-success" };
-}
-
-// Short readable timestamp without a date library.
-function fmt(value: string | null): string {
-  if (!value) return "-";
-  return value.slice(0, 16).replace("T", " ");
 }
 
 // The date of one link's expiry with its own input state, so editing one link
@@ -219,8 +214,8 @@ export default function AdminLinksPage() {
                 </div>
               <div className="mt-1.5 flex flex-wrap gap-x-6 gap-y-1 text-sm tabular-nums text-muted">
                 <span>Opens: {link.view_count}</span>
-                <span>Last opened: {fmt(link.last_viewed_at)}</span>
-                <span>Created: {fmt(link.created_at)}</span>
+                <span>Last opened: {formatTimestamp(link.last_viewed_at)}</span>
+                <span>Created: {formatTimestamp(link.created_at)}</span>
                 <span>
                   Expires:{" "}
                   {link.expires_at ? link.expires_at.slice(0, 10) : "never"}
