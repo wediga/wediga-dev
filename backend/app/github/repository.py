@@ -25,13 +25,10 @@ from app.github.models import (
     GithubSync,
     TextField,
 )
-from app.github.schemas import TEXT_FIELDS, SyncedRepo, TextFieldKey
+from app.github.schemas import TEXT_FIELDS, SyncedRepo
 
 # The columns of a repo that a later run overwrites.
 _SYNCED_COLUMNS = ("homepage_url", "archived", "last_seen_sync_id")
-
-# The texts the admin list shows of each repo.
-_LISTED_TEXTS: tuple[TextFieldKey, ...] = ("name", "description")
 
 
 def start_run(started_at: datetime) -> uuid.UUID:
@@ -155,7 +152,7 @@ def finish_run(
 
 
 def _repos_seen_in(session: Session, run_id: uuid.UUID) -> list[dict]:
-    """Return the repos of one run with their name, description and topics."""
+    """Return the repos of one run with their texts and topics."""
     seen = GithubRepo.last_seen_sync_id == run_id
     repos = session.scalars(select(GithubRepo).where(seen)).all()
     texts: dict[uuid.UUID, dict[str, str]] = defaultdict(dict)
@@ -165,7 +162,7 @@ def _repos_seen_in(session: Session, run_id: uuid.UUID) -> list[dict]:
         select(GithubRepoText.github_repo_id, TextField.key, GithubRepoText.value)
         .join(TextField)
         .join(GithubRepo)
-        .where(seen, TextField.key.in_(_LISTED_TEXTS))
+        .where(seen)
     ):
         texts[repo_id][key] = value
 
@@ -181,14 +178,13 @@ def _repos_seen_in(session: Session, run_id: uuid.UUID) -> list[dict]:
     listed = [
         {
             **repo.as_dict(),
-            "name": texts[repo.id]["name"],
-            "description": texts[repo.id].get("description"),
+            "texts": texts[repo.id],
             "technologies": technologies[repo.id],
         }
         for repo in repos
     ]
 
-    return sorted(listed, key=lambda repo: repo["name"].lower())
+    return sorted(listed, key=lambda repo: repo["texts"]["name"].lower())
 
 
 def overview() -> dict:

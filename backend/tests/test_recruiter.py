@@ -220,7 +220,7 @@ def test_redeem_starts_session_and_records_view(app, admin_client) -> None:
 
     # The recruiter session now unlocks the gated views.
     assert visitor.get("/recruiter/session").status_code == 200
-    assert visitor.get("/content/projects").status_code == 200
+    assert visitor.get("/portfolio").status_code == 200
     assert visitor.get("/content/contact").status_code == 200
 
     # The view is tracked and visible to the admin with a count and a time.
@@ -296,13 +296,13 @@ def test_recruiter_session_grants_no_admin_rights(app, admin_client) -> None:
     assert visitor.get("/auth/me").status_code == 401
     assert visitor.post("/recruiter/links", json={}).status_code == 401
     assert visitor.get("/recruiter/links").status_code == 401
-    assert visitor.get("/content/admin/projects").status_code == 401
+    assert visitor.get("/portfolio/admin").status_code == 401
 
 
 def test_recruiter_gate_blocks_anonymous_but_admin_passes(client, admin_client) -> None:
-    assert client.get("/content/projects").status_code == 401
+    assert client.get("/portfolio").status_code == 401
     # An admin session satisfies the recruiter-or-admin gate.
-    assert admin_client.get("/content/projects").status_code == 200
+    assert admin_client.get("/portfolio").status_code == 200
     assert admin_client.get("/recruiter/session").status_code == 200
 
 
@@ -313,7 +313,7 @@ def test_revocation_cuts_an_active_recruiter_session(app, admin_client) -> None:
         visitor.post("/recruiter/redeem", json={"token": created["token"]}).status_code
         == 200
     )
-    assert visitor.get("/content/projects").status_code == 200
+    assert visitor.get("/portfolio").status_code == 200
 
     # The admin revokes the link the visitor is currently using.
     assert (
@@ -323,7 +323,7 @@ def test_revocation_cuts_an_active_recruiter_session(app, admin_client) -> None:
     # The open session loses access on the next read; revocation closes the
     # door and not only the entrance.
     assert visitor.get("/recruiter/session").status_code == 401
-    assert visitor.get("/content/projects").status_code == 401
+    assert visitor.get("/portfolio").status_code == 401
     assert visitor.get("/content/contact").status_code == 401
 
 

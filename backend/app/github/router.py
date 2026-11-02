@@ -1,31 +1,19 @@
-"""GitHub routes for the admin: the state of the sync and a sync on demand.
+"""GitHub route for the admin: a sync on demand.
 
-Nothing the sync stores is writable through a route. The write uses the
-standard gate (see WRITE_DEPS).
+Nothing the sync stores is writable through a route, and the admin reads it
+through the portfolio. The write uses the standard gate (see WRITE_DEPS).
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.csrf import require_csrf
 from app.auth.dependencies import require_admin
-from app.github import repository as repo
 from app.github import sync
 from app.github.client import GithubApiError
-from app.github.schemas import GithubOverview
 
 router = APIRouter(prefix="/github", tags=["github"])
 
 WRITE_DEPS = [Depends(require_admin), Depends(require_csrf)]
-
-
-@router.get(
-    "/admin/repos",
-    response_model=GithubOverview,
-    dependencies=[Depends(require_admin)],
-)
-def read_overview() -> dict:
-    """Admin read: the latest run and the repos of the latest successful one."""
-    return repo.overview()
 
 
 @router.post("/sync", dependencies=WRITE_DEPS)

@@ -1,4 +1,4 @@
-"""Pydantic schemas for the profile, projects, technologies and skills.
+"""Pydantic schemas for the profile, technologies and skills.
 
 The write models carry length limits so oversized input is rejected before it
 touches the database.
@@ -7,7 +7,7 @@ touches the database.
 import uuid
 from typing import Annotated, Literal, get_args
 
-from pydantic import AfterValidator, BaseModel, Field, field_validator
+from pydantic import AfterValidator, BaseModel, Field
 
 # Bounded limits so a write can never store an unbounded blob.
 SHORT = 200
@@ -27,11 +27,10 @@ def is_web_link(value: str) -> bool:
     return value.strip().lower().startswith(("http://", "https://"))
 
 
-def _validate_web_link(value: str | None) -> str | None:
-    if value is None or value == "":
-        return value
+def _validate_web_link(value: str) -> str:
     if not is_web_link(value):
         raise ValueError("link must start with http:// or https://")
+
     return value
 
 
@@ -70,28 +69,6 @@ class ImpressumContent(BaseModel):
 
     name: str
     email: str
-
-
-class ProjectWrite(BaseModel):
-    """A project row as written from the admin."""
-
-    name: str = Field(min_length=1, max_length=SHORT)
-    tagline: str | None = Field(default=None, max_length=MEDIUM)
-    problem: str | None = Field(default=None, max_length=LONG)
-    solution: str | None = Field(default=None, max_length=LONG)
-    learning: str | None = Field(default=None, max_length=LONG)
-    tech_stack: list[str] = Field(default_factory=list, max_length=50)
-    demo_link: str | None = Field(default=None, max_length=MEDIUM)
-    github_link: str | None = Field(default=None, max_length=MEDIUM)
-    status: str | None = Field(default=None, max_length=SHORT)
-    sort_order: int = 0
-    visible: bool = True
-
-    _check_links = field_validator("demo_link", "github_link")(_validate_web_link)
-
-
-class ProjectRead(ProjectWrite):
-    id: uuid.UUID
 
 
 class SkillRead(BaseModel):

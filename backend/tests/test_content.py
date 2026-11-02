@@ -1,7 +1,7 @@
 """Tests for the content CRUD layer.
 
 Cover the profile with its two views, create, read, update and delete for
-projects, technologies and skills, the public reads that need no session, the 401 when a
+technologies and skills, the public reads that need no session, the 401 when a
 write has no session and the 403 when a write has a session but no valid CSRF
 token. The client uses an
 https base URL so the Secure session cookie round-trips.
@@ -129,35 +129,6 @@ def test_profile_rejects_bad_links(admin_client, links) -> None:
     body = {**PROFILE, "links": links}
 
     assert admin_client.put("/content/profile", json=body).status_code == 422
-
-
-# --- projects ------------------------------------------------------------
-
-
-def test_project_crud_and_visibility(admin_client) -> None:
-    create = admin_client.post(
-        "/content/projects",
-        json={"name": "Demo", "tagline": "t", "tech_stack": ["Python"]},
-    )
-    assert create.status_code == 201
-    project = create.json()
-    assert uuid.UUID(project["id"])
-    assert project["tech_stack"] == ["Python"]
-    project_id = project["id"]
-
-    update = admin_client.put(
-        f"/content/projects/{project_id}",
-        json={"name": "Demo", "tagline": "new", "visible": False},
-    )
-    assert update.status_code == 200
-    assert update.json()["tagline"] == "new"
-
-    # Hidden projects stay out of the public list but show in the admin list.
-    assert admin_client.get("/content/projects").json() == []
-    assert len(admin_client.get("/content/admin/projects").json()) == 1
-
-    assert admin_client.delete(f"/content/projects/{project_id}").status_code == 200
-    assert admin_client.delete(f"/content/projects/{project_id}").status_code == 404
 
 
 # --- skills and technologies ---------------------------------------------
@@ -304,15 +275,6 @@ def test_topic_follows_the_github_rules(admin_client, topic) -> None:
     assert response.status_code == 422
 
 
-def test_duplicate_project_name_is_409(admin_client) -> None:
-    assert (
-        admin_client.post("/content/projects", json={"name": "Dup"}).status_code == 201
-    )
-    assert (
-        admin_client.post("/content/projects", json={"name": "Dup"}).status_code == 409
-    )
-
-
 # --- public reads --------------------------------------------------------
 
 
@@ -323,8 +285,7 @@ def test_public_reads_need_no_session(client) -> None:
 
 
 def test_recruiter_reads_need_a_session(client) -> None:
-    # The full portfolio and the contact details sit behind the recruiter gate.
-    assert client.get("/content/projects").status_code == 401
+    # The contact details sit behind the recruiter gate.
     assert client.get("/content/contact").status_code == 401
 
 
@@ -333,14 +294,18 @@ def test_recruiter_reads_need_a_session(client) -> None:
 
 def test_writes_without_session_are_401(client) -> None:
     assert client.put("/content/profile", json=PROFILE).status_code == 401
-    assert client.post("/content/projects", json={"name": "X"}).status_code == 401
-    assert client.delete("/content/projects/1").status_code == 401
+    assert (
+        client.post("/content/skills/categories", json={"name": "X"}).status_code == 401
+    )
 
 
 def test_writes_without_csrf_are_403(session_client) -> None:
     assert session_client.put("/content/profile", json=PROFILE).status_code == 403
     assert (
-        session_client.post("/content/projects", json={"name": "X"}).status_code == 403
+        session_client.post(
+            "/content/skills/categories", json={"name": "X"}
+        ).status_code
+        == 403
     )
 
 
@@ -367,31 +332,12 @@ def test_technologies_read_needs_session(client) -> None:
     assert client.get("/content/technologies").status_code == 401
 
 
-def test_admin_projects_read_needs_session(client) -> None:
-    assert client.get("/content/admin/projects").status_code == 401
-
-
 def test_profile_read_needs_session(client) -> None:
     assert client.get("/content/profile").status_code == 401
 
 
 def test_invalid_body_is_422(admin_client) -> None:
-    # Empty project name violates the min_length constraint.
-    assert admin_client.post("/content/projects", json={"name": ""}).status_code == 422
+    # An empty category name violates the min_length constraint.
+    response = admin_client.post("/content/skills/categories", json={"name": ""})
 
-
-def test_link_field_rejects_non_http_scheme(admin_client) -> None:
-    # A javascript: link must never be storable, even by the admin.
-    response = admin_client.post(
-        "/content/projects",
-        json={"name": "Bad", "demo_link": "javascript:alert(1)"},
-    )
     assert response.status_code == 422
-
-
-def test_link_field_accepts_https(admin_client) -> None:
-    response = admin_client.post(
-        "/content/projects",
-        json={"name": "Good", "github_link": "https://github.com/wediga/x"},
-    )
-    assert response.status_code == 201

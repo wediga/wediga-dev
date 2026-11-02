@@ -1,39 +1,14 @@
-"""Models of the site content: the profile, projects, technologies and skills.
-
-Projects keep the shape the table had in SQLite, as a step towards the data
-model in the plan, which replaces them with the portfolio from GitHub.
-"""
+"""Models of the site content: the profile, technologies and skills."""
 
 import uuid
 
 from sqlalchemy import ForeignKey, Index, UniqueConstraint, text
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import SITE_SCHEMA, UUID_DEFAULT, Base
 
 # The links and the address of the profile go away together with it.
 PROFILE_ID = f"{SITE_SCHEMA}.profile.id"
-
-
-class Project(Base):
-    __tablename__ = "project"
-    __table_args__ = ({"schema": SITE_SCHEMA},)
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        primary_key=True, server_default=UUID_DEFAULT, init=False
-    )
-    name: Mapped[str] = mapped_column(unique=True)
-    tagline: Mapped[str | None] = mapped_column(default=None)
-    problem: Mapped[str | None] = mapped_column(default=None)
-    solution: Mapped[str | None] = mapped_column(default=None)
-    learning: Mapped[str | None] = mapped_column(default=None)
-    tech_stack: Mapped[list[str] | None] = mapped_column(JSONB, default=None)
-    demo_link: Mapped[str | None] = mapped_column(default=None)
-    github_link: Mapped[str | None] = mapped_column(default=None)
-    status: Mapped[str | None] = mapped_column(default=None)
-    sort_order: Mapped[int] = mapped_column(default=0)
-    visible: Mapped[bool] = mapped_column(default=True)
 
 
 class SkillCategory(Base):

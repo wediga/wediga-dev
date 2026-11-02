@@ -18,8 +18,6 @@ from app.content.schemas import (
     ContactContent,
     ImpressumContent,
     ProfileContent,
-    ProjectRead,
-    ProjectWrite,
     SkillCategoryRead,
     SkillCategoryWrite,
     TechnologyRead,
@@ -77,56 +75,6 @@ def read_impressum() -> ImpressumContent | None:
         return None
 
     return ImpressumContent(name=profile.name, email=profile.email)
-
-
-# --- projects ------------------------------------------------------------
-
-
-@router.get(
-    "/projects",
-    response_model=list[ProjectRead],
-    dependencies=RECRUITER_READ_DEPS,
-)
-def read_projects() -> list[dict]:
-    """Recruiter read: only visible projects."""
-    return repo.list_projects(include_hidden=False)
-
-
-@router.get(
-    "/admin/projects",
-    response_model=list[ProjectRead],
-    dependencies=[Depends(require_admin)],
-)
-def read_all_projects() -> list[dict]:
-    """Admin read: every project, including hidden ones."""
-    return repo.list_projects(include_hidden=True)
-
-
-@router.post(
-    "/projects",
-    response_model=ProjectRead,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=WRITE_DEPS,
-)
-def create_project(body: ProjectWrite) -> dict:
-    return repo.create_project(body)
-
-
-@router.put(
-    "/projects/{project_id}", response_model=ProjectRead, dependencies=WRITE_DEPS
-)
-def update_project(project_id: uuid.UUID, body: ProjectWrite) -> dict:
-    updated = repo.update_project(project_id, body)
-    if updated is None:
-        raise NOT_FOUND
-    return updated
-
-
-@router.delete("/projects/{project_id}", dependencies=WRITE_DEPS)
-def delete_project(project_id: uuid.UUID) -> dict[str, bool]:
-    if not repo.delete_project(project_id):
-        raise NOT_FOUND
-    return {"ok": True}
 
 
 # --- skills --------------------------------------------------------------

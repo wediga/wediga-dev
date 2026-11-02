@@ -6,7 +6,6 @@ from app.content.models import (
     PostalAddress,
     Profile,
     ProfileLink,
-    Project,
     Skill,
     SkillCategory,
     Technology,
@@ -17,7 +16,6 @@ from app.db.seed import run_seed
 
 def _counts() -> dict[str, int]:
     statements = {
-        "projects": select(func.count()).select_from(Project),
         "categories": select(func.count()).select_from(SkillCategory),
         "skills": select(func.count()).select_from(Skill),
         "technologies": select(func.count()).select_from(Technology),
@@ -36,7 +34,6 @@ def _counts() -> dict[str, int]:
 def test_seed_loads_content(migrated_db) -> None:
     run_seed()
     counts = _counts()
-    assert counts["projects"] == 1
     assert counts["categories"] == 2
     assert counts["profiles"] == 1
     assert counts["links"] == 2

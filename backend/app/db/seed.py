@@ -2,9 +2,7 @@
 
 Reads the content files and upserts them on a stable natural key, so a re-run
 makes no duplicates and pulls in file edits, never writing back to the files.
-The admin-managed ``visible`` flag on a project survives a re-seed, so it never
-re-shows a project the admin hid. The summary counts entries processed, not
-rows changed.
+The summary counts entries processed, not rows changed.
 """
 
 import json
@@ -15,24 +13,10 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.content import repository
-from app.content.models import Project, Skill, SkillCategory, Technology
+from app.content.models import Skill, SkillCategory, Technology
 from app.content.schemas import ProfileContent, TechnologyWrite
 from app.db.connection import get_session
 from app.paths import content_dir
-
-# The project columns a re-seed overwrites. ``visible`` is absent because it
-# belongs to the admin.
-_PROJECT_FILE_COLUMNS = (
-    "tagline",
-    "problem",
-    "solution",
-    "learning",
-    "tech_stack",
-    "demo_link",
-    "github_link",
-    "status",
-    "sort_order",
-)
 
 
 def _require(path: Path) -> Path:
@@ -47,38 +31,6 @@ def _seed_profile(session: Session, base: Path) -> int:
     repository.save_profile(session, ProfileContent(**data, about_md=about))
 
     return 1
-
-
-def _seed_projects(session: Session, base: Path) -> int:
-    path = _require(base / "projects.json")
-    projects = json.loads(path.read_text(encoding="utf-8"))
-
-    for index, item in enumerate(projects):
-        links = item.get("links", {}) or {}
-        statement = insert(Project).values(
-            name=item.get("name"),
-            tagline=item.get("tagline"),
-            problem=item.get("problem"),
-            solution=item.get("solution"),
-            learning=item.get("learning"),
-            tech_stack=item.get("tech_stack", []),
-            demo_link=links.get("demo"),
-            github_link=links.get("github"),
-            status=item.get("status"),
-            sort_order=index,
-            visible=True,
-        )
-        session.execute(
-            statement.on_conflict_do_update(
-                index_elements=[Project.name],
-                set_={
-                    column: statement.excluded[column]
-                    for column in _PROJECT_FILE_COLUMNS
-                },
-            )
-        )
-
-    return len(projects)
 
 
 def _seed_skills(session: Session, base: Path) -> tuple[int, int]:
@@ -139,7 +91,6 @@ def run_seed() -> dict[str, int]:
 
     with get_session() as session:
         summary["profile"] = _seed_profile(session, base)
-        summary["projects"] = _seed_projects(session, base)
         categories, skills = _seed_skills(session, base)
         summary["skill_categories"] = categories
         summary["skills"] = skills
