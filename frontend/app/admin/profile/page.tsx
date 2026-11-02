@@ -11,6 +11,7 @@ import { LINK_LABELS, type LinkKind, type ProfileLinks } from "@/lib/types";
 type ProfileForm = {
   name: string;
   email: string;
+  phone: string;
   links: ProfileLinks;
   street: string;
   postal_code: string;
@@ -21,6 +22,7 @@ type ProfileForm = {
 const EMPTY: ProfileForm = {
   name: "",
   email: "",
+  phone: "",
   links: {},
   street: "",
   postal_code: "",
@@ -55,6 +57,7 @@ export default function AdminProfilePage() {
         return {
           name: recordString(data.name),
           email: recordString(data.email),
+          phone: recordString(data.phone),
           links: Object.fromEntries(
             LINK_KINDS.map((kind) => [kind, recordString(links[kind])]),
           ),
@@ -67,6 +70,7 @@ export default function AdminProfilePage() {
       toBody={(value) => ({
         name: value.name,
         email: value.email,
+        phone: value.phone,
         about_md: value.about_md,
         links: Object.fromEntries(
           Object.entries(value.links).filter(([, url]) => url),
@@ -95,6 +99,12 @@ export default function AdminProfilePage() {
               type="email"
               value={form.email}
               onChange={(value) => update("email", value)}
+            />
+            <AdminField
+              label="Phone"
+              type="tel"
+              value={form.phone}
+              onChange={(value) => update("phone", value)}
             />
             {LINK_KINDS.map((kind) => (
               <AdminField

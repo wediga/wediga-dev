@@ -70,6 +70,7 @@ class Profile(Base):
     )
     name: Mapped[str]
     email: Mapped[str]
+    phone: Mapped[str]
     about_md: Mapped[str]
 
 

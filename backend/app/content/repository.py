@@ -51,6 +51,7 @@ def get_profile() -> ProfileContent | None:
             {
                 "name": profile.name,
                 "email": profile.email,
+                "phone": profile.phone,
                 "about_md": profile.about_md,
                 "links": dict(links.all()),
                 "address": ProfileAddress.model_validate(address, from_attributes=True)
@@ -65,12 +66,15 @@ def save_profile(session: Session, data: ProfileContent) -> None:
     profile = session.scalar(select(Profile))
 
     if profile is None:
-        profile = Profile(name=data.name, email=data.email, about_md=data.about_md)
+        profile = Profile(
+            name=data.name, email=data.email, phone=data.phone, about_md=data.about_md
+        )
         session.add(profile)
         session.flush()
     else:
         profile.name = data.name
         profile.email = data.email
+        profile.phone = data.phone
         profile.about_md = data.about_md
 
     session.execute(delete(ProfileLink).where(ProfileLink.profile_id == profile.id))
