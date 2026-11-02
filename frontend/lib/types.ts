@@ -101,3 +101,12 @@ export interface SkillCategory {
   sort_order: number;
   skills: Skill[];
 }
+
+// A technology by its GitHub topic. With a category it is a skill.
+export interface Technology {
+  id: string;
+  topic: string;
+  name: string;
+  skill_category_id: string | null;
+  sort_order: number | null;
+}

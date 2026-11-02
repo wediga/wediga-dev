@@ -9,6 +9,7 @@ from app.content.models import (
     Project,
     Skill,
     SkillCategory,
+    Technology,
 )
 from app.db.connection import get_session
 from app.db.seed import run_seed
@@ -19,6 +20,7 @@ def _counts() -> dict[str, int]:
         "projects": select(func.count()).select_from(Project),
         "categories": select(func.count()).select_from(SkillCategory),
         "skills": select(func.count()).select_from(Skill),
+        "technologies": select(func.count()).select_from(Technology),
         "profiles": select(func.count()).select_from(Profile),
         "links": select(func.count()).select_from(ProfileLink),
         "addresses": select(func.count()).select_from(PostalAddress),
@@ -39,7 +41,8 @@ def test_seed_loads_content(migrated_db) -> None:
     assert counts["profiles"] == 1
     assert counts["links"] == 2
     assert counts["addresses"] == 1
-    assert counts["skills"] > 0
+    assert counts["skills"] == 3
+    assert counts["technologies"] == 3
 
 
 def test_seed_is_idempotent(migrated_db) -> None:

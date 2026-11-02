@@ -15,8 +15,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.content import repository
-from app.content.models import Project, Skill, SkillCategory
-from app.content.schemas import ProfileContent
+from app.content.models import Project, Skill, SkillCategory, Technology
+from app.content.schemas import ProfileContent, TechnologyWrite
 from app.db.connection import get_session
 from app.paths import content_dir
 
@@ -87,7 +87,7 @@ def _seed_skills(session: Session, base: Path) -> tuple[int, int]:
     category_count = 0
     skill_count = 0
 
-    for cat_index, (category, names) in enumerate(data.items()):
+    for cat_index, (category, entries) in enumerate(data.items()):
         category_insert = insert(SkillCategory).values(
             name=category, sort_order=cat_index
         )
@@ -102,14 +102,29 @@ def _seed_skills(session: Session, base: Path) -> tuple[int, int]:
             select(SkillCategory.id).where(SkillCategory.name == category)
         ).one()
 
-        for skill_index, name in enumerate(names):
+        for skill_index, entry in enumerate(entries):
+            technology = TechnologyWrite.model_validate(entry)
+            technology_insert = insert(Technology).values(
+                topic=technology.topic, name=technology.name
+            )
+            technology_id = session.scalars(
+                technology_insert.on_conflict_do_update(
+                    index_elements=[Technology.topic],
+                    set_={"name": technology_insert.excluded.name},
+                ).returning(Technology.id)
+            ).one()
             skill_insert = insert(Skill).values(
-                category_id=category_id, name=name, sort_order=skill_index
+                skill_category_id=category_id,
+                technology_id=technology_id,
+                sort_order=skill_index,
             )
             session.execute(
                 skill_insert.on_conflict_do_update(
-                    index_elements=[Skill.category_id, Skill.name],
-                    set_={"sort_order": skill_insert.excluded.sort_order},
+                    index_elements=[Skill.technology_id],
+                    set_={
+                        "skill_category_id": skill_insert.excluded.skill_category_id,
+                        "sort_order": skill_insert.excluded.sort_order,
+                    },
                 )
             )
             skill_count += 1

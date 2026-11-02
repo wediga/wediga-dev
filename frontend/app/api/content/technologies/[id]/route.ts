@@ -3,10 +3,16 @@ import { proxyToBackend, type Params } from "@/lib/bff";
 
 export async function PUT(request: NextRequest, { params }: Params) {
   const { id } = await params;
-  return proxyToBackend(request, `/content/skills/${encodeURIComponent(id)}`);
+  return proxyToBackend(
+    request,
+    `/content/technologies/${encodeURIComponent(id)}`,
+  );
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
   const { id } = await params;
-  return proxyToBackend(request, `/content/skills/${encodeURIComponent(id)}`);
+  return proxyToBackend(
+    request,
+    `/content/technologies/${encodeURIComponent(id)}`,
+  );
 }
