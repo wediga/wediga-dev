@@ -374,3 +374,20 @@ def test_login_rate_limit_blocks_after_too_many_attempts(client) -> None:
     assert (
         client.post("/auth/login", json={"password": ADMIN_PASSWORD}).status_code == 429
     )
+
+
+def test_login_rate_limit_counts_one_ipv6_64_as_one_visitor(client) -> None:
+    def attempt(ip: str) -> int:
+        headers = {"x-forwarded-for": ip}
+
+        return client.post(
+            "/auth/login", json={"password": "wrong"}, headers=headers
+        ).status_code
+
+    # Rotating through addresses of one /64 does not buy fresh attempts, while
+    # a visitor from another /64 still has their own budget.
+    for host in range(1, 11):
+        assert attempt(f"2001:db8:1:2::{host}") == 401
+
+    assert attempt("2001:db8:1:2::ff") == 429
+    assert attempt("2001:db8:1:3::1") == 401

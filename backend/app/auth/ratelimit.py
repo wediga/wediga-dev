@@ -4,8 +4,13 @@ The client IP comes from ``X-Forwarded-For``, trusted because the backend is
 reachable only through the Caddy and Next.js BFF proxy chain that sets it.
 """
 
+import ipaddress
 import time
 from threading import Lock
+
+# An IPv6 subscriber usually gets a whole /64 from their provider, so counting
+# single addresses would let them rotate through it and escape every limit.
+IPV6_LIMIT_PREFIX_BITS = 64
 
 
 def client_ip(request) -> str:
@@ -23,6 +28,25 @@ def client_ip(request) -> str:
         if parts:
             return parts[-1]
     return request.client.host if request.client else "unknown"
+
+
+def limit_key(request) -> str:
+    """Return the key the rate limiters count a request under.
+
+    An IPv4 address counts on its own, an IPv6 address counts for its whole
+    /64. A value that is no address is used as it is.
+    """
+    ip = client_ip(request)
+
+    try:
+        address = ipaddress.ip_address(ip)
+    except ValueError:
+        return ip
+
+    if isinstance(address, ipaddress.IPv4Address):
+        return ip
+
+    return str(ipaddress.ip_network(f"{ip}/{IPV6_LIMIT_PREFIX_BITS}", strict=False))
 
 
 class RateLimiter:

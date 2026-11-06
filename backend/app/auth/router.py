@@ -14,7 +14,7 @@ from app.auth.csrf import csrf_token, require_csrf
 from app.auth.dependencies import require_admin, require_login
 from app.auth.models import Admin, LegacyAdminLogin
 from app.auth.passwords import verify_password
-from app.auth.ratelimit import client_ip, login_limiter, totp_limiter
+from app.auth.ratelimit import limit_key, login_limiter, totp_limiter
 from app.db.connection import get_session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -72,8 +72,8 @@ def login(request: Request, body: LoginRequest) -> dict[str, bool]:
     factor enabled a correct password only starts a login waiting for it and
     grants no admin rights until the TOTP step succeeds.
     """
-    ip = client_ip(request)
-    if not login_limiter.hit(ip):
+    key = limit_key(request)
+    if not login_limiter.hit(key):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many login attempts, try again later",
@@ -90,7 +90,7 @@ def login(request: Request, body: LoginRequest) -> dict[str, bool]:
 
     # A correct password clears the counter, so earlier mistyped attempts
     # never lock out a legitimate admin.
-    login_limiter.reset(ip)
+    login_limiter.reset(key)
 
     # The password alone grants no admin rights when the second factor is
     # active; only the step below promotes the login.
@@ -115,8 +115,8 @@ def login_totp(request: Request, body: CodeRequest) -> dict[str, bool]:
             detail="No pending second factor",
         )
 
-    ip = client_ip(request)
-    if not totp_limiter.hit(ip):
+    key = limit_key(request)
+    if not totp_limiter.hit(key):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many code attempts, try again later",
@@ -144,7 +144,7 @@ def login_totp(request: Request, body: CodeRequest) -> dict[str, bool]:
             detail="Invalid code",
         )
 
-    totp_limiter.reset(ip)
+    totp_limiter.reset(key)
     _start_session(request, second_factor_done=True)
     return {"ok": True}
 
@@ -231,8 +231,8 @@ def totp_confirm(request: Request, body: CodeRequest) -> dict[str, bool]:
     The confirmation shares the code rate limiter, so a brute-force of the
     confirm step is capped just like the login step.
     """
-    ip = client_ip(request)
-    if not totp_limiter.hit(ip):
+    key = limit_key(request)
+    if not totp_limiter.hit(key):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many code attempts, try again later",
@@ -255,7 +255,7 @@ def totp_confirm(request: Request, body: CodeRequest) -> dict[str, bool]:
             detail="Invalid code",
         )
 
-    totp_limiter.reset(ip)
+    totp_limiter.reset(key)
 
     with get_session() as session:
         session.execute(update(Admin).values(totp_enabled=True))
