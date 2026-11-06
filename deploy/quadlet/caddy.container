@@ -12,7 +12,11 @@ Network=wediga.network
 Volume=/home/web/wediga-dev/Caddyfile:/etc/caddy/Caddyfile:ro
 Volume=caddy-data.volume:/data
 NoNewPrivileges=true
+# Caddy opens no privileged port itself, they come from caddy.socket. The
+# official image sets this capability on /usr/bin/caddy, though, and the kernel
+# refuses to start a program whose file capabilities the container lacks.
 DropCapability=ALL
+AddCapability=CAP_NET_BIND_SERVICE
 
 [Service]
 Restart=always
