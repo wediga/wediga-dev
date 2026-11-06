@@ -1,0 +1,18 @@
+[Unit]
+Description=Public ports of Caddy
+
+# systemd opens the ports and hands them to caddy.service, so connections keep
+# the visitor's address instead of passing through Podman's port forwarder.
+# Caddy finds the sockets only by their position, counted from fd 3, so the
+# order below must match the fd/ and fdgram/ binds in the Caddyfile.
+[Socket]
+BindIPv6Only=both
+# fd/3
+ListenStream=[::]:80
+# fd/4
+ListenStream=[::]:443
+# fdgram/5
+ListenDatagram=[::]:443
+
+[Install]
+WantedBy=sockets.target

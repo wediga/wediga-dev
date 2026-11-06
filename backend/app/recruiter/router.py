@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.auth.csrf import require_csrf
 from app.auth.dependencies import require_admin
-from app.auth.ratelimit import client_ip, redeem_limiter
+from app.auth.ratelimit import client_ip, limit_key, redeem_limiter
 from app.auth.sessions import renew
 from app.errors import not_found
 from app.recruiter import repository as repo
@@ -90,7 +90,7 @@ def redeem(body: RecruiterRedeem, request: Request) -> dict[str, bool]:
     view row is written with only the coarse origin. The per-IP rate limit caps
     request floods and view-count inflation from one source.
     """
-    if not redeem_limiter.hit(client_ip(request)):
+    if not redeem_limiter.hit(limit_key(request)):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many attempts, try again later",
