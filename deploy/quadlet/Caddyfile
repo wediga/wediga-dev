@@ -1,5 +1,25 @@
 {
 	email wedig.alexander@gmail.com
+
+	# Caddy does not open the public ports itself. systemd opens them through
+	# caddy.socket and hands them over in the order they are listed there.
+	default_bind fd/4 {
+		protocols h1 h2
+	}
+	default_bind fdgram/5 {
+		protocols h3
+	}
+
+	# The automatic redirect would need port 80 of its own, so the http://
+	# site below takes it over.
+	auto_https disable_redirects
+}
+
+http:// {
+	bind fd/3 {
+		protocols h1
+	}
+	redir https://{host}{uri} 308
 }
 
 wediga.dev {
@@ -20,4 +40,10 @@ cr-prediction.wediga.dev {
 # by the authentik server container.
 auth.wediga.dev {
 	reverse_proxy authentik-server:9000
+}
+
+# Placeholder until the company site of NuviraLabs is ready. It keeps the
+# certificate for the domain in place.
+nuviralabs.de, www.nuviralabs.de {
+	respond "NuviraLabs is coming soon."
 }

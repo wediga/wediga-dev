@@ -16,8 +16,9 @@ The commands in this file run as that user. After switching to it with `sudo`, r
 | Database dumps of the identity provider | `~/authentik/backups/` |
 | Command of the key for recruiter links (`create-recruiter-link.sh`) | `~/wediga-dev/create-recruiter-link.sh` |
 | Backup scripts, services and timers (`systemd/`) | `~/authentik/backup.sh`, `~/wediga-dev/backup.sh`, `~/.config/systemd/user/` |
+| Public ports of Caddy (`systemd/caddy.socket`) | `~/.config/systemd/user/` |
 
-Caddy is the only container that publishes host ports. Every other container is reached by name over an internal Podman network.
+No container publishes host ports. systemd opens ports 80 and 443 through `caddy.socket` and hands them to Caddy, and every other container is reached by name over an internal Podman network.
 
 ## What a deploy does
 
@@ -34,6 +35,33 @@ After a change to the Caddyfile:
 ```
 podman exec caddy caddy validate --config /etc/caddy/Caddyfile
 podman exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
+## Public ports and the visitor's address
+
+A port published by a rootless container passes through Podman's port forwarder, which replaces the visitor's address with Caddy's own address on the internal network. The login limiter of the backend would then count every visitor as one. That is why `caddy.socket` opens the ports instead and Caddy takes them over when it starts, so it sees the real address and passes it on in `X-Forwarded-For`. Caddy finds the sockets only by their position, so the order in `caddy.socket` must match the `fd/` and `fdgram/` binds in the Caddyfile.
+
+The deploy does not install the socket unit. Install it once, with Caddy stopped, because the socket and the old published ports cannot hold 80 and 443 at the same time:
+
+```
+cp caddy.socket ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user stop caddy.service
+systemctl --user enable --now caddy.socket
+systemctl --user start caddy.service
+```
+
+HTTP/3 runs over 443/udp, which the host firewall has to let through as well. That is a one-time `sudo ufw allow 443/udp` by an admin account, because the user running the containers has no sudo.
+
+`podman exec caddy netstat -tn` then shows the visitors' addresses and not the `10.89.0.x` of the internal network.
+
+To go back to published ports, revert the change in `caddy.container` and the Caddyfile, let the deploy copy them and then run:
+
+```
+systemctl --user daemon-reload
+systemctl --user stop caddy.service caddy.socket
+systemctl --user disable caddy.socket
+systemctl --user start caddy.service
 ```
 
 ## Changing the identity provider's setup
