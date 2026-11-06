@@ -53,7 +53,7 @@ systemctl --user start caddy.service
 
 HTTP/3 runs over 443/udp, which the host firewall has to let through as well. That is a one-time `sudo ufw allow 443/udp` by an admin account, because the user running the containers has no sudo.
 
-`podman exec caddy netstat -tn` then shows the visitors' addresses and not the `10.89.0.x` of the internal network.
+The connections belong to the host's network, where systemd opened the sockets, and not to the container's, so `netstat` inside Caddy shows none of them. On the host, `ss -tn state established '( sport = :443 )'` lists them with the visitors' addresses.
 
 To go back to published ports, revert the change in `caddy.container` and the Caddyfile, let the deploy copy them and then run:
 
