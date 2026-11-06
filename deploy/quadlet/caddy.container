@@ -3,7 +3,7 @@ Description=Caddy reverse proxy for wediga.dev
 After=frontend.service
 
 [Container]
-Image=docker.io/library/caddy:2@sha256:af5fdcd76f2db5e4e974ee92f96ee8c0fc3edb55bd4ba5032547cbf3f65e486d
+Image=docker.io/library/caddy:2.11.7@sha256:04913b1da43339a40ad1ea87827d70a576ac5aa6cf674c6e24fdca675887533a
 ContainerName=caddy
 Network=wediga.network
 PublishPort=80:80
