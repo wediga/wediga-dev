@@ -42,8 +42,13 @@ auth.wediga.dev {
 	reverse_proxy authentik-server:9000
 }
 
-# Placeholder until the company site of NuviraLabs is ready. It keeps the
-# certificate for the domain in place.
-nuviralabs.de, www.nuviralabs.de {
-	respond "NuviraLabs is coming soon."
+# The company site of NuviraLabs lives in its own repository. Its frontend
+# joins the network nuviralabs, which Caddy shares, and the site uses the
+# domain without www as its address.
+nuviralabs.de {
+	reverse_proxy nuviralabs-frontend:3000
+}
+
+www.nuviralabs.de {
+	redir https://nuviralabs.de{uri} permanent
 }
