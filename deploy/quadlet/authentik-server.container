@@ -12,10 +12,12 @@ ContainerName=authentik-server
 Exec=server
 
 # wediga.network is where Caddy reaches the server on port 9000,
-# authentik.network is where the server reaches its database. No host port is
-# published.
+# authentik.network is where the server reaches its database.
 Network=wediga.network
 Network=authentik.network
+# The port polaris assigns, so its Caddy reaches the server. Only on loopback,
+# the server is never reachable from outside except through Caddy.
+PublishPort=127.0.0.1:8102:9000
 
 # Secret key and database password come from a file that only exists on the
 # server.

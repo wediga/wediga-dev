@@ -18,7 +18,7 @@ The commands in this file run as that user. After switching to it with `sudo`, r
 | Backup scripts, services and timers (`systemd/`) | `~/authentik/backup.sh`, `~/wediga-dev/backup.sh`, `~/.config/systemd/user/` |
 | Public ports of Caddy (`systemd/caddy.socket`) | `~/.config/systemd/user/` |
 
-No container publishes host ports. systemd opens ports 80 and 443 through `caddy.socket` and hands them to Caddy, and every other container is reached by name over an internal Podman network.
+systemd opens ports 80 and 443 through `caddy.socket` and hands them to Caddy, and Caddy reaches the other containers by name over an internal Podman network. The frontend and the authentik server also publish a port on `127.0.0.1` (8101 and 8102), because Caddy is moving to the repository `NuviraLabs/polaris`, which reaches every app only through such a port. ufw lets only 22, 80 and 443 in, so a port published by mistake on every address still stays closed to the internet.
 
 ## What a deploy does
 

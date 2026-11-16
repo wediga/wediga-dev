@@ -10,6 +10,9 @@ After=backend.service
 Image=ghcr.io/wediga/wediga-dev-frontend:main
 ContainerName=frontend
 Network=wediga.network
+# The port polaris assigns, so its Caddy reaches the frontend. Only on loopback,
+# the frontend is never reachable from outside except through Caddy.
+PublishPort=127.0.0.1:8101:3000
 # Reaches the backend by name over the internal network.
 Environment=BACKEND_URL=http://backend:8000
 # Hardening: the standalone server only writes to /tmp and its on-disk cache,

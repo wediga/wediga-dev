@@ -1,4 +1,4 @@
-"""The production units must reach PostgreSQL and no longer the SQLite volume."""
+"""The production units reach PostgreSQL and publish their entry points only on loopback."""
 
 from pathlib import Path
 
@@ -8,6 +8,12 @@ QUADLET_DIR = Path(__file__).resolve().parents[2] / "deploy/quadlet"
 DB_ENV_FILE = "EnvironmentFile=/home/web/wediga-dev/wediga-db.env"
 DB_SERVICE = "wediga-db.service"
 BACKEND_UNITS = ["backend.container", "backend-migrate.container"]
+# The ports polaris assigns, so its Caddy reaches each entry point on the
+# server's loopback address.
+PUBLISHED_PORTS = {
+    "frontend.container": "PublishPort=127.0.0.1:8101:3000",
+    "authentik-server.container": "PublishPort=127.0.0.1:8102:9000",
+}
 
 
 def unit_lines(name: str) -> list[str]:
@@ -29,6 +35,13 @@ def test_migration_runs_alembic_after_the_database() -> None:
     assert "Exec=alembic upgrade head" in lines
     assert f"Requires={DB_SERVICE}" in lines
     assert f"After={DB_SERVICE}" in lines
+
+
+@pytest.mark.parametrize(("name", "expected"), PUBLISHED_PORTS.items())
+def test_entry_point_is_published_only_on_loopback(name: str, expected: str) -> None:
+    published = [line for line in unit_lines(name) if line.startswith("PublishPort=")]
+
+    assert published == [expected]
 
 
 def test_database_counts_as_started_only_when_healthy() -> None:
