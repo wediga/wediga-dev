@@ -38,6 +38,8 @@ jobs:
               - 'deploy/authentik-test/*.py'
               - 'pyrightconfig.json'
               - 'deploy/quadlet/wediga-db.container'
+              - 'deploy/quadlet/frontend.container'
+              - 'deploy/quadlet/authentik-server.container'
               - '.github/workflows/ci.yml'
             frontend:
               - 'frontend/**'
