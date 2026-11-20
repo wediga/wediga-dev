@@ -14,6 +14,7 @@ The commands in this file run as that user. After switching to it with `sudo`, r
 | Secrets for the identity provider | `~/authentik/authentik.env`, `~/authentik/authentik-db.env` |
 | Setup of the identity provider (`authentik/blueprints/`) | `~/authentik/blueprints/` |
 | Database dumps of the identity provider | `~/authentik/backups/` |
+| Deploy script (`deploy.sh`) | `~/wediga-dev/deploy.sh` |
 | Command of the key for recruiter links (`create-recruiter-link.sh`) | `~/wediga-dev/create-recruiter-link.sh` |
 | Backup scripts, services and timers (`systemd/`) | `~/authentik/backup.sh`, `~/wediga-dev/backup.sh`, `~/.config/systemd/user/` |
 
@@ -23,11 +24,20 @@ Caddy, the routes and the public ports 80 and 443 belong to the repository `Nuvi
 
 A push to `main` builds both app images, scans them and, if the scan passes, triggers the deploy script on the server. The script
 
-1. downloads the Quadlet units and the identity provider's setup file from `main`,
+1. downloads the Quadlet units, the identity provider's setup file and itself from that commit, and stops before it replaces anything if one download fails,
 2. pins the app units to the images of that commit,
-3. restarts `backend-migrate`, which applies new database migrations with `alembic upgrade head`, and then the backend and the frontend.
+3. restarts `backend-migrate`, which applies new database migrations with `alembic upgrade head`, and then the backend and the frontend,
+4. deletes every other image of the backend and the frontend and replaces itself with the version from the commit.
 
 It restarts neither the identity provider nor the app's database (`wediga-db`). Both are deliberate, so a routine deploy of the app cannot take the login or the data down.
+
+Every deploy replaces the script, so it is installed by hand only once:
+
+```
+curl -fsSL https://raw.githubusercontent.com/wediga/wediga-dev/main/deploy/deploy.sh -o ~/wediga-dev/deploy.sh && chmod 700 ~/wediga-dev/deploy.sh
+```
+
+The line of the deploy key in `~/.ssh/authorized_keys` forces it with `command="/home/web/wediga-dev/deploy.sh"`.
 
 ## Changing the identity provider's setup
 
