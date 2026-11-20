@@ -36,6 +36,7 @@ jobs:
               - 'backend/**'
               - 'deploy/Dockerfile.backend'
               - 'deploy/authentik-test/*.py'
+              - 'deploy/deploy.sh'
               - 'pyrightconfig.json'
               - 'deploy/quadlet/wediga-db.container'
               - 'deploy/quadlet/frontend.container'
