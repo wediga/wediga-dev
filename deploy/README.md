@@ -1,6 +1,6 @@
 # Running it on the server
 
-Everything on the server runs as rootless Podman containers under one unprivileged user, started by systemd through Quadlet units. This file is the operating manual: where things live, how a deploy works and what has to be done by hand.
+Everything this repository puts on the server runs as rootless Podman containers under one unprivileged user, started by systemd through Quadlet units. This file is the operating manual: where things live, how a deploy works and what has to be done by hand.
 
 The commands in this file run as that user. After switching to it with `sudo`, run `export XDG_RUNTIME_DIR=/run/user/$(id -u)` once, because `sudo` does not set it and `systemctl --user` cannot reach the user's systemd without it.
 
@@ -9,60 +9,25 @@ The commands in this file run as that user. After switching to it with `sudo`, r
 | What | Where on the server |
 |---|---|
 | Quadlet units (`quadlet/*.container`, `*.volume`, `*.network`) | `~/.config/containers/systemd/` |
-| Caddyfile, the app's `.env` and the database connection `wediga-db.env` | `~/wediga-dev/` |
+| The app's `.env` and the database connection `wediga-db.env` | `~/wediga-dev/` |
 | Database dumps of the app | `~/wediga-dev/backups/` |
 | Secrets for the identity provider | `~/authentik/authentik.env`, `~/authentik/authentik-db.env` |
 | Setup of the identity provider (`authentik/blueprints/`) | `~/authentik/blueprints/` |
 | Database dumps of the identity provider | `~/authentik/backups/` |
 | Command of the key for recruiter links (`create-recruiter-link.sh`) | `~/wediga-dev/create-recruiter-link.sh` |
 | Backup scripts, services and timers (`systemd/`) | `~/authentik/backup.sh`, `~/wediga-dev/backup.sh`, `~/.config/systemd/user/` |
-| Public ports of Caddy (`systemd/caddy.socket`) | `~/.config/systemd/user/` |
 
-systemd opens ports 80 and 443 through `caddy.socket` and hands them to Caddy, and Caddy reaches the other containers by name over an internal Podman network. The frontend and the authentik server also publish a port on `127.0.0.1` (8101 and 8102), because Caddy is moving to the repository `NuviraLabs/polaris`, which reaches every app only through such a port. ufw lets only 22, 80 and 443 in, so a port published by mistake on every address still stays closed to the internet.
+Caddy, the routes and the public ports 80 and 443 belong to the repository `NuviraLabs/polaris` and run under a user of their own. Caddy reaches the app only through ports on `127.0.0.1` that polaris assigns, so the frontend publishes 8101 and the authentik server 8102. ufw lets only 22, 80 and 443 in, so a port published by mistake on every address still stays closed to the internet.
 
 ## What a deploy does
 
 A push to `main` builds both app images, scans them and, if the scan passes, triggers the deploy script on the server. The script
 
-1. downloads the Quadlet units, the Caddyfile and the identity provider's setup file from `main`,
+1. downloads the Quadlet units and the identity provider's setup file from `main`,
 2. pins the app units to the images of that commit,
 3. restarts `backend-migrate`, which applies new database migrations with `alembic upgrade head`, and then the backend and the frontend.
 
-It does not reload Caddy and it restarts neither the identity provider nor the app's database (`wediga-db`). All of this is deliberate, so a routine deploy of the app cannot take the login, the proxy or the data down.
-
-After a change to the Caddyfile:
-
-```
-podman exec caddy caddy validate --config /etc/caddy/Caddyfile
-podman exec caddy caddy reload --config /etc/caddy/Caddyfile
-```
-
-## Public ports and the visitor's address
-
-A port published by a rootless container passes through Podman's port forwarder, which replaces the visitor's address with Caddy's own address on the internal network. The login limiter of the backend would then count every visitor as one. That is why `caddy.socket` opens the ports instead and Caddy takes them over when it starts, so it sees the real address and passes it on in `X-Forwarded-For`. Caddy finds the sockets only by their position, so the order in `caddy.socket` must match the `fd/` and `fdgram/` binds in the Caddyfile.
-
-The deploy does not install the socket unit. Install it once, with Caddy stopped, because the socket and the old published ports cannot hold 80 and 443 at the same time:
-
-```
-cp caddy.socket ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user stop caddy.service
-systemctl --user enable --now caddy.socket
-systemctl --user start caddy.service
-```
-
-HTTP/3 runs over 443/udp, which the host firewall has to let through as well. That is a one-time `sudo ufw allow 443/udp` by an admin account, because the user running the containers has no sudo.
-
-The connections belong to the host's network, where systemd opened the sockets, and not to the container's, so `netstat` inside Caddy shows none of them. On the host, `ss -tn state established '( sport = :443 )'` lists them with the visitors' addresses.
-
-To go back to published ports, revert the change in `caddy.container` and the Caddyfile, let the deploy copy them and then run:
-
-```
-systemctl --user daemon-reload
-systemctl --user stop caddy.service caddy.socket
-systemctl --user disable caddy.socket
-systemctl --user start caddy.service
-```
+It restarts neither the identity provider nor the app's database (`wediga-db`). Both are deliberate, so a routine deploy of the app cannot take the login or the data down.
 
 ## Changing the identity provider's setup
 
