@@ -11,7 +11,7 @@ Image=ghcr.io/goauthentik/server:2026.8.5@sha256:602227a86455d6772e3d16b7d852713
 ContainerName=authentik-server
 Exec=server
 
-# wediga.network is where Caddy reaches the server on port 9000,
+# wediga.network is where the backend reaches the server on port 9000,
 # authentik.network is where the server reaches its database.
 Network=wediga.network
 Network=authentik.network
