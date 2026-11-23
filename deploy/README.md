@@ -18,7 +18,7 @@ The commands in this file run as that user. After switching to it with `sudo`, r
 | Command of the key for recruiter links (`create-recruiter-link.sh`) | `~/wediga-dev/create-recruiter-link.sh` |
 | Backup scripts, services and timers (`systemd/`) | `~/authentik/backup.sh`, `~/wediga-dev/backup.sh`, `~/.config/systemd/user/` |
 
-Caddy, the routes and the public ports 80 and 443 belong to the repository `NuviraLabs/polaris` and run under a user of their own. Caddy reaches the app only through ports on `127.0.0.1` that polaris assigns, so the frontend publishes 8101 and the authentik server 8102. ufw lets only 22, 80 and 443 in, so a port published by mistake on every address still stays closed to the internet.
+Caddy, the routes and the public ports 80 and 443 belong to the repository `NuviraLabs/polaris` and run under a user of their own. Caddy reaches the app only through ports on `127.0.0.1` that polaris assigns, so the frontend publishes 8101 and the authentik server 8102. ufw lets only 22, 80, 443 and the VPN on 51820/udp in, so a port published by mistake on every address still stays closed to the internet.
 
 ## What a deploy does
 
